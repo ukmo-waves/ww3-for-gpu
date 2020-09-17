@@ -12,7 +12,7 @@ module load pgi
 
 ## Change directory to where job was submitted:
 cd ${PBS_O_WORKDIR}
-
+mkdir -p out/
 ## link in the correct *.dev input files:
 ln -sf inp/ww3_grid.nml ./
 
