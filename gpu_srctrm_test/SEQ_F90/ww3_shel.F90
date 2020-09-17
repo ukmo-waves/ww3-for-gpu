@@ -321,6 +321,7 @@
                              FLAGSTIDE(4), FLH(-7:8), FLGDAS(3),       &
                              FLLST_ALL(-7:8)
       LOGICAL             :: DEBUG_NCC = .FALSE.
+      LOGICAL             :: OMPBOOL = .FALSE.
 !
 !/ ------------------------------------------------------------------- /
 !/
@@ -892,7 +893,12 @@
         READ (NDSI,'(A)') COMSTR
         IF (COMSTR.EQ.' ') COMSTR = '$'
         IF ( IAPROC .EQ. NAPOUT ) WRITE (NDSO,901) COMSTR
- 
+        
+        #if defined _OPENMP
+            OMPBOOL = .TRUE.
+        #endif
+        
+        IF ( IAPROC .EQ. NAPOUT ) WRITE (NDSO,902) OMPBOOL 
 ! 2.1 forcing flags
  
         DO J=JFIRST, 7
@@ -1972,6 +1978,7 @@
   900 FORMAT (/15X,'      *** WAVEWATCH III Program shell ***      '/ &
                15X,'==============================================='/)
   901 FORMAT ( '  Comment character is ''',A,''''/)
+  902 FORMAT ( '  OpenMP is defined: ',L1,'.'/)
 !
   920 FORMAT (/'  Input fields : '/                                   &
                ' --------------------------------------------------')
