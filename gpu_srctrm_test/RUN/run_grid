@@ -17,6 +17,7 @@ mkdir -p out/
 ln -sf inp/ww3_grid.nml ./
 
 ## run the ww3_grid program:
+../OMP_F90/ww3_grid
 ../SEQ_F90/ww3_grid
 
 mv mod_def.ww3 out/
