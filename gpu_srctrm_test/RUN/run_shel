@@ -1,23 +1,25 @@
 #!/bin/bash
-## The following comment lines are PBS resour
-#PBS -q shared
+## The following comment lines are PBS resource requests:
+#PBS -l select=1:ncpus=1:ngpus=1
+#PBS -q pascalq
 #PBS -l walltime=120
 #PBS -e out/run_shel.err
 #PBS -o out/run_shel.out
 
-# abort on error:
-set -eu 
+set -eu
 
-# Go to directory:
-cd ${PBS_O_WORKDIR}
+module load pgi
+module load cuda10.1/toolkit/10.1.243
 
-# link in the correct *.dev input files
+## Change directory to where job was submitted:
+cd ${PBS_O_WORKDIR:-.}
+
+## link in the correct input files:
 ln -sf inp/ww3_shel.inp ./
-mv out/mod_def.ww3 ./
+ln -sf out/mod_def.ww3 ./
 
-# export OMP_NUM_THREADS=4
-
-# run the ww3_grid program
-# /home/d03/lsampson/GPU_Hacka/OMP_F90/ww3_shel
-/home/d03/lsampson/GPU_Hacka/SEQ_F90/ww3_shel
+#export OMP_NUM_THREADS=4
+## run the ww3_shel program:
+../SEQ_F90/ww3_shel
+rm mod_def.ww3
 mv *.ww3 out/

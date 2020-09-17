@@ -1,20 +1,22 @@
 #!/bin/bash
 ## The following comment lines are PBS resource requests:
-#PBS -q shared
+#PBS -q pascalq
+#PBS -l ncpus=1
 #PBS -l walltime=120
 #PBS -e out/run_grid.err
 #PBS -o out/run_grid.out
 
-# abort on error:
-set -eu 
+set -eu
 
-# Go to directory:
+module load pgi
+
+## Change directory to where job was submitted:
 cd ${PBS_O_WORKDIR}
 
-# link in the correct *.dev input files
+## link in the correct *.dev input files:
 ln -sf inp/ww3_grid.nml ./
 
-# run the ww3_grid program:
-/home/d03/lsampson/GPU_Hacka/SEQ_F90/ww3_grid
+## run the ww3_grid program:
+../SEQ_F90/ww3_grid
 
 mv mod_def.ww3 out/
