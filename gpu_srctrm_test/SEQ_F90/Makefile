@@ -1,6 +1,6 @@
 
 FC=pgf90
-FFLAGS= -module obj/ -O2 -g 
+FFLAGS= -module obj/ -O2
 LIBS=
 
 .SUFFIXES: .F90 .o 
@@ -49,8 +49,7 @@ clean:
 	rm -f ww3_grid ww3_shel *.mod *.o obj/* 
 
 ## Specific dependencies of each module (to make building more robust 
-## or enable parallel building), we could specify each dependency
-## below, e.g.:
+## or enable parallel building):
 
 constants.o : constants.F90 w3macros.h
 

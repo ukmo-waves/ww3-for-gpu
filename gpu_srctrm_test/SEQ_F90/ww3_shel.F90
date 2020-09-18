@@ -374,6 +374,9 @@
       IAPROC = 1
 !
  
+#if defined _OPENMP
+      OMPBOOL = .TRUE.
+#endif
 !
  
 !
@@ -893,10 +896,6 @@
         READ (NDSI,'(A)') COMSTR
         IF (COMSTR.EQ.' ') COMSTR = '$'
         IF ( IAPROC .EQ. NAPOUT ) WRITE (NDSO,901) COMSTR
-        
-        #if defined _OPENMP
-            OMPBOOL = .TRUE.
-        #endif
         
         IF ( IAPROC .EQ. NAPOUT ) WRITE (NDSO,902) OMPBOOL 
 ! 2.1 forcing flags
