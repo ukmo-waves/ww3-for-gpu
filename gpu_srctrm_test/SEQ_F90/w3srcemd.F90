@@ -466,18 +466,22 @@
 !XP     = 0.15
 !FACP   = XP / PI * 0.62E-3 * TPI**4 / GRAV**2
 !
+!$ACC KERNELS
+!$ACC LOOP INDEPENDENT
       DO IK=1, NK
         DAM(1+(IK-1)*NTH) = FACP / ( SIG(IK) * WN1(IK)**3 )
         WN2(1+(IK-1)*NTH) = WN1(IK)
-        END DO
+      END DO
 !
+!$ACC LOOP INDEPENDENT
       DO IK=1, NK
         IS0    = (IK-1)*NTH
         DO ITH=2, NTH
           DAM(ITH+IS0) = DAM(1+IS0)
           WN2(ITH+IS0) = WN2(1+IS0)
-          END DO
         END DO
+      END DO
+!$ACC END KERNELS
 !
 ! 1.b Prepare dynamic time stepping
 !

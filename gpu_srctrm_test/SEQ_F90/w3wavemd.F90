@@ -443,6 +443,7 @@
 !
 ! 0.a Set pointers to data structure
 !
+            write(0,*)"WPG HERE -100"
       IF ( IOUTP  .NE. IMOD ) CALL W3SETO ( IMOD, NDSE, NDST )
       IF ( IGRID  .NE. IMOD ) CALL W3SETG ( IMOD, NDSE, NDST )
       IF ( IWDATA .NE. IMOD ) CALL W3SETW ( IMOD, NDSE, NDST )
@@ -672,6 +673,7 @@
         DTRES  = 0.
  
 !
+        write(0,*)"WPG HERE -9",IT0,NT ! CALLED
         DO IT=IT0, NT
 ! copy old values
 !
@@ -708,6 +710,7 @@
 !
  
           IF ( FLCUR  ) THEN
+            write(0,*)"WPG HERE -8" ! Not called
  
             CALL W3UCUR ( FLFRST )
  
@@ -735,8 +738,10 @@
  
           IF ( FLWIND ) THEN
             IF ( FLFRST ) ASF = 1.
+            write(0,*)"WPG HERE -8.1" ! CALLED
             CALL W3UWND ( FLFRST, VGX, VGY )
           ELSE IF ( FLFRST ) THEN
+            write(0,*)"WPG HERE -8.2"
             U10    = 0.01
             U10D   = 0.
             UST    = 0.05
@@ -759,12 +764,16 @@
  
  
 !
-          IF ( FLIWND .AND. LOCAL ) CALL W3UINI ( VA )
+          IF ( FLIWND .AND. LOCAL ) THEN
+            write(0,*)"WPG HERE -8.3"
+            CALL W3UINI ( VA )
+          ENDIF
 !
 ! 3.2 Update boundary conditions if boundary flag is true (FLBPI)
 !
  
           IF ( FLBPI .AND. LOCAL ) THEN
+            write(0,*)"WPG HERE -7"
 !
               DO
                 IF ( TBPIN(1) .EQ. -1 ) THEN
@@ -799,6 +808,7 @@
 !     Need to be run on output nodes too, to update MAPSTx
 !
           IF ( FLICE .AND. DTI0.NE.0. ) THEN
+            write(0,*)"WPG HERE -6"
 !
               IF ( TICE(1).GE.0 ) THEN
                   IF ( DTI0 .LT. 0. ) THEN
@@ -823,6 +833,7 @@
 ! 3.3.2 Update ice thickness
 !
           IF ( FLIC1 .AND. DTI10.NE.0. ) THEN
+            write(0,*)"WPG HERE -5"
 !
               IF ( TIC1(1).GE.0 ) THEN
                   IF ( DTI10 .LT. 0. ) THEN
@@ -855,6 +866,7 @@
 !
 !          write(740+IAPROC,*) 'TEST ARON', FLLEV, DTL0, TLEV(1), IDACT(5:5), DSEC21 ( TIME, TLN ), TIME, TLN
           IF ( FLLEV .AND. DTL0 .NE.0. ) THEN
+            write(0,*)"WPG HERE -4"
 !
               IF ( TLEV(1) .GE. 0 ) THEN
                   IF ( DTL0 .LT. 0. ) THEN
@@ -886,6 +898,7 @@
 ! 3.5 Update maps and derivatives.
 !
           IF ( FLMAP .AND. RGLGRD ) THEN
+            write(0,*)"WPG HERE -4.1" ! CALLED
               CALL W3UTRN ( TRNX, TRNY )
               CALL W3NMIN ( MAPSTA, FLAG0 )
               IF ( FLAG0 .AND. IAPROC.EQ.NAPERR ) WRITE (NDSE,1030) IMOD
@@ -893,6 +906,7 @@
           END IF
 !
           IF ( FLDDIR ) THEN
+            write(0,*)"WPG HERE -4.2"
             IF (GTYPE .NE. UNGTYPE) THEN
 !!Li          CALL W3DZXY(DW(1:NSEA),'m',DDDX,DDDY) !DEPTH (DW) GRADIENT
               IF( RGLGRD ) CALL W3DZXY(DW(1:UBOUND(DW,1)),'m',DDDX,DDDY)
@@ -915,6 +929,7 @@
  
 !
         IF ( FLSOU .and. LPDLIB) THEN
+            write(0,*)"WPG HERE -3"
 !
           D50=0.0002
           REFLEC(:)=0.
@@ -958,6 +973,7 @@
 !
                 IF ( FLOGRD(9,3).AND. UGDTUPDATE ) THEN
                   IF (FSTOTALIMP .eqv. .FALSE.) THEN
+            write(0,*)"WPG HERE -2"
                       NKCFL=NK
 !
                       DO JSEA=1, NSEAL
@@ -990,6 +1006,7 @@
           IF ( FLCTH .OR. FLCK ) THEN
               DO ITLOC=1, ITLOCH
 !
+            write(0,*)"WPG HERE -1"
                 DO JSEA=1, NSEAL
                   CALL INIT_GET_ISEA(ISEA, JSEA)
                   IX     = MAPSF(ISEA,1)
@@ -1040,6 +1057,7 @@
 !
 !!/OMPX/!$OMP DO SCHEDULE (DYNAMIC,1)
 !
+            write(0,*)"WPG HERE -1.1"
             DO ISPEC=1, NSPEC
               IF ( IAPPRO(ISPEC) .EQ. IAPROC ) THEN
                 IF (.NOT.LPDLIB .AND. RGLGRD) CALL W3GATH ( ISPEC, FIELD )
@@ -1087,6 +1105,7 @@
 ! 3.6.4 Intra-spectral part 2
 !
           IF ( FLCTH .OR. FLCK ) THEN
+            write(0,*)"WPG HERE 0"
               DO ITLOC=ITLOCH+1, NTLOC
 !
                 DO JSEA = 1, NSEAL
@@ -1127,8 +1146,9 @@
             REFLED(:)=0
             PSIC=0.
 !
+            write(0,*)"WPG HERE 1"
               DO JSEA=1, NSEAL
-                CALL INIT_GET_ISEA(ISEA, JSEA)
+                CALL INIT_GET_ISEA(ISEA, JSEA) ! Just does this:-  ISEA         = JSEA
                 IX     = MAPSF(ISEA,1)
                 IY     = MAPSF(ISEA,2)
                 DELA=1.

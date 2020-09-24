@@ -1,6 +1,6 @@
 
 FC=pgf90
-FFLAGS= -module obj/ -O2
+FFLAGS= -module obj/ -O2 -acc -ta=nvidia -Minfo=acc
 LIBS=
 
 .SUFFIXES: .F90 .o 
