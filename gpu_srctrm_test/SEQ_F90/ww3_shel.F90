@@ -325,6 +325,10 @@
                              FLLST_ALL(-7:8)
       LOGICAL             :: DEBUG_NCC = .FALSE.
       LOGICAL             :: OMPBOOL = .FALSE.
+
+      REAL(8)             :: sTime1, eTime1, T1, sTime2, eTime2, T2
+      CHARACTER(LEN=26)   :: S1, S2
+
 !
 !/ ------------------------------------------------------------------- /
 !/
@@ -1848,12 +1852,18 @@
 ! 7.b Run the wave model for the given interval
 !
       OPEN(NDTO, file='run_shel.time')
-      CALL PRINT_MY_TIME( "Wave model time step - W3SHEL", NDTO )
+!      CALL PRINT_MY_TIME( "Wave model time step - W3SHEL", NDTO )
+      CALL WAV_MY_WTIME(sTime1)
+
       TIME0  = TTIME
 !
       CALL W3WAVE ( 1, ODAT, TIME0                                    &
                   )
- 
+      CALL WAV_MY_WTIME(eTime1)
+      T1 = eTime1 - sTime1
+      S1 = 'W3SHEL calls W3WAVE -'
+
+      WRITE(NDTO,101) S1, T1  
 !
       ! The following lines prevents us from trying to read past the end
       ! of the files. This feature existed in v3.14.
@@ -1872,7 +1882,8 @@
 !
 ! 7.c Run data assimilation at ending time
 !
-      CALL PRINT_MY_TIME ( "Data assimilation time step - W3SHEL", NDTO )
+!      CALL PRINT_MY_TIME ( "Data assimilation time step - W3SHEL", NDTO )
+      CALL WAV_MY_WTIME(sTime2)
       DTTST  = DSEC21 ( TIME , TDN )
       IF ( DTTST .EQ. 0 ) THEN
         CALL STME21 ( TIME0 , DTME21 )
@@ -1895,6 +1906,11 @@
         END IF
       END IF
 !
+      CALL WAV_MY_WTIME(eTime2)
+      T2 = eTime2 - sTime2
+      S2 = 'W3SHEL calls W3WDAS -'
+
+      WRITE(NDTO,101) S2, T2  
 ! 7.e Check times
 !
  
@@ -1980,6 +1996,8 @@
  
 !
 ! Formats
+  101 FORMAT ('TIMESTAMP : ', A, F10.6)
+
 !
   900 FORMAT (/15X,'      *** WAVEWATCH III Program shell ***      '/ &
                15X,'==============================================='/)

@@ -371,7 +371,7 @@
 !/
       USE W3SERVMD
       USE W3TIMEMD
-      USE W3PARALL, ONLY : INIT_GET_ISEA, PRINT_MY_TIME
+      USE W3PARALL, ONLY : INIT_GET_ISEA, WAV_MY_WTIME
  
  
 !
@@ -430,12 +430,15 @@
       CHARACTER(LEN=23)       :: IDTIME
       INTEGER eIOBP
       INTEGER ITH_F
-!      INTEGER                 :: NDTO = 7
+
+!!LS  Newly added time varibles
+      REAL(8)                 :: sTime1, eTime1, T1, SIN4TOT, SPR4TOT, &
+                                 SIN4T, SPR4T
+      CHARACTER(LEN=30)       :: S1
+      CHARACTER(LEN=34)       :: SIN4S, SPR4S
 !
 !/
- 
- 
- 
+
 !/ ------------------------------------------------------------------- /
 ! 0.  Initializations
  
@@ -449,23 +452,20 @@
       IF ( IADATA .NE. IMOD ) CALL W3SETA ( IMOD, NDSE, NDST )
       IF ( IIDATA .NE. IMOD ) CALL W3SETI ( IMOD, NDSE, NDST )
  
- 
- 
- 
 !
       ALLOCATE(TAUWX(NSEAL), TAUWY(NSEAL))
 !
       IF ( PRESENT(STAMP) ) THEN
-          TSTAMP = STAMP
-        ELSE
-          TSTAMP = .TRUE.
-        END IF
+        TSTAMP = STAMP
+      ELSE
+        TSTAMP = .TRUE.
+      END IF
 !
       IF ( PRESENT(NO_OUT) ) THEN
-          SKIP_O = NO_OUT
-        ELSE
-          SKIP_O = .FALSE.
-        END IF
+        SKIP_O = NO_OUT
+      ELSE
+        SKIP_O = .FALSE.
+      END IF
 !
 ! 0.b Subroutine tracing
 !
@@ -482,14 +482,14 @@
       FLPFLD = .FALSE.
       DO J=1,NOGE(4)
         FLPFLD = FLPFLD .OR. FLOGRD(4,J) .OR. FLOGR2(4,J)
-        END DO
+      END DO
 !
       IF ( IAPROC .EQ. NAPLOG ) BACKSPACE ( NDSO )
 !
       IF ( FLCOLD ) THEN
-          DTDYN = 0.
-          FCUT  = SIG(NK) * TPIINV
-        END IF
+        DTDYN = 0.
+        FCUT  = SIG(NK) * TPIINV
+      END IF
 !
 !!Li  ALLOCATE ( FIELD(1-NY:NY*(NX+2)) )
       IF( RGLGRD .AND. .NOT. FLOMP ) ALLOCATE ( FIELD(1-NY:NY*(NX+2)) )
@@ -500,7 +500,7 @@
         FACX   =  1./(DERA * RADIUS)
       ELSE
         FACX   =  1.
-        END IF
+      END IF
 !
       TAUWX  = 0.
       TAUWY  = 0.
@@ -513,89 +513,89 @@
       DTTST  = DSEC21 ( TIME , TEND )
       FLZERO = DTTST .EQ. 0.
       IF ( DTTST .LT. 0. ) THEN
-          IF ( IAPROC .EQ. NAPERR ) WRITE (NDSE,1000)
-          CALL EXTCDE ( 1 )
-        END IF
+        IF ( IAPROC .EQ. NAPERR ) WRITE (NDSE,1000)
+        CALL EXTCDE ( 1 )
+      END IF
 !
 ! 1.b Water level time
 !
       IF ( FLLEV ) THEN
-          IF ( TLEV(1) .GE. 0. ) THEN
-              DTL0   = DSEC21 ( TLEV , TLN )
-            ELSE
-              DTL0   = 1.
-            END IF
-          IF ( DTL0 .LT. 0. ) THEN
-              IF ( IAPROC .EQ. NAPERR ) WRITE (NDSE,1001)
-              CALL EXTCDE ( 2 )
-            END IF
+        IF ( TLEV(1) .GE. 0. ) THEN
+          DTL0   = DSEC21 ( TLEV , TLN )
         ELSE
-          DTL0   = 0.
+          DTL0   = 1.
         END IF
+        IF ( DTL0 .LT. 0. ) THEN
+          IF ( IAPROC .EQ. NAPERR ) WRITE (NDSE,1001)
+          CALL EXTCDE ( 2 )
+        END IF
+      ELSE
+        DTL0   = 0.
+      END IF
 !
 ! 1.c Current interval
 !
       IF ( FLCUR ) THEN
-          DTTST1 = DSEC21 ( TC0 , TCN )
-          DTTST2 = DSEC21 ( TC0 , TIME )
-          DTTST3 = DSEC21 ( TEND , TCN )
-          IF ( DTTST1.LT.0. .OR. DTTST2.LT.0. .OR. DTTST3.LT.0. ) THEN
-              IF ( IAPROC .EQ. NAPERR ) WRITE (NDSE,1002)
-              CALL EXTCDE ( 3 )
-            END IF
-          IF ( DTTST2.EQ.0..AND. ITIME.EQ.0 ) THEN
-              IDACT(7:7) = 'F'
-              TOFRST = TIME
-            END IF
+        DTTST1 = DSEC21 ( TC0 , TCN )
+        DTTST2 = DSEC21 ( TC0 , TIME )
+        DTTST3 = DSEC21 ( TEND , TCN )
+        IF ( DTTST1.LT.0. .OR. DTTST2.LT.0. .OR. DTTST3.LT.0. ) THEN
+          IF ( IAPROC .EQ. NAPERR ) WRITE (NDSE,1002)
+          CALL EXTCDE ( 3 )
         END IF
+        IF ( DTTST2.EQ.0..AND. ITIME.EQ.0 ) THEN
+          IDACT(7:7) = 'F'
+          TOFRST = TIME
+        END IF
+      END IF
 !
 ! 1.d Wind interval
 !
       IF ( FLWIND ) THEN
-          DTTST1 = DSEC21 ( TW0 , TWN )
-          DTTST2 = DSEC21 ( TW0 , TIME )
-          DTTST3 = DSEC21 ( TEND , TWN )
-          IF ( DTTST1.LT.0. .OR. DTTST2.LT.0. .OR. DTTST3.LT.0. ) THEN
-              IF ( IAPROC .EQ. NAPERR ) WRITE (NDSE,1003)
-              CALL EXTCDE ( 4 )
-            END IF
-          IF ( DTTST2.EQ.0..AND. ITIME.EQ.0 ) THEN
-              IDACT(3:3) = 'F'
-              TOFRST = TIME
-            END IF
+        DTTST1 = DSEC21 ( TW0 , TWN )
+        DTTST2 = DSEC21 ( TW0 , TIME )
+        DTTST3 = DSEC21 ( TEND , TWN )
+        IF ( DTTST1.LT.0. .OR. DTTST2.LT.0. .OR. DTTST3.LT.0. ) THEN
+          IF ( IAPROC .EQ. NAPERR ) WRITE (NDSE,1003)
+          CALL EXTCDE ( 4 )
         END IF
+        IF ( DTTST2.EQ.0..AND. ITIME.EQ.0 ) THEN
+          IDACT(3:3) = 'F'
+          TOFRST = TIME
+        END IF
+      END IF
 !
 ! 1.e Ice concentration interval
 !
       IF ( FLICE ) THEN
-          IF ( TICE(1) .GE. 0 ) THEN
-              DTI0   = DSEC21 ( TICE , TIN )
-            ELSE
-              DTI0   = 1.
-            END IF
-          IF ( DTI0 .LT. 0. ) THEN
-              IF ( IAPROC .EQ. NAPERR ) WRITE (NDSE,1004)
-              CALL EXTCDE ( 5 )
-            END IF
+        IF ( TICE(1) .GE. 0 ) THEN
+          DTI0   = DSEC21 ( TICE , TIN )
         ELSE
-          DTI0   = 0.
+          DTI0   = 1.
         END IF
+        IF ( DTI0 .LT. 0. ) THEN
+            IF ( IAPROC .EQ. NAPERR ) WRITE (NDSE,1004)
+            CALL EXTCDE ( 5 )
+        END IF
+      ELSE
+        DTI0   = 0.
+      END IF
 !
 ! 1.e Ice thickness interval
 !
       IF ( FLIC1 ) THEN
-          IF ( TIC1(1) .GE. 0 ) THEN
-              DTI10   = DSEC21 ( TIC1 , TI1 )
-            ELSE
-              DTI10   = 1.
-            END IF
-          IF ( DTI10 .LT. 0. ) THEN
-              IF ( IAPROC .EQ. NAPERR ) WRITE (NDSE,1005)
-              CALL EXTCDE ( 5 )
-            END IF
+        IF ( TIC1(1) .GE. 0 ) THEN
+          DTI10   = DSEC21 ( TIC1 , TI1 )
         ELSE
-          DTI10   = 0.
+          DTI10   = 1.
         END IF
+        IF ( DTI10 .LT. 0. ) THEN
+          IF ( IAPROC .EQ. NAPERR ) WRITE (NDSE,1005)
+          CALL EXTCDE ( 5 )
+        END IF
+      ELSE
+        DTI10   = 0.
+      END IF
 !
 ! 1.e Ice floe interval
 !
@@ -603,6 +603,7 @@
 !     time and get corresponding time step.
 !
       FLFRST = .TRUE.
+!GPUNotes loop over seapoints
       DO
 !      DO JSEA = 1, NSEAL
 !        DO IS = 1, NSPEC
@@ -626,10 +627,10 @@
 !     from W3SIC3MD module. ------------------------------------------ /
 !     Note: "IF FLFRST" can be added for efficiency, but testing req'd
  
-         JSEA=1 ! no switch (intentional)
+        JSEA=1 ! no switch (intentional)
  
  
-           ISEA   = JSEA
+        ISEA   = JSEA
  
 ! 2.b.1 Using Cheng method: requires stationary/uniform rheology.
 !       However, ice thickness may be input by either method
@@ -641,27 +642,27 @@
  
 !
         IF ( TOFRST(1) .GT. 0 ) THEN
-            DTTST  = DSEC21 ( TEND , TOFRST )
-          ELSE
-            DTTST  = 0.
-          ENDIF
+          DTTST  = DSEC21 ( TEND , TOFRST )
+        ELSE
+          DTTST  = 0.
+        ENDIF
 !
         IF ( DTTST.GE.0. ) THEN
-            TCALC = TEND
-          ELSE
-            TCALC = TOFRST
-          END IF
+          TCALC = TEND
+        ELSE
+          TCALC = TOFRST
+        END IF
 !
         DTTST  = DSEC21 ( TIME , TCALC )
         NT     = 1 + INT ( DTTST / DTMAX - 0.001 )
         DTGA   = DTTST / REAL(NT)
         IF ( DTTST .EQ. 0. ) THEN
-            IT0    = 0
-            IF ( .NOT.FLZERO ) ITIME  = ITIME - 1
-            NT     = 0
-          ELSE
-            IT0    = 1
-          END IF
+          IT0    = 0
+          IF ( .NOT.FLZERO ) ITIME  = ITIME - 1
+          NT     = 0
+        ELSE
+          IT0    = 1
+        END IF
  
  
 !
@@ -672,6 +673,7 @@
         DTRES  = 0.
  
 !
+!GPUNotes loop over timesetps
         DO IT=IT0, NT
 ! copy old values
 !
@@ -684,24 +686,24 @@
 !
  
           IF ( TSTAMP .AND. SCREEN.NE.NDSO .AND. IAPROC.EQ.NAPOUT ) THEN
-              CALL WWTIME ( STTIME )
-              CALL STME21 ( TIME , IDTIME )
-              WRITE (SCREEN,950) IDTIME, STTIME
-            END IF
+            CALL WWTIME ( STTIME )
+            CALL STME21 ( TIME , IDTIME )
+            WRITE (SCREEN,950) IDTIME, STTIME
+          END IF
  
  
 !
           VGX = 0.
           VGY = 0.
           IF(INFLAGS1(8)) THEN
-              DTTST1 = DSEC21 ( TIME, TGN )
-              DTTST2 = DSEC21 ( TG0, TGN )
-              FAC    = DTTST1 / MAX ( 1. , DTTST2 )
-              VGX    = (FAC*GA0+(1.-FAC)*GAN) *                       &
-                            COS(FAC*GD0+(1.-FAC)*GDN)
-              VGY    = (FAC*GA0+(1.-FAC)*GAN) *                       &
-                            SIN(FAC*GD0+(1.-FAC)*GDN)
-            END IF
+            DTTST1 = DSEC21 ( TIME, TGN )
+            DTTST2 = DSEC21 ( TG0, TGN )
+            FAC    = DTTST1 / MAX ( 1. , DTTST2 )
+            VGX    = (FAC*GA0+(1.-FAC)*GAN) *                       &
+                          COS(FAC*GD0+(1.-FAC)*GDN)
+            VGY    = (FAC*GA0+(1.-FAC)*GAN) *                       &
+                          SIN(FAC*GD0+(1.-FAC)*GDN)
+          END IF
 !
 ! 3.1 Interpolate winds and currents.
 !     (Initialize wave fields with winds)
@@ -713,8 +715,8 @@
  
             IF (GTYPE .NE. UNGTYPE) THEN
               IF( RGLGRD ) THEN
-              CALL W3DZXY(CX(1:UBOUND(CX,1)),'m/s',DCXDX, DCXDY) !CX GRADIENT
-              CALL W3DZXY(CY(1:UBOUND(CY,1)),'m/s',DCYDX, DCYDY) !CY GRADIENT
+                CALL W3DZXY(CX(1:UBOUND(CX,1)),'m/s',DCXDX, DCXDY) !CX GRADIENT
+                CALL W3DZXY(CY(1:UBOUND(CY,1)),'m/s',DCYDX, DCYDY) !CY GRADIENT
               ENDIF
             ELSE
               CALL UG_GRADIENTS(CX, DCXDX, DCXDY)
@@ -725,12 +727,12 @@
             END IF
  
 !
-            ELSE IF ( FLFRST ) THEN
-              UGDTUPDATE=.TRUE.
-              CFLXYMAX = 0.
-              CX = 0.
-              CY = 0.
-              END IF ! FLCUR
+          ELSE IF ( FLFRST ) THEN
+            UGDTUPDATE=.TRUE.
+            CFLXYMAX = 0.
+            CX = 0.
+            CY = 0.
+          END IF ! FLCUR
 !
  
           IF ( FLWIND ) THEN
@@ -766,27 +768,27 @@
  
           IF ( FLBPI .AND. LOCAL ) THEN
 !
-              DO
-                IF ( TBPIN(1) .EQ. -1 ) THEN
-                    READBC = .TRUE.
-                    IDACT(1:1) = 'F'
-                ELSE
-                    READBC = DSEC21(TIME,TBPIN).LT.0.
-                    IF (READBC.AND.IDACT(1:1).EQ.' ') IDACT(1:1) = 'X'
-                END IF
-                FLACT  = READBC .OR. FLACT
+            DO
+              IF ( TBPIN(1) .EQ. -1 ) THEN
+                READBC = .TRUE.
+                IDACT(1:1) = 'F'
+              ELSE
+                READBC = DSEC21(TIME,TBPIN).LT.0.
+                IF (READBC.AND.IDACT(1:1).EQ.' ') IDACT(1:1) = 'X'
+              END IF
+              FLACT  = READBC .OR. FLACT
  
-                IF ( READBC ) THEN
-                  CALL W3IOBC ( 'READ', NDS(9), TBPI0, TBPIN,       &
-                                ITEST, IMOD )
-                  IF ( ITEST .NE. 1 ) CALL W3UBPT
-                ELSE
-                  ITEST  = 0
-                END IF
+              IF ( READBC ) THEN
+                CALL W3IOBC ( 'READ', NDS(9), TBPI0, TBPIN,       &
+                            ITEST, IMOD )
+                IF ( ITEST .NE. 1 ) CALL W3UBPT
+              ELSE
+                ITEST  = 0
+              END IF
                 IF ( ITEST .LT. 0 ) IDACT(1:1) = 'L'
                 IF ( ITEST .GT. 0 ) IDACT(1:1) = ' '
                 IF ( .NOT. (READBC.AND.FLBPI) ) EXIT
-                END DO
+            END DO
  
           END IF
  
@@ -800,23 +802,23 @@
 !
           IF ( FLICE .AND. DTI0.NE.0. ) THEN
 !
-              IF ( TICE(1).GE.0 ) THEN
-                  IF ( DTI0 .LT. 0. ) THEN
-                      IDACT(9:9) = 'B'
-                    ELSE
-                      DTTST  = DSEC21 ( TIME, TIN )
-                      IF ( DTTST .LE. 0.5*DTI0 ) IDACT(9:9) = 'U'
-                    END IF
-                ELSE
-                  IDACT(9:9) = 'I'
-                END IF
-!
-              IF ( IDACT(9:9).NE.' ' ) THEN
-                  CALL W3UICE ( VA, VA )
-                  DTI0   = 0.
-                  FLACT  = .TRUE.
-                  FLMAP  = .TRUE.
+            IF ( TICE(1).GE.0 ) THEN
+              IF ( DTI0 .LT. 0. ) THEN
+                IDACT(9:9) = 'B'
+              ELSE
+                DTTST  = DSEC21 ( TIME, TIN )
+                IF ( DTTST .LE. 0.5*DTI0 ) IDACT(9:9) = 'U'
               END IF
+            ELSE
+              IDACT(9:9) = 'I'
+            END IF
+!
+            IF ( IDACT(9:9).NE.' ' ) THEN
+              CALL W3UICE ( VA, VA )
+              DTI0   = 0.
+              FLACT  = .TRUE.
+              FLMAP  = .TRUE.
+            END IF
           END IF
  
 !
@@ -824,26 +826,26 @@
 !
           IF ( FLIC1 .AND. DTI10.NE.0. ) THEN
 !
-              IF ( TIC1(1).GE.0 ) THEN
-                  IF ( DTI10 .LT. 0. ) THEN
-                      IDACT(11:11) = 'B'
-                    ELSE
-                      DTTST  = DSEC21 ( TIME, TI1 )
-                      IF ( DTTST .LE. 0.5*DTI10 ) IDACT(11:11) = 'U'
-                    END IF
-                ELSE
-                  IDACT(11:11) = 'I'
-                END IF
+            IF ( TIC1(1).GE.0 ) THEN
+              IF ( DTI10 .LT. 0. ) THEN
+                IDACT(11:11) = 'B'
+              ELSE
+                DTTST  = DSEC21 ( TIME, TI1 )
+                IF ( DTTST .LE. 0.5*DTI10 ) IDACT(11:11) = 'U'
+              END IF
+            ELSE
+              IDACT(11:11) = 'I'
+            END IF
  
 !
-              IF ( IDACT(11:11).NE.' ' ) THEN
-                  CALL W3UIC1 ( FLFRST )
-                  DTI10   = 0.
-                  FLACT  = .TRUE.
-                  FLMAP  = .TRUE.
-                END IF
-!
+            IF ( IDACT(11:11).NE.' ' ) THEN
+              CALL W3UIC1 ( FLFRST )
+              DTI10   = 0.
+              FLACT  = .TRUE.
+              FLMAP  = .TRUE.
             END IF
+!
+          END IF
  
  
 !
@@ -856,29 +858,29 @@
 !          write(740+IAPROC,*) 'TEST ARON', FLLEV, DTL0, TLEV(1), IDACT(5:5), DSEC21 ( TIME, TLN ), TIME, TLN
           IF ( FLLEV .AND. DTL0 .NE.0. ) THEN
 !
-              IF ( TLEV(1) .GE. 0 ) THEN
-                  IF ( DTL0 .LT. 0. ) THEN
-                      IDACT(5:5) = 'B'
-                    ELSE
-                      DTTST  = DSEC21 ( TIME, TLN )
-                      IF ( DTTST .LE. 0.5*DTL0 ) IDACT(5:5) = 'U'
-                    END IF
-                ELSE
-                  IDACT(5:5) = 'I'
-                END IF
-!
-              IF ( IDACT(5:5).NE.' ' ) THEN
- 
-                  CALL W3ULEV ( VA, VA )
- 
-                  UGDTUPDATE=.TRUE.
-                  CFLXYMAX = 0.
-                  DTL0   = 0.
-                  FLACT  = .TRUE.
-                  FLMAP  = .TRUE.
-                  FLDDIR = FLDDIR .OR.  FLCTH .OR. FSREFRACTION        &
-                        .OR. FLCK .OR. FSFREQSHIFT
+            IF ( TLEV(1) .GE. 0 ) THEN
+              IF ( DTL0 .LT. 0. ) THEN
+                IDACT(5:5) = 'B'
+              ELSE
+                DTTST  = DSEC21 ( TIME, TLN )
+                IF ( DTTST .LE. 0.5*DTL0 ) IDACT(5:5) = 'U'
               END IF
+            ELSE
+              IDACT(5:5) = 'I'
+            END IF
+!
+            IF ( IDACT(5:5).NE.' ' ) THEN
+ 
+              CALL W3ULEV ( VA, VA )
+ 
+              UGDTUPDATE=.TRUE.
+              CFLXYMAX = 0.
+              DTL0   = 0.
+              FLACT  = .TRUE.
+              FLMAP  = .TRUE.
+              FLDDIR = FLDDIR .OR.  FLCTH .OR. FSREFRACTION        &
+                      .OR. FLCK .OR. FSFREQSHIFT
+            END IF
           END IF
  
  
@@ -886,10 +888,10 @@
 ! 3.5 Update maps and derivatives.
 !
           IF ( FLMAP .AND. RGLGRD ) THEN
-              CALL W3UTRN ( TRNX, TRNY )
-              CALL W3NMIN ( MAPSTA, FLAG0 )
-              IF ( FLAG0 .AND. IAPROC.EQ.NAPERR ) WRITE (NDSE,1030) IMOD
-              FLMAP  = .FALSE.
+            CALL W3UTRN ( TRNX, TRNY )
+            CALL W3NMIN ( MAPSTA, FLAG0 )
+            IF ( FLAG0 .AND. IAPROC.EQ.NAPERR ) WRITE (NDSE,1030) IMOD
+            FLMAP  = .FALSE.
           END IF
 !
           IF ( FLDDIR ) THEN
@@ -899,8 +901,8 @@
 !
             ELSE
               CALL UG_GRADIENTS(DW, DDDX, DDDY)
-              END IF
-              FLDDIR = .FALSE.
+            END IF
+            FLDDIR = .FALSE.
           END IF
  
  
@@ -914,58 +916,60 @@
 !
  
 !
-        IF ( FLSOU .and. LPDLIB) THEN
+          IF ( FLSOU .and. LPDLIB) THEN
 !
-          D50=0.0002
-          REFLEC(:)=0.
-          REFLED(:)=0
-          PSIC=0.
+            D50=0.0002
+            REFLEC(:)=0.
+            REFLED(:)=0
+            PSIC=0.
  
-          DO JSEA=1, NSEAL
-            CALL INIT_GET_ISEA(ISEA, JSEA)
-            IX     = MAPSF(ISEA,1)
-            IY     = MAPSF(ISEA,2)
-            DELA=1.
-            DELX=1.
-            DELY=1.
+!GPUNotes loop on seapoints
+            DO JSEA=1, NSEAL
+              CALL INIT_GET_ISEA(ISEA, JSEA)
+              IX     = MAPSF(ISEA,1)
+              IY     = MAPSF(ISEA,2)
+              DELA=1.
+              DELX=1.
+              DELY=1.
 !
-            IF ( MAPSTA(IY,IX) .EQ. 1 .AND. FLAGST(ISEA)) THEN
-              IF (FSSOURCE) THEN
-              ENDIF
-            ELSE
-              UST   (ISEA) = UNDEF
-              USTDIR(ISEA) = UNDEF
-              DTDYN (JSEA) = UNDEF
-              FCUT  (JSEA) = UNDEF
-            END IF
-          END DO ! JSEA
-        END IF ! PDLIB
+              IF ( MAPSTA(IY,IX) .EQ. 1 .AND. FLAGST(ISEA)) THEN
+                IF (FSSOURCE) THEN
+                ENDIF
+              ELSE
+                UST   (ISEA) = UNDEF
+                USTDIR(ISEA) = UNDEF
+                DTDYN (JSEA) = UNDEF
+                FCUT  (JSEA) = UNDEF
+              END IF
+            END DO ! JSEA
+          END IF ! PDLIB
  
  
           IF ( FLZERO ) THEN
-              GOTO 400
-            END IF
+            GOTO 400
+          END IF
           IF ( IT.EQ.0 ) THEN
             DTG = 1.
 !            DTG = 60.
             GOTO 370
           END IF
           IF ( FLDRY .OR. IAPROC.GT.NAPROC ) THEN
-              GOTO 380
+            GOTO 380
           END IF
 !
 ! Estimation of the local maximum CFL for XY propagation
 !
-                IF ( FLOGRD(9,3).AND. UGDTUPDATE ) THEN
-                  IF (FSTOTALIMP .eqv. .FALSE.) THEN
-                      NKCFL=NK
+          IF ( FLOGRD(9,3).AND. UGDTUPDATE ) THEN
+            IF (FSTOTALIMP .eqv. .FALSE.) THEN
+              NKCFL=NK
 !
-                      DO JSEA=1, NSEAL
-                        CALL INIT_GET_ISEA(ISEA, JSEA)
-                      END DO
+!GPUNotes loop on seapoints
+              DO JSEA=1, NSEAL
+                CALL INIT_GET_ISEA(ISEA, JSEA)
+              END DO
 !
-                    END IF
-                END IF
+            END IF
+          END IF
  
 !
  
@@ -987,30 +991,31 @@
 !
 ! 3.6.2 Intra-spectral part 1
 !
+!GPUNotes These loops not active in source term test
           IF ( FLCTH .OR. FLCK ) THEN
-              DO ITLOC=1, ITLOCH
+            DO ITLOC=1, ITLOCH
 !
-                DO JSEA=1, NSEAL
-                  CALL INIT_GET_ISEA(ISEA, JSEA)
-                  IX     = MAPSF(ISEA,1)
-                  IY     = MAPSF(ISEA,2)
+              DO JSEA=1, NSEAL
+                CALL INIT_GET_ISEA(ISEA, JSEA)
+                IX     = MAPSF(ISEA,1)
+                IY     = MAPSF(ISEA,2)
  
-                  IF ( GTYPE .EQ. UNGTYPE ) THEN
-                    IF (IOBP(ISEA) .NE. 1) CYCLE
-                  ENDIF
+                IF ( GTYPE .EQ. UNGTYPE ) THEN
+                  IF (IOBP(ISEA) .NE. 1) CYCLE
+                ENDIF
  
-                  IF ( MAPSTA(IY,IX) .EQ. 1 ) THEN
-                           DEPTH  = MAX ( DMIN , DW(ISEA) )
-                           IF (LPDLIB) THEN
-                             IXrel = JSEA
-                           ELSE
-                             IXrel = IX
-                           END IF
+                IF ( MAPSTA(IY,IX) .EQ. 1 ) THEN
+                  DEPTH  = MAX ( DMIN , DW(ISEA) )
+                  IF (LPDLIB) THEN
+                    IXrel = JSEA
+                  ELSE
+                    IXrel = IX
+                  END IF
 !
-                    END IF
-                  END DO
-!
+                END IF
               END DO
+!
+            END DO
           END IF
  
  
@@ -1018,40 +1023,41 @@
 ! 3.6.3 Longitude-latitude
 !       (time step correction in routine)
 !
-        IF (GTYPE .EQ. UNGTYPE) THEN
-          IF (FLAGLL) THEN
-            FACX   =  1./(DERA * RADIUS)
-          ELSE
-            FACX   =  1.
+          IF (GTYPE .EQ. UNGTYPE) THEN
+            IF (FLAGLL) THEN
+              FACX   =  1./(DERA * RADIUS)
+            ELSE
+              FACX   =  1.
+            END IF
           END IF
-        END IF
-        IF ((GTYPE .EQ. UNGTYPE) .and. LPDLIB) THEN
+          IF ((GTYPE .EQ. UNGTYPE) .and. LPDLIB) THEN
 !
-        ELSE
-          IF (FLCX .or. FLCY) THEN
+          ELSE
+            IF (FLCX .or. FLCY) THEN
 !
 !!/OMPX/!$OMP PARALLEL PRIVATE (ISPEC,FIELD)
 !
  
-            IF ( FLOMP ) ALLOCATE ( FIELD(1-NY:NY*(NX+2)) )
+              IF ( FLOMP ) ALLOCATE ( FIELD(1-NY:NY*(NX+2)) )
 !
 ! Initialize FIELD variable
-             FIELD = 0.
+              FIELD = 0.
 !
 !!/OMPX/!$OMP DO SCHEDULE (DYNAMIC,1)
 !
-            DO ISPEC=1, NSPEC
-              IF ( IAPPRO(ISPEC) .EQ. IAPROC ) THEN
-                IF (.NOT.LPDLIB .AND. RGLGRD) CALL W3GATH ( ISPEC, FIELD )
+!GPUNotes Loop for MPI allocation not used in source term test
+              DO ISPEC=1, NSPEC
+                IF ( IAPPRO(ISPEC) .EQ. IAPROC ) THEN
+                  IF (.NOT.LPDLIB .AND. RGLGRD) CALL W3GATH ( ISPEC, FIELD )
 !
-                IF (GTYPE .NE. UNGTYPE) THEN
+                  IF (GTYPE .NE. UNGTYPE) THEN
 !
-                ELSE IF (GTYPE .EQ. UNGTYPE) THEN
+                  ELSE IF (GTYPE .EQ. UNGTYPE) THEN
+                  END IF
+                  IF (.NOT.LPDLIB .AND. RGLGRD) CALL W3SCAT ( ISPEC, MAPSTA, FIELD )
+!
                 END IF
-                IF (.NOT.LPDLIB .AND. RGLGRD) CALL W3SCAT ( ISPEC, MAPSTA, FIELD )
-!
-              END IF
-            END DO
+              END DO
 !
  
  
@@ -1067,51 +1073,52 @@
               IX=1
               IY=1
 !
-          IF( ARCTIC ) THEN
-            ISPEC = 0
-             JSEA = IY
-          ENDIF
+              IF( ARCTIC ) THEN
+                ISPEC = 0
+                JSEA = IY
+              ENDIF
 !
  
-          IF( ARCTIC ) THEN
-            ISPEC = 0
-             JSEA = IX
-          ENDIF
+              IF( ARCTIC ) THEN
+                ISPEC = 0
+                JSEA = IX
+              ENDIF
 !
 ! End of test FLCX.OR.FLCY
 !
+            END IF
           END IF
-        END IF
  
 !
 ! 3.6.4 Intra-spectral part 2
 !
+!GPUNotes these loops not used in source term tests
           IF ( FLCTH .OR. FLCK ) THEN
-              DO ITLOC=ITLOCH+1, NTLOC
+            DO ITLOC=ITLOCH+1, NTLOC
 !
-                DO JSEA = 1, NSEAL
+              DO JSEA = 1, NSEAL
  
-                  CALL INIT_GET_ISEA(ISEA, JSEA)
-                  IX     = MAPSF(ISEA,1)
-                  IY     = MAPSF(ISEA,2)
-                  DEPTH  = MAX ( DMIN , DW(ISEA) )
+                CALL INIT_GET_ISEA(ISEA, JSEA)
+                IX     = MAPSF(ISEA,1)
+                IY     = MAPSF(ISEA,2)
+                DEPTH  = MAX ( DMIN , DW(ISEA) )
  
-                  IF ( GTYPE .EQ. UNGTYPE ) THEN
-                    IF (IOBP(ISEA) .NE. 1) CYCLE
-                  ENDIF
+                IF ( GTYPE .EQ. UNGTYPE ) THEN
+                  IF (IOBP(ISEA) .NE. 1) CYCLE
+                ENDIF
  
-                  IF ( MAPSTA(IY,IX) .EQ. 1 ) THEN
-                           IF (LPDLIB) THEN
-                             IXrel = JSEA
-                           ELSE
-                             IXrel = IX
-                           END IF
+                IF ( MAPSTA(IY,IX) .EQ. 1 ) THEN
+                  IF (LPDLIB) THEN
+                    IXrel = JSEA
+                  ELSE
+                    IXrel = IX
+                  END IF
 !
-                    END IF
-                  END DO
-!
-                END DO
-            END IF
+                END IF
+              END DO
+!  
+            END DO
+          END IF
 !
           UGDTUPDATE = .FALSE.
 !
@@ -1121,8 +1128,6 @@
 !
   370     CONTINUE
 
-          CALL PRINT_MY_TIME("    Calculate and integrate source term -&
-          & W3WAVE", NDTO)
           IF ( FLSOU ) THEN
 !
             D50=0.0002
@@ -1130,22 +1135,24 @@
             REFLED(:)=0
             PSIC=0.
 !
-              DO JSEA=1, NSEAL
-                CALL INIT_GET_ISEA(ISEA, JSEA)
-                IX     = MAPSF(ISEA,1)
-                IY     = MAPSF(ISEA,2)
-                DELA=1.
-                DELX=1.
-                DELY=1.
+            SPR4TOT=0.
+            SIN4TOT=0.
+!GPUNotes Outer seapoint loop for source term calculations
+            CALL WAV_MY_WTIME(sTime1)
+            DO JSEA=1, NSEAL
+              CALL INIT_GET_ISEA(ISEA, JSEA)
+              IX     = MAPSF(ISEA,1)
+              IY     = MAPSF(ISEA,2)
+              DELA=1.
+              DELX=1.
+              DELY=1.
 !
- 
- 
-                IF ( MAPSTA(IY,IX) .EQ. 1 .AND. FLAGST(ISEA)) THEN
-                     TMP1   = WHITECAP(JSEA,1:4)
-                     TMP2   = BEDFORMS(JSEA,1:3)
-                     TMP3   = TAUBBL(JSEA,1:2)
-                     TMP4   = TAUICE(JSEA,1:2)
-                       CALL W3SRCE(srce_direct, IT, JSEA, IX, IY, IMOD, &
+              IF ( MAPSTA(IY,IX) .EQ. 1 .AND. FLAGST(ISEA)) THEN
+                TMP1   = WHITECAP(JSEA,1:4)
+                TMP2   = BEDFORMS(JSEA,1:3)
+                TMP3   = TAUBBL(JSEA,1:2)
+                TMP4   = TAUICE(JSEA,1:2)
+                CALL W3SRCE(srce_direct, IT, JSEA, IX, IY, IMOD, &
                             VAoldDummy, VA(:,JSEA),                     &
                             VSioDummy, VDioDummy, SHAVETOTioDummy,      &
                             ALPHA(1:NK,JSEA), WN(1:NK,ISEA),            &
@@ -1163,22 +1170,32 @@
                             TAUWNY(JSEA),  PHIAW(JSEA), CHARN(JSEA),    &
                             TWS(JSEA), PHIOC(JSEA), TMP1, D50, PSIC,TMP2,&
                             PHIBBL(JSEA), TMP3, TMP4 , PHICE(JSEA),     &
-                            ASF(ISEA))
-                     WHITECAP(JSEA,1:4) = TMP1
-                     BEDFORMS(JSEA,1:3) = TMP2
-                     TAUBBL(JSEA,1:2) = TMP3
-                     TAUICE(JSEA,1:2) = TMP4
-                ELSE
-                    UST   (ISEA) = UNDEF
-                    USTDIR(ISEA) = UNDEF
-                    DTDYN (JSEA) = UNDEF
-                    FCUT  (JSEA) = UNDEF
-!                    VA(:,JSEA)  = 0.
-                END IF
-              END DO
- 
+                            ASF(ISEA), SIN4T, SPR4T)
+                SIN4TOT = SIN4TOT + SIN4T
+                SPR4TOT = SPR4TOT + SPR4T
+                WHITECAP(JSEA,1:4) = TMP1
+                BEDFORMS(JSEA,1:3) = TMP2
+                TAUBBL(JSEA,1:2) = TMP3
+                TAUICE(JSEA,1:2) = TMP4
+              ELSE
+                UST   (ISEA) = UNDEF
+                USTDIR(ISEA) = UNDEF
+                DTDYN (JSEA) = UNDEF
+                FCUT  (JSEA) = UNDEF
+!               VA(:,JSEA)  = 0.
+              END IF
+            END DO
+!GPUNotes end of seapoint loop for source terms  
 !
- 
+            CALL WAV_MY_WTIME(eTime1)
+            T1 = eTime1 - sTime1
+            S1 = 'Outer seapoint loop, W3SRCE - '
+            WRITE(NDTO,101) S1, T1
+            SIN4S = 'Total of W3SIN4 subroutines - '
+            WRITE(NDTO,101) SIN4S, SIN4TOT
+            SPR4S = 'Total of W3SPR4 subroutines - '
+            WRITE(NDTO,101) SPR4S, SPR4TOT
+
 !
 ! This barrier is from older code versions. It has been removed in 3.11
 ! to optimize IO2/3 settings. May be needed on some systems still
@@ -1187,8 +1204,9 @@
 !!/MPI            ELSE
 !!/MPI              CALL MPI_BARRIER (MPI_COMM_WCMP,IERR_MPI)
 !
-            END IF
-!
+          END IF
+
+
 ! End of interations for DTMAX < 1s
 !
 ! 3.8 Update global time step.
@@ -1197,22 +1215,22 @@
   380     CONTINUE
 !
           IF (IT.NE.NT) THEN
-              DTTST  = DSEC21 ( TIME , TCALC )
-              DTG    = DTTST / REAL(NT-IT)
-            END IF
+            DTTST  = DSEC21 ( TIME , TCALC )
+            DTG    = DTTST / REAL(NT-IT)
+          END IF
 !
           IF ( FLACT .AND. IT.NE.NT .AND. IAPROC.EQ.NAPLOG ) THEN
-              CALL STME21 ( TIME , IDTIME )
-              IF ( IDLAST .NE. TIME(1) ) THEN
-                  WRITE (NDSO,900) ITIME, IPASS, IDTIME(01:19),       &
+            CALL STME21 ( TIME , IDTIME )
+            IF ( IDLAST .NE. TIME(1) ) THEN
+              WRITE (NDSO,900) ITIME, IPASS, IDTIME(01:19),       &
+                                     IDACT, OUTID
+              IDLAST = TIME(1)
+            ELSE
+              WRITE (NDSO,901) ITIME, IPASS, IDTIME(12:19),       &
                                    IDACT, OUTID
-                  IDLAST = TIME(1)
-                ELSE
-                  WRITE (NDSO,901) ITIME, IPASS, IDTIME(12:19),       &
-                                   IDACT, OUTID
-                END IF
-              FLACT  = .FALSE.
-              IDACT  = '         '
+            END IF
+            FLACT  = .FALSE.
+            IDACT  = '         '
           END IF
 !
         END DO
@@ -1228,16 +1246,16 @@
 !     Delay if data assimilation time.
 !
         IF ( TOFRST(1)  .EQ. -1 ) THEN
-            DTTST  = 1.
-          ELSE
-            DTTST   = DSEC21 ( TIME, TOFRST )
-          END IF
+          DTTST  = 1.
+        ELSE
+          DTTST   = DSEC21 ( TIME, TOFRST )
+        END IF
 !
         IF ( TDN(1)  .EQ. -1 ) THEN
-            DTTST1 = 1.
-          ELSE
-            DTTST1  = DSEC21 ( TIME, TDN )
-          END IF
+          DTTST1 = 1.
+        ELSE
+          DTTST1  = DSEC21 ( TIME, TDN )
+        END IF
 !
         DTTST2 = DSEC21 ( TIME, TEND )
         FLAG_O = .NOT.SKIP_O .OR. ( SKIP_O .AND. DTTST2.NE.0. )
@@ -1246,27 +1264,27 @@
 !
 ! 4.b Processing and MPP preparations
 !
-            IF ( FLOUT(1) ) THEN
-                FLOUTG = DSEC21(TIME,TONEXT(:,1)).EQ.0.
-              ELSE
-                FLOUTG = .FALSE.
-              END IF
+          IF ( FLOUT(1) ) THEN
+            FLOUTG = DSEC21(TIME,TONEXT(:,1)).EQ.0.
+          ELSE
+            FLOUTG = .FALSE.
+          END IF
 !
-            IF ( FLOUT(7) ) THEN
-                FLOUTG2 = DSEC21(TIME,TONEXT(:,7)).EQ.0.
-              ELSE
-                FLOUTG2 = .FALSE.
-              END IF
+          IF ( FLOUT(7) ) THEN
+            FLOUTG2 = DSEC21(TIME,TONEXT(:,7)).EQ.0.
+          ELSE
+            FLOUTG2 = .FALSE.
+          END IF
 !
           FLPART = .FALSE.
           IF ( FLOUT(1) .AND. FLPFLD )                               &
-               FLPART = FLPART .OR. DSEC21(TIME,TONEXT(:,1)).EQ.0.
+            FLPART = FLPART .OR. DSEC21(TIME,TONEXT(:,1)).EQ.0.
           IF ( FLOUT(6) )                                            &
-               FLPART = FLPART .OR. DSEC21(TIME,TONEXT(:,6)).EQ.0.
+            FLPART = FLPART .OR. DSEC21(TIME,TONEXT(:,6)).EQ.0.
 !
-            IF ( LOCAL .AND. FLPART ) CALL W3CPRT ( IMOD )
-            IF ( LOCAL .AND. (FLOUTG .OR. FLOUTG2) )                   &
-                 CALL W3OUTG ( VA, FLPFLD, FLOUTG, FLOUTG2 )
+          IF ( LOCAL .AND. FLPART ) CALL W3CPRT ( IMOD )
+          IF ( LOCAL .AND. (FLOUTG .OR. FLOUTG2) )                   &
+            CALL W3OUTG ( VA, FLPFLD, FLOUTG, FLOUTG2 )
 !
  
 !
@@ -1279,128 +1297,129 @@
 ! 4.c Reset next output time
  
 !
-            TOFRST(1) = -1
-            TOFRST(2) =  0
+        TOFRST(1) = -1
+        TOFRST(2) =  0
 !
             
 !            CALL PRINT_MY_TIME("    Performing wave output - W3WAVE", NDTO)
-            DO J=1, NOTYPE
+        DO J=1, NOTYPE
  
-              IF ( FLOUT(J) ) THEN
+          IF ( FLOUT(J) ) THEN
 !
 ! 4.d Perform output
 !
-                  TOUT(:) = TONEXT(:,J)
-                  DTTST   = DSEC21 ( TIME, TOUT )
+             TOUT(:) = TONEXT(:,J)
+             DTTST   = DSEC21 ( TIME, TOUT )
 !
-                  IF ( DTTST .EQ. 0. ) THEN
-                      IF ( ( J .EQ. 1 ) .OR. ( J .EQ. 7 ) ) THEN
-                          IF ( IAPROC .EQ. NAPFLD ) THEN
+             IF ( DTTST .EQ. 0. ) THEN
+               IF ( ( J .EQ. 1 ) .OR. ( J .EQ. 7 ) ) THEN
+                 IF ( IAPROC .EQ. NAPFLD ) THEN
 !
-                              IF ( J .EQ. 1 ) CALL W3IOGO             &
-                                 ( 'WRITE', NDS(7), ITEST, IMOD )
+                   IF ( J .EQ. 1 ) CALL W3IOGO             &
+                     ( 'WRITE', NDS(7), ITEST, IMOD )
 !
-                            END IF
+                 END IF
+!
+                 IF ( J .EQ. 7 ) THEN
+
+
+                 END IF
  
-                          IF ( J .EQ. 7 ) THEN
- 
-                          END IF
- 
-                        ELSE IF ( J .EQ. 2 ) THEN
+               ELSE IF ( J .EQ. 2 ) THEN
 !
 !   Point output
 !
-                          IF ( IAPROC .EQ. NAPPNT ) THEN
+                 IF ( IAPROC .EQ. NAPPNT ) THEN
 !
 !   Gets the necessary spectral data
 !
-                            CALL W3IOPE ( VA )
-                            CALL W3IOPO ( 'WRITE', NDS(8), ITEST, IMOD )
-                            END IF
+                   CALL W3IOPE ( VA )
+                   CALL W3IOPO ( 'WRITE', NDS(8), ITEST, IMOD )
+                 END IF
 !
-                        ELSE IF ( J .EQ. 3 ) THEN
+               ELSE IF ( J .EQ. 3 ) THEN
 !
 ! Track output
 !
-                          CALL W3IOTR ( NDS(11), NDS(12), VA, IMOD )
-                        ELSE IF ( J .EQ. 4 ) THEN
-                          CALL W3IORS ('HOT', NDS(6), XXX, IMOD, FLOUT(8) )
-                          ITEST = RSTYPE
-                        ELSE IF ( J .EQ. 5 ) THEN
-                          IF ( IAPROC .EQ. NAPBPT ) THEN
-                              CALL W3IOBC ( 'WRITE', NDS(10),         &
-                                            TIME, TIME, ITEST, IMOD )
-                            END IF
-                        ELSE IF ( J .EQ. 6 ) THEN
-                          CALL W3IOSF ( NDS(13), IMOD )
-                        END IF
-!
-                      CALL TICK21 ( TOUT, DTOUT(J) )
-                      TONEXT(:,J) = TOUT
-                      TLST        = TOLAST(:,J)
-                      DTTST       = DSEC21 ( TOUT , TLST )
-                      FLOUT(J)    = DTTST.GE.0.
-                      IF ( FLOUT(J) ) THEN
-                          OUTID(2*J-1:2*J-1) = 'X'
-                        ELSE
-                          OUTID(2*J-1:2*J-1) = 'L'
-                        END IF
-                    END IF
-!
-! 4.e Update next output time
-!
-                  IF ( FLOUT(J) ) THEN
-                      IF ( TOFRST(1).EQ.-1 ) THEN
-                          TOFRST = TOUT
-                        ELSE
-                          DTTST  = DSEC21 ( TOUT , TOFRST )
-                          IF ( DTTST.GT.0.) THEN
-                              TOFRST = TOUT
-                            END IF
-                        END IF
-                    END IF
-!
+                  CALL W3IOTR ( NDS(11), NDS(12), VA, IMOD )
+                ELSE IF ( J .EQ. 4 ) THEN
+                  CALL W3IORS ('HOT', NDS(6), XXX, IMOD, FLOUT(8) )
+                  ITEST = RSTYPE
+                ELSE IF ( J .EQ. 5 ) THEN
+                  IF ( IAPROC .EQ. NAPBPT ) THEN
+                    CALL W3IOBC ( 'WRITE', NDS(10),         &
+                                   TIME, TIME, ITEST, IMOD )
+                  END IF
+                ELSE IF ( J .EQ. 6 ) THEN
+                  CALL W3IOSF ( NDS(13), IMOD )
                 END IF
 !
-              END DO
- 
- 
-! If there is a second stream of restart files then J=8 and FLOUT(8)=.TRUE.
-            J=8
-            IF ( FLOUT(J) ) THEN
-!
-! 4.d Perform output
-!
-              TOUT(:) = TONEXT(:,J)
-              DTTST   = DSEC21 ( TIME, TOUT )
-              IF ( DTTST .EQ. 0. ) THEN
-                CALL W3IORS ('HOT', NDS(6), XXX, IMOD, FLOUT(8) )
-                 ITEST = RSTYPE
-                 CALL TICK21 ( TOUT, DTOUT(J) )
-                 TONEXT(:,J) = TOUT
-                 TLST        = TOLAST(:,J)
-                 DTTST       = DSEC21 ( TOUT , TLST )
-                 FLOUT(J)    = DTTST.GE.0.
-                 IF ( FLOUT(J) ) THEN
-                   OUTID(2*J-1:2*J-1) = 'X'
-                  ELSE
-                    OUTID(2*J-1:2*J-1) = 'L'
-                  END IF
+                CALL TICK21 ( TOUT, DTOUT(J) )
+                TONEXT(:,J) = TOUT
+                TLST        = TOLAST(:,J)
+                DTTST       = DSEC21 ( TOUT , TLST )
+                FLOUT(J)    = DTTST.GE.0.
+                IF ( FLOUT(J) ) THEN
+                  OUTID(2*J-1:2*J-1) = 'X'
+                ELSE
+                  OUTID(2*J-1:2*J-1) = 'L'
+                END IF
               END IF
 !
 ! 4.e Update next output time
 !
               IF ( FLOUT(J) ) THEN
-                 IF ( TOFRST(1).EQ.-1 ) THEN
+                IF ( TOFRST(1).EQ.-1 ) THEN
+                  TOFRST = TOUT
+                ELSE
+                  DTTST  = DSEC21 ( TOUT , TOFRST )
+                  IF ( DTTST.GT.0.) THEN
                     TOFRST = TOUT
-                 ELSE
-                    DTTST  = DSEC21 ( TOUT , TOFRST )
-                    IF ( DTTST.GT.0.) THEN
-                       TOFRST = TOUT
-                    END IF
                   END IF
+                END IF
+              END IF
+!
+            END IF
+!
+          END DO !End of NOTYPE loop
+ 
+ 
+! If there is a second stream of restart files then J=8 and FLOUT(8)=.TRUE.
+          J=8
+          IF ( FLOUT(J) ) THEN
+!
+! 4.d Perform output
+!
+            TOUT(:) = TONEXT(:,J)
+            DTTST   = DSEC21 ( TIME, TOUT )
+            IF ( DTTST .EQ. 0. ) THEN
+              CALL W3IORS ('HOT', NDS(6), XXX, IMOD, FLOUT(8) )
+              ITEST = RSTYPE
+              CALL TICK21 ( TOUT, DTOUT(J) )
+              TONEXT(:,J) = TOUT
+              TLST        = TOLAST(:,J)
+              DTTST       = DSEC21 ( TOUT , TLST )
+              FLOUT(J)    = DTTST.GE.0.
+              IF ( FLOUT(J) ) THEN
+                OUTID(2*J-1:2*J-1) = 'X'
+              ELSE
+                OUTID(2*J-1:2*J-1) = 'L'
               END IF
             END IF
+!
+! 4.e Update next output time
+!
+            IF ( FLOUT(J) ) THEN
+              IF ( TOFRST(1).EQ.-1 ) THEN
+                TOFRST = TOUT
+              ELSE
+                DTTST  = DSEC21 ( TOUT , TOFRST )
+                IF ( DTTST.GT.0.) THEN
+                  TOFRST = TOUT
+                END IF
+              END IF
+            END IF
+          END IF
 !        END OF CHECKPOINT
 !
  
@@ -1410,7 +1429,7 @@
 !
 !!/MPI            IF (FLDRY) CALL MPI_BARRIER (MPI_COMM_WAVE,IERR_MPI)
 !
-          END IF
+        END IF
  
  
 !
@@ -1424,30 +1443,30 @@
 !
         IF ( IAPROC.EQ.NAPLOG ) THEN
 !
-            CALL STME21 ( TIME , IDTIME )
-            IF ( FLCUR ) THEN
-                DTTST  = DSEC21 ( TIME , TCN )
-                IF ( DTTST .EQ. 0. ) IDACT(7:7) = 'X'
-              END IF
-            IF ( FLWIND ) THEN
-                DTTST  = DSEC21 ( TIME , TWN )
-                IF ( DTTST .EQ. 0. ) IDACT(3:3) = 'X'
-              END IF
-            IF ( TDN(1) .GT. 0  ) THEN
-                DTTST  = DSEC21 ( TIME , TDN )
-                IF ( DTTST .EQ. 0. ) IDACT(17:17) = 'X'
-              END IF
-!
-            IF ( IDLAST.NE.TIME(1) ) THEN
-                WRITE (NDSO,900) ITIME, IPASS, IDTIME(1:19),          &
-                                 IDACT, OUTID
-                IDLAST = TIME(1)
-              ELSE
-                WRITE (NDSO,901) ITIME, IPASS, IDTIME(12:19),         &
-                                 IDACT, OUTID
-              END IF
-!
+          CALL STME21 ( TIME , IDTIME )
+          IF ( FLCUR ) THEN
+            DTTST  = DSEC21 ( TIME , TCN )
+            IF ( DTTST .EQ. 0. ) IDACT(7:7) = 'X'
           END IF
+          IF ( FLWIND ) THEN
+            DTTST  = DSEC21 ( TIME , TWN )
+            IF ( DTTST .EQ. 0. ) IDACT(3:3) = 'X'
+          END IF
+          IF ( TDN(1) .GT. 0  ) THEN
+            DTTST  = DSEC21 ( TIME , TDN )
+            IF ( DTTST .EQ. 0. ) IDACT(17:17) = 'X'
+          END IF
+!
+          IF ( IDLAST.NE.TIME(1) ) THEN
+            WRITE (NDSO,900) ITIME, IPASS, IDTIME(1:19),          &
+                             IDACT, OUTID
+            IDLAST = TIME(1)
+          ELSE
+            WRITE (NDSO,901) ITIME, IPASS, IDTIME(12:19),         &
+                               IDACT, OUTID
+          END IF
+!
+        END IF
 !
         IDACT  = '         '
         OUTID  = '           '
@@ -1462,8 +1481,8 @@
 !
  
       IF ( TSTAMP .AND. SCREEN.NE.NDSO .AND. IAPROC.EQ.NAPOUT ) THEN
-         CALL WWTIME ( STTIME )
-         WRITE (SCREEN,951) STTIME
+        CALL WWTIME ( STTIME )
+        WRITE (SCREEN,951) STTIME
       END IF
  
       IF ( IAPROC .EQ. NAPLOG ) WRITE (NDSO,902)
@@ -1476,6 +1495,8 @@
 !
 ! Formats
 !
+  101 FORMAT ('TIMESTAMP : ', A, F8.6)
+
   900 FORMAT (4X,I6,'|',I6,'| ', A19  ,' | ',A,' | ',A,' |')
   901 FORMAT (4X,I6,'|',I6,'| ',11X,A8,' | ',A,' | ',A,' |')
   902 FORMAT (2X,'--------+------+---------------------+'             &
@@ -1504,6 +1525,9 @@
 !/ End of W3WAVE ----------------------------------------------------- /
 !/
       END SUBROUTINE W3WAVE
+!/
+!GPUNotes the subroutines below are all related to MPI processing
+!
 !/ ------------------------------------------------------------------- /
       SUBROUTINE W3GATH ( ISPEC, FIELD )
 !/
@@ -1752,7 +1776,7 @@
       DO ISEA=1, NSEA
         IXY           = MAPSF(ISEA,3)
         IF ( MAPSTA(IXY) .GE. 1 ) A(ISPEC,ISEA) = FIELD(IXY)
-        END DO
+      END DO
 !
       RETURN
 !
@@ -1875,7 +1899,7 @@
         END DO
 !
         NMIN   = MIN ( NMIN , NLOC )
-        END DO
+      END DO
 !
       FLAG0  = NMIN .EQ. 0
 !

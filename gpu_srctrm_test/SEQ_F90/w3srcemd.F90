@@ -59,7 +59,7 @@
                           TAUWY, TAUOX, TAUOY, TAUWIX, TAUWIY, TAUWNX,&
                           TAUWNY, PHIAW, CHARN, TWS, PHIOC, WHITECAP, &
                           D50, PSIC, BEDFORM , PHIBBL, TAUBBL, TAUICE,&
-                          PHICE, COEF)
+                          PHICE, COEF, SIN4T, SPR4T)
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -368,7 +368,7 @@
       USE W3SRC4MD, ONLY : W3SPR4, W3SIN4, W3SDS4
       USE W3GDATMD, ONLY : ZZWND, FFXFM, FFXPM, FFXFA, FFXFI, FFXFD
       USE W3SNL1MD
-      USE W3PARALL, ONLY : PRINT_MY_TIME
+      USE W3PARALL, ONLY : WAV_MY_WTIME
 !/
       IMPLICIT NONE
 !/
@@ -395,6 +395,7 @@
                                  ICEF
       REAL, INTENT(OUT)       :: DTDYN, FCUT
       REAL, INTENT(IN)        :: COEF
+      REAL(8), INTENT(OUT)    :: SIN4T, SPR4T
 !/
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
@@ -437,10 +438,15 @@
       REAL                    :: DeltaSRC(NSPEC), MAXDAC(NSPEC)
  
 !/
- 
+!!LS  Newly added time varibles
+      REAL(8)                 :: sTime1, eTime1, sTime2, eTime2
+!      REAL(8)                 :: T1, T2
+      CHARACTER(LEN=30)       :: S1, S2
 !/
 !/ ------------------------------------------------------------------- /
 !/
+      SPR4T = 0.0
+      SIN4T = 0.0
 !
       DEPTH  = MAX ( DMIN , D_INP )
       IKS1 = 1
@@ -452,7 +458,7 @@
 !
       VSIN = 0.
       VDIN = 0.
- 
+    
       VSBT = 0.
       VDBT = 0.
 !
@@ -467,20 +473,25 @@
 !XP     = 0.15
 !FACP   = XP / PI * 0.62E-3 * TPI**4 / GRAV**2
 !
-      CALL PRINT_MY_TIME("        Starting ACC loop 1 - W3SRCE", NDTO)
+
+!GPUNotes loop over frequencies
+
+!      CALL PRINT_MY_TIME("        Starting ACC loop 1 - W3SRCE", NDTO)
       DO IK=1, NK
         DAM(1+(IK-1)*NTH) = FACP / ( SIG(IK) * WN1(IK)**3 )
         WN2(1+(IK-1)*NTH) = WN1(IK)
-        END DO
+      END DO
 !
-      CALL PRINT_MY_TIME("        Starting ACC loop 2 - W3SRCE", NDTO)
+
+!GPUNotes loop over full spectrum
+!      CALL PRINT_MY_TIME("        Starting ACC loop 2 - W3SRCE", NDTO)
       DO IK=1, NK
         IS0    = (IK-1)*NTH
         DO ITH=2, NTH
           DAM(ITH+IS0) = DAM(1+IS0)
           WN2(ITH+IS0) = WN2(1+IS0)
-          END DO
         END DO
+      END DO
 !
 ! 1.b Prepare dynamic time stepping
 !
@@ -512,23 +523,37 @@
       TAUWX=0.
       TAUWY=0.
       IF ( IT .eq. 0 ) THEN
-          LLWS(:) = .TRUE.
-          USTAR=0.
-          USTDIR=0.
+         LLWS(:) = .TRUE.
+         USTAR=0.
+         USTDIR=0.
       ELSE
+!GPUNotes calls to W3PSR4 and W3SIN4 below will contain source term specific spectral loops
+!GPUNotes the sequencing is important (although maybe excessive?)
+        CALL WAV_MY_WTIME(sTime1)
         CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN, &
                    AMAX, U10ABS, U10DIR, USTAR, USTDIR,            &
                    TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
- 
- 
+        CALL WAV_MY_WTIME(eTime1)
+        SPR4T = SPR4T + eTime1 - sTime1
+        !S1 = 'Call to W3SPR4 in W3SRCE -'
+        !WRITE(NDTO,101) S1, T1
+        CALL WAV_MY_WTIME(sTime2) 
         CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
                  U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,       &
                  VSIN, VDIN, LLWS, IX, IY, BRLAMBDA )
-        END IF
+        CALL WAV_MY_WTIME(eTime2)
+        SIN4T = SIN4T + eTime2 - sTime2
+        !S2 = 'Call to W3SIN4 in W3SRCE -'
+        !WRITE(NDTO,101) S2, T2
+      END IF
  
+!GPUNotes call below will contain source term specific spectral loops
+      CALL WAV_MY_WTIME(sTime1)
       CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN, &
-                   AMAX, U10ABS, U10DIR, USTAR, USTDIR,          &
-                   TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
+                 AMAX, U10ABS, U10DIR, USTAR, USTDIR,            &
+                 TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
+      CALL WAV_MY_WTIME(eTime1)
+      SPR4T = SPR4T + eTime1 - sTime1
       TWS = 1./FMEANWS
 !
 ! 1.c2 Stores the initial data
@@ -549,6 +574,9 @@
 !
 ! ... Branch point dynamic integration - - - - - - - - - - - - - - - -
 !
+!GPUNotes loop for explicit time integration of source terms
+!GPUNotes this might be a pain in the proverbial for tightening
+!GPUNotes the seapoint and spectral loops
       DO
 !
         NSTEPS = NSTEPS + 1
@@ -557,21 +585,27 @@
 !
 ! 2.a Input.
 !
+!GPUNotes subroutine will contain source term specific spectral loops
         CALL W3SLN1 (       WN1, FHIGH, USTAR, U10DIR , VSLN       )
 !
+!GPUNotes subrotuine will contain source term specific spectral loops
+        CALL WAV_MY_WTIME(sTime2) 
         CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
                  U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,       &
                  VSIN, VDIN, LLWS, IX, IY, BRLAMBDA )
- 
- 
+        CALL WAV_MY_WTIME(eTime2)
+        SIN4T = SIN4T + eTime2 - sTime2
+
 !
 ! 2.b Nonlinear interactions.
 !
+!GPUnotes subruoutine will contain source term specific spectral loops
         CALL W3SNL1 ( SPEC, CG1, WNMEAN*DEPTH,        VSNL, VDNL )
 !
 ! 2.c Dissipation... except for ST4
 ! 2.c1   as in source term package
 !
+!GPUNotes subroutine will contain source term specific spectral loops
         CALL W3SDS4 ( SPEC, WN1, CG1, USTAR, USTDIR, DEPTH, VSDS,    &
                       VDDS, IX, IY, BRLAMBDA, WHITECAP )
  
@@ -613,13 +647,14 @@
           VDIN(1:NSPECH) = ICESCALEIN * VDIN(1:NSPECH)
           VSDS(1:NSPECH) = ICESCALEDS * VSDS(1:NSPECH)
           VDDS(1:NSPECH) = ICESCALEDS * VDDS(1:NSPECH)
-          END IF
+        END IF
 !
         NKI    = MAX ( 2 , MIN ( NKH1 ,                           &
                  INT ( FACTI2 + FACTI1*LOG(MAX(1.E-7,FFXFI* FMEAN1)) ) ) )
  
         VS = 0
         VD = 0
+!GPUNotes spectral loop up to frequency cut off
         DO IS=IS1, NSPECH
           VS(IS) = VSLN(IS) + VSIN(IS) + VSNL(IS)  &
                  + VSDS(IS) + VSBT(IS)
@@ -631,7 +666,7 @@
                          1. + OFFSET*AFAC*MIN(0.,VD(IS)) ) ) )
 !          IF (IX == DEBUG_NODE) THEN
 !            WRITE(*,'(A20,I10,10F30.10)') 'TIME STEP COMP', IS, DAMAX, DAM(IS), XREL*SPECINIT(IS), AFILT, AFAC, DT
-!          ENDIF
+!          END IF
         END DO  ! end of loop on IS
 !
 !        WRITE(*,*) 'NODE_NUMBER', IX
@@ -649,7 +684,12 @@
         DTTOT  = DTTOT + DT
  
  
- 
+!GPUNotes calls below may be for implicit source term update
+!GPUNotes would this remove the need for the NSTEPS loop?
+!GPUNotes discussed in section 3.6 of manual, although maybe
+!GPUNotes not it looks like Aron R code?
+!GPUNotes Not used in source term test, which sets srce_direct
+!GPUNotes loops below are over spectrum
         IF (srce_call .eq. srce_imp_pre) THEN
           PrintDeltaSmDA=.FALSE.
           IF (PrintDeltaSmDA .eqv. .TRUE.) THEN
@@ -677,21 +717,22 @@
             WRITE(740+IAPROC,*) 'min/max/sum(DeltaDS)=', minval(DeltaSRC), maxval(DeltaSRC), sum(DeltaSRC)
           END IF
  
-            IF (optionCall .eq. 1) THEN
-              CALL SIGN_VSD_PATANKAR_WW3(SPEC,VS,VD)
-            ELSE IF (optionCall .eq. 2) THEN
-              CALL SIGN_VSD_SEMI_IMPLICIT_WW3(SPEC,VS,VD)
-            ELSE IF (optionCall .eq. 3) THEN
-              CALL SIGN_VSD_SEMI_IMPLICIT_WW3(SPEC,VS,VD)
-            ENDIF
-            VSIO=VS
-            VDIO=VD
+          IF (optionCall .eq. 1) THEN
+            CALL SIGN_VSD_PATANKAR_WW3(SPEC,VS,VD)
+          ELSE IF (optionCall .eq. 2) THEN
+            CALL SIGN_VSD_SEMI_IMPLICIT_WW3(SPEC,VS,VD)
+          ELSE IF (optionCall .eq. 3) THEN
+            CALL SIGN_VSD_SEMI_IMPLICIT_WW3(SPEC,VS,VD)
+          END IF
+          VSIO=VS
+          VDIO=VD
 !!/DEBUGSRC          IF (IX == DEBUG_NODE) WRITE(44,'(10EN15.4)') SUM(VS), SUM(VD), SUM(VSIN), SUM(VDIN), SUM(VSDS), SUM(VDDS), SUM(
           RETURN ! return everything is done for the implicit ...
         END IF ! srce_imp_pre
 !
 ! 5.  Increment spectrum --------------------------------------------- *
 !
+!GPUNotes Integrations over spectrum below active in source term test
         IF (srce_call .eq. srce_direct) THEN
 !          SHAVE = .FALSE.
 !         IF (IX == DEBUG_NODE) THEN
@@ -723,43 +764,48 @@
 !              wave ->BBL  flux PHIBBL------------------------------- *
 !              wave ->ice  flux PHICE ------------------------------- *
 !
-       WHITECAP(3)=0.
-       HSTOT=0.
-       DO IK=IKS1, NK
-         FACTOR = DDEN(IK)/CG1(IK)                    !Jacobian to get energy in band
-         FACTOR2= FACTOR*GRAV*WN1(IK)/SIG(IK)         ! coefficient to get momentum
+        WHITECAP(3)=0.
+        HSTOT=0.
+!GPUNotes Loops over spectrum - the spectrum must be properly updated
+!GPUNotes first
+        DO IK=IKS1, NK
+          FACTOR = DDEN(IK)/CG1(IK)                    !Jacobian to get energy in band
+          FACTOR2= FACTOR*GRAV*WN1(IK)/SIG(IK)         ! coefficient to get momentum
  
-         ! Wave direction is "direction to"
-         ! therefore there is a PLUS sign for the stress
-         DO ITH=1, NTH
-           IS   = (IK-1)*NTH + ITH
-           COSI(1)=ECOS(IS)
-           COSI(2)=ESIN(IS)
-           PHIAW = PHIAW + (VSIN(IS))* DT * FACTOR                    &
-             / MAX ( 1. , (1.-HDT*VDIN(IS))) ! semi-implict integration scheme
- 
-           PHIBBL= PHIBBL- (VSBT(IS))* DT * FACTOR                    &
+          ! Wave direction is "direction to"
+          ! therefore there is a PLUS sign for the stress
+          DO ITH=1, NTH
+            IS   = (IK-1)*NTH + ITH
+            COSI(1)=ECOS(IS)
+            COSI(2)=ESIN(IS)
+            PHIAW = PHIAW + (VSIN(IS))* DT * FACTOR                    &
+              / MAX ( 1. , (1.-HDT*VDIN(IS))) ! semi-implict integration scheme
+            PHIBBL= PHIBBL- (VSBT(IS))* DT * FACTOR                    &
              / MAX ( 1. , (1.-HDT*VDBT(IS))) ! semi-implict integration scheme
-           PHINL = PHINL + VSNL(IS)* DT * FACTOR                      &
+            PHINL = PHINL + VSNL(IS)* DT * FACTOR                      &
              / MAX ( 1. , (1.-HDT*VDNL(IS))) ! semi-implict integration scheme
-           IF (VSIN(IS).GT.0.) WHITECAP(3) = WHITECAP(3) + SPEC(IS)  * FACTOR
-           HSTOT = HSTOT + SPEC(IS) * FACTOR
-           END DO
-         END DO
-       WHITECAP(3)=4.*SQRT(WHITECAP(3))
-       HSTOT=4.*SQRT(HSTOT)
-       TAUWIX= TAUWIX+ TAUWX * DRAT *DT
-       TAUWIY= TAUWIY+ TAUWY * DRAT *DT
-       TAUWNX= TAUWNX+ TAUWAX * DRAT *DT
-       TAUWNY= TAUWNY+ TAUWAY * DRAT *DT
-       ! MISSING: TAIL TO BE ADDED ?
+            IF (VSIN(IS).GT.0.) WHITECAP(3) = WHITECAP(3) + SPEC(IS)  * FACTOR
+            HSTOT = HSTOT + SPEC(IS) * FACTOR
+          END DO
+        END DO
+        WHITECAP(3)=4.*SQRT(WHITECAP(3))
+        HSTOT=4.*SQRT(HSTOT)
+        TAUWIX= TAUWIX+ TAUWX * DRAT *DT
+        TAUWIY= TAUWIY+ TAUWY * DRAT *DT
+        TAUWNX= TAUWNX+ TAUWAX * DRAT *DT
+        TAUWNY= TAUWNY+ TAUWAY * DRAT *DT
+        ! MISSING: TAIL TO BE ADDED ?
 !
 ! 6.  Add tail ------------------------------------------------------- *
 !   a Mean parameters
 !
-        CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN,&
-                   AMAX, U10ABS, U10DIR, USTAR, USTDIR,           &
+!GPUNotes source term specific loops over spectrum in this call
+        CALL WAV_MY_WTIME(sTime1)
+        CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN, &
+                   AMAX, U10ABS, U10DIR, USTAR, USTDIR,            &
                    TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
+        CALL WAV_MY_WTIME(eTime1)
+        SPR4T = SPR4T + eTime1 - sTime1
 !
 ! Introduces a Long & Resio (JGR2007) type dependance on wave age
         FAGE   = FFXFA*TANH(0.3*U10ABS*FMEANWS*TPI/GRAV)
@@ -779,30 +825,35 @@
 !
 ! 6.d Add tail
 !
+!GPUNotes Smaller spectral loop to add energy to tail
         DO IK=NKH+1, NK
           DO ITH=1, NTH
             SPEC(ITH+(IK-1)*NTH) = SPEC(ITH+(IK-2)*NTH) * FACHFA         &
                        + 0.
-            END DO
           END DO
+        END DO
 !
 ! 6.e  Update wave-supported stress----------------------------------- *
 !
-        CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,      &
-                      U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY, &
-                      VSIN, VDIN, LLWS, IX, IY, BRLAMBDA )
+! GPUNotes source term specific loops over spectrum in this call
+        CALL WAV_MY_WTIME(sTime2) 
+        CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
+                 U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,       &
+                 VSIN, VDIN, LLWS, IX, IY, BRLAMBDA )
+        CALL WAV_MY_WTIME(eTime2)
+        SIN4T = SIN4T + eTime2 - sTime2
  
 !
 ! 7.  Check if integration complete ---------------------------------- *
 !
-          IF (srce_call .eq. srce_imp_post) THEN
-            EXIT
-            ENDIF
-          IF ( DTTOT .GE. 0.9999*DTG ) THEN
-!            IF (IX == DEBUG_NODE) WRITE(*,*) 'DTTOT, DTG', DTTOT, DTG
-            EXIT
-            ENDIF
-        END DO ! INTEGRATIN LOOP
+        IF (srce_call .eq. srce_imp_post) THEN
+          EXIT
+        ENDIF
+        IF ( DTTOT .GE. 0.9999*DTG ) THEN
+!          IF (IX == DEBUG_NODE) WRITE(*,*) 'DTTOT, DTG', DTTOT, DTG
+          EXIT
+        ENDIF
+      END DO ! INTEGRATIN LOOP
 !
 ! ... End point dynamic integration - - - - - - - - - - - - - - - - - -
 !
@@ -822,6 +873,7 @@
 !     and final energy, plus wind input plus the SNL flux to high freq.,
 !     minus the energy lost to the bottom boundary layer (BBL)
 !
+!GPUNotes loop over spectrum requires spectrum to be properly updated
       EFINISH  = 0.
       MWXFINISH  = 0.
       MWYFINISH  = 0.
@@ -834,13 +886,13 @@
           EBAND = EBAND + DIFF
           A1BAND = A1BAND + DIFF*ECOS(ITH)
           B1BAND = B1BAND + DIFF*ESIN(ITH)
-          END DO
+        END DO
         EFINISH  = EFINISH  + EBAND * DDEN(IK) / CG1(IK)
         MWXFINISH  = MWXFINISH  + A1BAND * DDEN(IK) / CG1(IK)        &
                   * WN1(IK)/SIG(IK)
         MWYFINISH  = MWYFINISH  + B1BAND * DDEN(IK) / CG1(IK)        &
                   * WN1(IK)/SIG(IK)
-        END DO
+      END DO
 !
 ! Transformation in momentum flux in m^2 / s^2
 !
@@ -866,52 +918,56 @@
  
       IF ( INFLAGS2(4).AND.ICE.GT.0 ) THEN
  
-         IF (IICEDISP) THEN
-           ICECOEF2 = 1E-6
-           CALL LIU_FORWARD_DISPERSION (ICEH,ICECOEF2,DEPTH, &
-                                        SIG,WN_R,CG_ICE,ALPHA_LIU)
+        IF (IICEDISP) THEN
+          ICECOEF2 = 1E-6
+          CALL LIU_FORWARD_DISPERSION (ICEH,ICECOEF2,DEPTH, &
+                                       SIG,WN_R,CG_ICE,ALPHA_LIU)
 !
-      IF (IICESMOOTH) THEN
+          IF (IICESMOOTH) THEN
+          END IF
+        ELSE
+          WN_R=WN1
+          CG_ICE=CG1
         END IF
-     ELSE
-      WN_R=WN1
-      CG_ICE=CG1
-     END IF
 !
-     R(:)=1 ! In case IC2 is defined but not IS2
+        R(:)=1 ! In case IC2 is defined but not IS2
 !
  
 !
-   SPEC2 = SPEC
+        SPEC2 = SPEC
 !
-   TAUICE(:) = 0.
-   PHICE = 0.
-   DO IK=1,NK
-     IS = 1+(IK-1)*NTH
+        TAUICE(:) = 0.
+        PHICE = 0.
+!GPUNotes These spectral loops are for ice effects?
+!GPUnotes slightly surprised they aren't enclosed in a conditional?
+!GPUNotes actually maybe they are, think this is an indentation thing
+!GPUNotes which I have tried to address
+        DO IK=1,NK
+          IS = 1+(IK-1)*NTH
 !
 ! First part of ice term integration: dissipation part
 !
-     ATT=1.
-             SPEC(1+(IK-1)*NTH:NTH+(IK-1)*NTH) = ATT*SPEC2(1+(IK-1)*NTH:NTH+(IK-1)*NTH)
+          ATT=1.
+            SPEC(1+(IK-1)*NTH:NTH+(IK-1)*NTH) = ATT*SPEC2(1+(IK-1)*NTH:NTH+(IK-1)*NTH)
 !
 ! Second part of ice term integration: scattering including re-distribution in directions
 !
 ! 10.2  Fluxes of energy and momentum due to ice effects
 !
-             FACTOR = DDEN(IK)/CG1(IK)                    !Jacobian to get energy in band
-             FACTOR2= FACTOR*GRAV*WN1(IK)/SIG(IK)         ! coefficient to get momentum
-             DO ITH = 1,NTH
-               IS = ITH+(IK-1)*NTH
-               PHICE = PHICE + (SPEC(IS)-SPEC2(IS)) * FACTOR
-               COSI(1)=ECOS(IS)
-               COSI(2)=ESIN(IS)
-               TAUICE(:) = TAUICE(:) - (SPEC(IS)-SPEC2(IS))*FACTOR2*COSI(:)
-               END DO
-             END DO
-           PHICE =-1.*DWAT*GRAV*PHICE /DTG
-           TAUICE(:)=TAUICE(:)/DTG
-           ELSE
-           END IF
+          FACTOR = DDEN(IK)/CG1(IK)                    !Jacobian to get energy in band
+          FACTOR2= FACTOR*GRAV*WN1(IK)/SIG(IK)         ! coefficient to get momentum
+          DO ITH = 1,NTH
+            IS = ITH+(IK-1)*NTH
+            PHICE = PHICE + (SPEC(IS)-SPEC2(IS)) * FACTOR
+            COSI(1)=ECOS(IS)
+            COSI(2)=ESIN(IS)
+            TAUICE(:) = TAUICE(:) - (SPEC(IS)-SPEC2(IS))*FACTOR2*COSI(:)
+          END DO
+        END DO
+        PHICE =-1.*DWAT*GRAV*PHICE /DTG
+        TAUICE(:)=TAUICE(:)/DTG
+      ELSE
+      END IF
 !
 ! - - - - - - - - - - - - - - - - - - - - - -
 ! 11. Sea state dependent stress routine calls
@@ -938,6 +994,8 @@
 !
 ! Formats
 !
+  101 FORMAT ('TIMESTAMP : ', A, F8.6)
+!
  9006 FORMAT (' TEST W3SRCE : FHIGH (3X) : ',3F8.4/                   &
               ' ------------- NEW DYNAMIC INTEGRATION LOOP',          &
               ' ------------- ')
@@ -948,6 +1006,10 @@
 !/ End of W3SRCE ----------------------------------------------------- /
 !/
       END SUBROUTINE W3SRCE
+!/
+!GPUNotes The subroutines below are for implicit options?
+!GPUNotes so not used in the source term test
+!/
 !/ ------------------------------------------------------------------- /
       SUBROUTINE CALC_FPI( A, CG, FPI, S )
 !/

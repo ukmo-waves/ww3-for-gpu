@@ -3,14 +3,14 @@ MOD=mod
 OBJ=obj
 
 ## PGI Fortran:
-#FC=pgf90
-#FFLAGS= -module $(MOD) -O2 -mp
-#LIBS=
+FC=nvfortran
+FFLAGS= -module $(MOD) -O2 -acc -ta=tesla,cuda10.2 -Minfo=acc
+LIBS=
 
 ## GNU Fortran
-FC=gfortran
-FFLAGS=-J$(MOD) -O2 -fopenmp
-LIBS=
+#FC=gfortran
+#FFLAGS=-J$(MOD) -O2
+#LIBS=
 
 .SUFFIXES: .F90 .o 
 
@@ -26,7 +26,8 @@ SHEL_OBJS=$(addprefix $(OBJ)/, constants.o w3servmd.o w3gsrumd.o w3arrymd.o \
 
 GRID_OBJS=$(addprefix $(OBJ)/, constants.o w3servmd.o w3gsrumd.o w3arrymd.o \
 	w3gdatmd.o w3odatmd.o w3idatmd.o w3timemd.o w3nmlgridmd.o w3dispmd.o \
-	w3adatmd.o w3snl1md.o w3src4md.o w3iogrmd.o w3triamd.o ww3_grid.o)
+	w3adatmd.o w3snl1md.o w3src4md.o w3parall.o w3iogrmd.o w3triamd.o \
+        ww3_grid.o)
 
 OUTF_OBJS=$(addprefix $(OBJ)/, constants.o w3servmd.o w3timemd.o w3arrymd.o \
 	w3dispmd.o w3gsrumd.o w3parall.o wmmdatmd.o w3gdatmd.o w3wdatmd.o \
@@ -126,9 +127,9 @@ $(OBJ)/w3sln1md.o : w3sln1md.F90 w3macros.h $(OBJ)/constants.o $(OBJ)/w3gdatmd.o
 
 $(OBJ)/w3snl1md.o : w3snl1md.F90 w3macros.h $(OBJ)/constants.o $(OBJ)/w3adatmd.o $(OBJ)/w3gdatmd.o $(OBJ)/w3odatmd.o
 
-$(OBJ)/w3src4md.o : w3src4md.F90 w3macros.h $(OBJ)/constants.o $(OBJ)/w3dispmd.o $(OBJ)/w3gdatmd.o $(OBJ)/w3odatmd.o $(OBJ)/w3servmd.o
+$(OBJ)/w3src4md.o : w3src4md.F90 w3macros.h $(OBJ)/constants.o $(OBJ)/w3dispmd.o $(OBJ)/w3gdatmd.o $(OBJ)/w3odatmd.o $(OBJ)/w3servmd.o $(OBJ)/w3parall.o
 
-$(OBJ)/w3srcemd.o : w3srcemd.F90 w3macros.h $(OBJ)/constants.o $(OBJ)/w3dispmd.o $(OBJ)/w3gdatmd.o $(OBJ)/w3idatmd.o $(OBJ)/w3odatmd.o $(OBJ)/w3sln1md.o $(OBJ)/w3snl1md.o $(OBJ)/w3src4md.o $(OBJ)/w3wdatmd.o
+$(OBJ)/w3srcemd.o : w3srcemd.F90 w3macros.h $(OBJ)/constants.o $(OBJ)/w3dispmd.o $(OBJ)/w3gdatmd.o $(OBJ)/w3idatmd.o $(OBJ)/w3odatmd.o $(OBJ)/w3sln1md.o $(OBJ)/w3snl1md.o $(OBJ)/w3src4md.o $(OBJ)/w3wdatmd.o $(OBJ)/w3parall.o
 
 $(OBJ)/w3timemd.o : w3timemd.F90 w3macros.h $(OBJ)/w3odatmd.o $(OBJ)/w3servmd.o
 
