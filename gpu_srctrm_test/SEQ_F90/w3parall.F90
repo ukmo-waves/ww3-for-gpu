@@ -131,7 +131,7 @@
 !/
       END SUBROUTINE
 !/ ------------------------------------------------------------------- /
-      SUBROUTINE PRINT_MY_TIME(string)
+      SUBROUTINE PRINT_MY_TIME(string, fileint)
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -176,7 +176,6 @@
 ! 10. Source code :
 !
 !/ ------------------------------------------------------------------- /
-      USE W3ODATMD, ONLY : IAPROC
       IMPLICIT NONE
 !/
 !/ ------------------------------------------------------------------- /
@@ -190,8 +189,10 @@
 !
       character(*), intent(in) :: string
       REAL(8) :: eTime
+      integer :: fileint
       CALL WAV_MY_WTIME(eTime)
-      WRITE(740+IAPROC,*) 'TIMING time=', eTime, ' at step ', string
+      WRITE(fileint,101) eTime, string
+ 101 FORMAT ('TIMESTAMP: time =',F6.2,' at step: ',A)
 !/
 !/ End of JACOBI_INIT ------------------------------------------------ /
 !/

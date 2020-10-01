@@ -1,7 +1,7 @@
 #!/bin/bash
 ## The following comment lines are PBS resource requests:
 #PBS -l select=1:ncpus=16
-#PBS -q pascalq
+#PBS -q normal
 #PBS -l walltime=120
 #PBS -e out/run_shel.err
 #PBS -o out/run_shel.out
@@ -17,7 +17,7 @@ ln -sf out/mod_def.ww3 ./
 
 export OMP_NUM_THREADS=4
 ## run the ww3_shel program:
-../OMP_F90/ww3_shel
-#../SEQ_F90/ww3_shel
+#../OMP_F90/ww3_shel
+../SEQ_F90/ww3_shel
 rm mod_def.ww3
 mv *.ww3 out/

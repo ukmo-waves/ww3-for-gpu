@@ -1,6 +1,6 @@
 #!/bin/bash
 ## The following comment lines are PBS resource requests:
-#PBS -q pascalq
+#PBS -q shared
 #PBS -l ncpus=1
 #PBS -l walltime=120
 #PBS -e out/run_grid.err
@@ -15,7 +15,7 @@ mkdir -p out/
 ln -sf inp/ww3_grid.nml ./
 
 ## run the ww3_grid program:
-../OMP_F90/ww3_grid
-#../SEQ_F90/ww3_grid
+#../OMP_F90/ww3_grid
+../SEQ_F90/ww3_grid
 
 mv mod_def.ww3 out/

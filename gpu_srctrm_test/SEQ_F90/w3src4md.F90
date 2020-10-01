@@ -362,7 +362,8 @@
                           ESIN, ECOS, EC2, ZZWND, AALPHA, BBETA, ZZALP,&
                           TTAUWSHELTER, SSWELLF, DDEN2, DTH, SSINTHP,  &
                           ZZ0RAT, SSINBR
-      USE W3ODATMD, ONLY: IAPROC
+      USE W3ODATMD, ONLY: IAPROC, NDTO
+      USE W3PARALL, ONLY: PRINT_MY_TIME
 !
       IMPLICIT NONE
 !/
@@ -405,6 +406,7 @@
 !/ ------------------------------------------------------------------- /
 !/
 !
+!      CALL PRINT_MY_TIME("    Calculate input source terms",NDTO)
 ! 1.  Preparations
 !
       !JDM: Initializing values to zero, they shouldn't be used unless
@@ -721,7 +723,7 @@
 !
 !/ ------------------------------------------------------------------- /
       USE CONSTANTS, ONLY: TPIINV, RADE, GRAV
-      USE W3ODATMD,  ONLY: NDSE
+      USE W3ODATMD
       USE W3SERVMD,  ONLY: EXTCDE
       USE W3DISPMD,  ONLY: WAVNU2
       USE W3GDATMD,  ONLY: SIG, DSIP, NK, NTH, TTAUWSHELTER,             &

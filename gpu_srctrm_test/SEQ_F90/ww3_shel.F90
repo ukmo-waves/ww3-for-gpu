@@ -95,6 +95,9 @@
 !       NDSE    Int.  Error output unit number (shell only).
 !       NDST    Int.  Test output unit number (shell only).
 !       NDSF    I.A.  Field files unit numbers (shell only).
+
+!       NDTO    Int.  Standard time output unit number (shell only).
+
 !       FLH     L.A.  Flags for homogeneous fields.
 !       FLAGSC  L.A.  Flags for coupling fields
 !       FLAGSCI Log.  Flags for ice ic1 ic5 coupling
@@ -253,7 +256,7 @@
       USE W3IOPOMD
       USE W3SERVMD, ONLY : NEXTLN, EXTCDE
       USE W3TIMEMD
- 
+      USE W3PARALL, ONLY: PRINT_MY_TIME, WAV_MY_WTIME 
  
 !
       USE W3NMLSHELMD
@@ -279,7 +282,7 @@
 !
       INTEGER             :: NDSI, NDSI2, NDSS, NDSO, NDSE, NDST, NDSL,&
                              NDSEN, IERR, J, I, ILOOP, IPTS, NPTS,     &
-                             NDTNEW, MPI_COMM = -99,                   &
+                             NDTO, NDTNEW, MPI_COMM = -99,             &
                              FLAGTIDE, COUPL_COMM, IH, N_TOT
       INTEGER             :: NDSF(-7:7), NDS(13), NTRACE(2), NDT(5:7), &
                              TIME0(2), TIMEN(2), TTIME(2), TTT(2),     &
@@ -390,6 +393,7 @@
       NDSE   =  6
       NDST   =  6
       NDSL   = 50
+      NDTO   =  7
  
       NDSF(-7)  = 1008
       NDSF(-6)  = 1009
@@ -1843,6 +1847,8 @@
 !
 ! 7.b Run the wave model for the given interval
 !
+      OPEN(NDTO, file='run_shel.time')
+      CALL PRINT_MY_TIME( "Wave model time step - W3SHEL", NDTO )
       TIME0  = TTIME
 !
       CALL W3WAVE ( 1, ODAT, TIME0                                    &
@@ -1866,6 +1872,7 @@
 !
 ! 7.c Run data assimilation at ending time
 !
+      CALL PRINT_MY_TIME ( "Data assimilation time step - W3SHEL", NDTO )
       DTTST  = DSEC21 ( TIME , TDN )
       IF ( DTTST .EQ. 0 ) THEN
         CALL STME21 ( TIME0 , DTME21 )

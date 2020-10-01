@@ -371,7 +371,7 @@
 !/
       USE W3SERVMD
       USE W3TIMEMD
-      USE W3PARALL, ONLY : INIT_GET_ISEA
+      USE W3PARALL, ONLY : INIT_GET_ISEA, PRINT_MY_TIME
  
  
 !
@@ -430,7 +430,7 @@
       CHARACTER(LEN=23)       :: IDTIME
       INTEGER eIOBP
       INTEGER ITH_F
- 
+!      INTEGER                 :: NDTO = 7
 !
 !/
  
@@ -1120,6 +1120,9 @@
 ! 3.7 Calculate and integrate source terms.
 !
   370     CONTINUE
+
+          CALL PRINT_MY_TIME("    Calculate and integrate source term -&
+          & W3WAVE", NDTO)
           IF ( FLSOU ) THEN
 !
             D50=0.0002
@@ -1279,6 +1282,8 @@
             TOFRST(1) = -1
             TOFRST(2) =  0
 !
+            
+!            CALL PRINT_MY_TIME("    Performing wave output - W3WAVE", NDTO)
             DO J=1, NOTYPE
  
               IF ( FLOUT(J) ) THEN

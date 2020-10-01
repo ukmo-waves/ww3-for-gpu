@@ -383,7 +383,7 @@
       END TYPE OTYPE6
 !/
       TYPE OUTPUT
-        INTEGER               :: NDSO, NDSE, NDST, SCREEN
+        INTEGER               :: NDSO, NDSE, NDTO, NDST, SCREEN
         INTEGER               :: NTPROC, NAPROC, IAPROC, NAPLOG,      &
                                  NAPOUT, NAPERR, NAPFLD, NAPPNT,      &
                                  NAPTRK, NAPRST, NAPBPT, NAPPRT
@@ -406,7 +406,7 @@
 !/
 !/ Data aliasses for structure OUTPUT
 !/
-      INTEGER, POINTER        :: NDSO, NDSE, NDST, SCREEN
+      INTEGER, POINTER        :: NDSO, NDSE, NDTO, NDST, SCREEN
       INTEGER, POINTER        :: NTPROC, NAPROC, IAPROC, NAPLOG,      &
                                  NAPOUT, NAPERR, NAPFLD, NAPPNT,      &
                                  NAPTRK, NAPRST, NAPBPT, NAPPRT
@@ -575,6 +575,7 @@
 !
         OUTPTS(I)%NDSO   = 6
         OUTPTS(I)%NDSE   = 6
+        OUTPTS(I)%NDTO   = 7
         OUTPTS(I)%NDST   = 6
         OUTPTS(I)%SCREEN = 6
 !
@@ -1398,6 +1399,7 @@
 !
       NDSO   => OUTPTS(IMOD)%NDSO
       NDSE   => OUTPTS(IMOD)%NDSE
+      NDTO   => OUTPTS(IMOD)%NDTO
       NDST   => OUTPTS(IMOD)%NDST
       SCREEN => OUTPTS(IMOD)%SCREEN
 !
