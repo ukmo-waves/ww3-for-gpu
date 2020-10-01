@@ -723,7 +723,7 @@
 !
 !/ ------------------------------------------------------------------- /
       USE CONSTANTS, ONLY: TPIINV, RADE, GRAV
-      USE W3ODATMD
+      USE W3ODATMD,  ONLY: NDSE
       USE W3SERVMD,  ONLY: EXTCDE
       USE W3DISPMD,  ONLY: WAVNU2
       USE W3GDATMD,  ONLY: SIG, DSIP, NK, NTH, TTAUWSHELTER,             &

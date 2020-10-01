@@ -430,7 +430,7 @@
       CHARACTER(LEN=23)       :: IDTIME
       INTEGER eIOBP
       INTEGER ITH_F
-!      INTEGER                 :: NDTO = 7
+ 
 !
 !/
  
