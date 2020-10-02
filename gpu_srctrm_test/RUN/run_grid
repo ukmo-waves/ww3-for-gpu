@@ -1,6 +1,6 @@
 #!/bin/bash
 ## The following comment lines are PBS resource requests:
-#PBS -q shared
+#PBS -q pascalq
 #PBS -l ncpus=1
 #PBS -l walltime=120
 #PBS -e out/run_grid.err

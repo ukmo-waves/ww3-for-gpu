@@ -3,14 +3,14 @@ MOD=mod
 OBJ=obj
 
 ## PGI Fortran:
-#FC=pgf90
-#FFLAGS= -module $(MOD) -O2 -mp
-#LIBS=
+FC=pgf90
+FFLAGS= -module $(MOD) -O2 -mp
+LIBS=
 
 ## GNU Fortran
-FC=gfortran
-FFLAGS=-J$(MOD) -O2 -fopenmp
-LIBS=
+#FC=gfortran
+#FFLAGS=-J$(MOD) -O2 -fopenmp
+#LIBS=
 
 .SUFFIXES: .F90 .o 
 

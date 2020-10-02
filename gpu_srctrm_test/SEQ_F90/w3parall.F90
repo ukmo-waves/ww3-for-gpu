@@ -192,7 +192,7 @@
       integer :: fileint
       CALL WAV_MY_WTIME(eTime)
       WRITE(fileint,101) eTime, string
- 101 FORMAT ('TIMESTAMP: time =',F6.2,' at step: ',A)
+ 101 FORMAT ('TIMESTAMP: time = ',F8.4,' at step: ',A)
 !/
 !/ End of JACOBI_INIT ------------------------------------------------ /
 !/
