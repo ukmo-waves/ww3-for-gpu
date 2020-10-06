@@ -3,14 +3,15 @@ MOD=mod
 OBJ=obj
 
 ## PGI Fortran:
-#FC=pgf90
+FC=pgf90
+FFLAGS= -module $(MOD) -O2 -acc -ta=nvidia,time -Minfo=acc
 #FFLAGS= -module $(MOD) -O2
-#LIBS=
+LIBS=
 
 ## GNU Fortran
-FC=gfortran
-FFLAGS=-J$(MOD) -O2
-LIBS=
+#FC=gfortran
+#FFLAGS=-J$(MOD) -O2
+#LIBS=
 
 .SUFFIXES: .F90 .o 
 

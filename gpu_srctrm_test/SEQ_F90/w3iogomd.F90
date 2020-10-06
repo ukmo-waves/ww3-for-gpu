@@ -1353,6 +1353,7 @@
 !
 ! 2.  Integral over discrete part of spectrum ------------------------ *
 !
+!$ACC DATA COPYIN(A, ECOS, ESIN, EC2, ESC, WN, SIG, CG, ES2, EC2, FCUT, FACTI1, FACTI2)
       DO IK=1, NK
 !
 ! 2.a Initialize energy in band
@@ -1370,8 +1371,10 @@
 !
 ! 2.b Integrate energy in band
 !
+!$ACC DATA COPY(NKH, AB, ABX, ABY, ABX2, ABY2, ABXX, ABXY, ABYX, ABYY, ABST)
         DO ITH=1, NTH
 !
+!$ACC KERNELS
           DO JSEA=1, NSEAL
             NKH(JSEA)  = MIN ( NK ,   &
                     INT(FACTI2+FACTI1*LOG(MAX(1.E-7,FCUT(JSEA)))) )
@@ -1386,7 +1389,9 @@
               ABST(JSEA) = ABST(JSEA) +                               &
                               A(ITH,IK,JSEA)*A(ITH+NTH/2,IK,JSEA)
               END IF
-            CALL INIT_GET_ISEA(ISEA, JSEA)
+            !CALL INIT_GET_ISEA(ISEA, JSEA)
+! ChrisB: Above call not needed in serial mode: isea = jsea
+            ISEA = JSEA !! ChrisB
             FACTOR     = MAX ( 0.5 , CG(IK,ISEA)/SIG(IK)*WN(IK,ISEA) )
             ABXX(JSEA) = ABXX(JSEA) + ((1.+EC2(ITH))*FACTOR-0.5) *    &
                                      A(ITH,IK,JSEA)
@@ -1394,8 +1399,10 @@
                                      A(ITH,IK,JSEA)
             ABXY(JSEA) = ABXY(JSEA) + ESC(ITH)*FACTOR * A(ITH,IK,JSEA)
             END DO
+!$ACC END KERNELS
 !
           END DO
+!$ACC END DATA
 !
 ! 2.c Finalize integration over band and update mean arrays
 !
@@ -1531,6 +1538,7 @@
           END DO
 !
         END DO
+!$ACC END DATA
 !
 ! Start of Space-Time Extremes Section
      IF ( ( STEXU .GT. 0. .AND. STEYU .GT. 0. ) &
