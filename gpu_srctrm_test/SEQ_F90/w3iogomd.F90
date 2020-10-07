@@ -1192,7 +1192,7 @@
                           NOGRP, NGRPP
       USE W3ADATMD, ONLY: NSEALM
 !
-      USE W3PARALL, ONLY : INIT_GET_ISEA
+      USE W3PARALL, ONLY : INIT_GET_ISEA, PRINT_MY_TIME
       IMPLICIT NONE
 !/
 !/ ------------------------------------------------------------------- /
@@ -1243,6 +1243,8 @@
       REAL                       USSCO, FT1
       REAL, SAVE              :: HSMIN = 0.01
       LOGICAL                 :: FLOLOC(NOGRP,NGRPP)
+
+      REAL :: t1, t2
 !/
  
 !/ ------------------------------------------------------------------- /
@@ -1371,10 +1373,13 @@
 !
 ! 2.b Integrate energy in band
 !
+!CALL PRINT_MY_TIME("CB-1 START")
+CALL CPU_TIME(t1)
 !$ACC DATA COPY(NKH, AB, ABX, ABY, ABX2, ABY2, ABXX, ABXY, ABYX, ABYY, ABST)
         DO ITH=1, NTH
 !
 !$ACC KERNELS
+!$ACC LOOP INDEPENDENT PRIVATE(JSEA)
           DO JSEA=1, NSEAL
             NKH(JSEA)  = MIN ( NK ,   &
                     INT(FACTI2+FACTI1*LOG(MAX(1.E-7,FCUT(JSEA)))) )
@@ -1391,8 +1396,8 @@
               END IF
             !CALL INIT_GET_ISEA(ISEA, JSEA)
 ! ChrisB: Above call not needed in serial mode: isea = jsea
-            ISEA = JSEA !! ChrisB
-            FACTOR     = MAX ( 0.5 , CG(IK,ISEA)/SIG(IK)*WN(IK,ISEA) )
+            !FACTOR     = MAX ( 0.5 , CG(IK,ISEA)/SIG(IK)*WN(IK,ISEA) )
+            FACTOR     = MAX ( 0.5 , CG(IK,JSEA)/SIG(IK)*WN(IK,JSEA) )
             ABXX(JSEA) = ABXX(JSEA) + ((1.+EC2(ITH))*FACTOR-0.5) *    &
                                      A(ITH,IK,JSEA)
             ABYY(JSEA) = ABYY(JSEA) + ((1.+ES2(ITH))*FACTOR-0.5) *    &
@@ -1403,6 +1408,9 @@
 !
           END DO
 !$ACC END DATA
+!CALL PRINT_MY_TIME("CB-1 END")
+CALL CPU_TIME(t2)
+WRITE(*,*) "Loop time ", t2 - t1
 !
 ! 2.c Finalize integration over band and update mean arrays
 !
