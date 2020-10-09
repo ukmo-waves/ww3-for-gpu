@@ -9,15 +9,17 @@
 set -eu
 
 ## Change directory to where job was submitted:
-cd ${PBS_O_WORKDIR:-.}
+#cd ${PBS_O_WORKDIR:-.}
 
 ## link in the correct input files:
 ln -sf inp/ww3_shel.inp ./
 ln -sf out/mod_def.ww3 ./
 
-export OMP_NUM_THREADS=4
+export OMP_NUM_THREADS=1
 ## run the ww3_shel program:
+
 #../OMP_F90/ww3_shel
 ../SEQ_F90/ww3_shel
+
 rm mod_def.ww3
 mv *.ww3 out/

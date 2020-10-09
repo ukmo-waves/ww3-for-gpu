@@ -371,7 +371,7 @@
 !/
       USE W3SERVMD
       USE W3TIMEMD
-      USE W3PARALL, ONLY : INIT_GET_ISEA, PRINT_MY_TIME
+      USE W3PARALL, ONLY : INIT_GET_ISEA, WAV_MY_WTIME
  
  
 !
@@ -430,7 +430,10 @@
       CHARACTER(LEN=23)       :: IDTIME
       INTEGER eIOBP
       INTEGER ITH_F
- 
+
+!!LS  Newly added time varibles
+      REAL(8)                 :: sTime1, eTime1, T1 
+      CHARACTER(LEN=50)       :: S1
 !
 !/
  
@@ -1121,8 +1124,8 @@
 !
   370     CONTINUE
 
-          CALL PRINT_MY_TIME("    Calculate and integrate source term -&
-          & W3WAVE", NDTO)
+!          CALL PRINT_MY_TIME("    Calculate and integrate source term -&
+!          & W3WAVE", NDTO)
           IF ( FLSOU ) THEN
 !
             D50=0.0002
@@ -1130,6 +1133,7 @@
             REFLED(:)=0
             PSIC=0.
 !
+              CALL WAV_MY_WTIME(sTime1)
               DO JSEA=1, NSEAL
                 CALL INIT_GET_ISEA(ISEA, JSEA)
                 IX     = MAPSF(ISEA,1)
@@ -1177,8 +1181,11 @@
                 END IF
               END DO
  
+            CALL WAV_MY_WTIME(eTime1)
+            T1 = eTime1 - sTime1
+            S1 = 'Total time for source term loop, W3SRCE in W3WAVE -'
+            WRITE(NDTO,101) S1,T1
 !
- 
 !
 ! This barrier is from older code versions. It has been removed in 3.11
 ! to optimize IO2/3 settings. May be needed on some systems still
@@ -1188,7 +1195,7 @@
 !!/MPI              CALL MPI_BARRIER (MPI_COMM_WCMP,IERR_MPI)
 !
             END IF
-!
+
 ! End of interations for DTMAX < 1s
 !
 ! 3.8 Update global time step.
@@ -1476,6 +1483,7 @@
 !
 ! Formats
 !
+  101 FORMAT ('TIME DIFFERENCE: ', A, F8.4)
   900 FORMAT (4X,I6,'|',I6,'| ', A19  ,' | ',A,' | ',A,' |')
   901 FORMAT (4X,I6,'|',I6,'| ',11X,A8,' | ',A,' | ',A,' |')
   902 FORMAT (2X,'--------+------+---------------------+'             &
