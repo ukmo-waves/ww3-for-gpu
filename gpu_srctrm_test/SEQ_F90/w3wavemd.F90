@@ -987,6 +987,7 @@
 !
 ! 3.6.2 Intra-spectral part 1
 !
+!GPUNotes These loops not active in source term test
           IF ( FLCTH .OR. FLCK ) THEN
               DO ITLOC=1, ITLOCH
 !
@@ -1007,8 +1008,8 @@
                              IXrel = IX
                            END IF
 !
-                    END IF
-                  END DO
+                  END IF
+                END DO
 !
               END DO
           END IF
@@ -1040,6 +1041,7 @@
 !
 !!/OMPX/!$OMP DO SCHEDULE (DYNAMIC,1)
 !
+!GPUNotes Loop for MPI allocation not used in source term test
             DO ISPEC=1, NSPEC
               IF ( IAPPRO(ISPEC) .EQ. IAPROC ) THEN
                 IF (.NOT.LPDLIB .AND. RGLGRD) CALL W3GATH ( ISPEC, FIELD )
@@ -1086,6 +1088,7 @@
 !
 ! 3.6.4 Intra-spectral part 2
 !
+!GPUNotes these loops not used in source term tests
           IF ( FLCTH .OR. FLCK ) THEN
               DO ITLOC=ITLOCH+1, NTLOC
 !
@@ -1130,6 +1133,7 @@
             REFLED(:)=0
             PSIC=0.
 !
+!GPUNotes Outer seapoint loop for source term calculations
               DO JSEA=1, NSEAL
                 CALL INIT_GET_ISEA(ISEA, JSEA)
                 IX     = MAPSF(ISEA,1)
@@ -1176,7 +1180,7 @@
 !                    VA(:,JSEA)  = 0.
                 END IF
               END DO
- 
+!GPUNotes end of seapoint loop for source terms  
 !
  
 !
@@ -1504,6 +1508,9 @@
 !/ End of W3WAVE ----------------------------------------------------- /
 !/
       END SUBROUTINE W3WAVE
+!/
+!GPUNotes the subroutines below are all related to MPI processing
+!
 !/ ------------------------------------------------------------------- /
       SUBROUTINE W3GATH ( ISPEC, FIELD )
 !/
