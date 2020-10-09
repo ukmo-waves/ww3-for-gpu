@@ -1,21 +1,28 @@
 #!/bin/bash
 ## The following comment lines are PBS resource requests:
-#PBS -l select=1:ncpus=1
-#PBS -q pascalq 
+#PBS -q pascalq
+#PBS -l ncpus=1
 #PBS -l walltime=120
-#PBS -o out/run_outf.out
-#PBS -e out/run_outf.err
-set -eu
+#PBS -e out/run_all.err
+#PBS -o out/run_all.out
 
-## Change directory to where job was submitted:
-#cd ${PBS_O_WORKDIR:-.}
+## run the ww3_grid program:
+## link in the correct *.dev input files:
+ln -sf inp/ww3_grid.nml ./
 
-## link in the correct input files:
-ln -sf inp/ww3_outf.inp ./
+#../OMP_F90/ww3_grid
+../SEQ_F90/ww3_grid
 
-mv out/*.ww3 ./
+## run the ww3_shel program:
+ln -sf inp/ww3_shel.inp ./
+export OMP_NUM_THREADS=1
+
+#../OMP_F90/ww3_shel
+../SEQ_F90/ww3_shel
 
 ## run the ww3_outf program:
+
+ln -sf inp/ww3_outf.inp ./
 #../OMP_F90/ww3_outf
 ../SEQ_F90/ww3_outf
 
