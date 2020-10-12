@@ -468,19 +468,27 @@
 !FACP   = XP / PI * 0.62E-3 * TPI**4 / GRAV**2
 !
 !      CALL PRINT_MY_TIME("        Starting ACC loop 1 - W3SRCE", NDTO)
+!$ACC DATA COPY   (WN2, DAM)                                            &
+!$ACC      COPYIN (WN1, FACP, NTH, SIG)
+!$ACC KERNELS      
+!$ACC LOOP INDEPENDENT
       DO IK=1, NK
         DAM(1+(IK-1)*NTH) = FACP / ( SIG(IK) * WN1(IK)**3 )
         WN2(1+(IK-1)*NTH) = WN1(IK)
-      END DO
-!
+        END DO
+!$ACC END KERNELS
 !      CALL PRINT_MY_TIME("        Starting ACC loop 2 - W3SRCE", NDTO)
+!$ACC KERNELS      
+!$ACC LOOP INDEPENDENT COLLAPSE(2) GANG VECTOR
       DO IK=1, NK
-        IS0    = (IK-1)*NTH
         DO ITH=2, NTH
+          IS0    = (IK-1)*NTH
           DAM(ITH+IS0) = DAM(1+IS0)
           WN2(ITH+IS0) = WN2(1+IS0)
+          END DO
         END DO
-      END DO
+!$ACC END KERNELS
+!$ACC END DATA
 !
 ! 1.b Prepare dynamic time stepping
 !
