@@ -468,13 +468,13 @@
 !FACP   = XP / PI * 0.62E-3 * TPI**4 / GRAV**2
 !
 !GPUNotes loop over spectra
-      CALL PRINT_MY_TIME("        Starting ACC loop 1 - W3SRCE", NDTO)
+!      CALL PRINT_MY_TIME("        Starting ACC loop 1 - W3SRCE", NDTO)
       DO IK=1, NK
         DAM(1+(IK-1)*NTH) = FACP / ( SIG(IK) * WN1(IK)**3 )
         WN2(1+(IK-1)*NTH) = WN1(IK)
       END DO
 !
-      CALL PRINT_MY_TIME("        Starting ACC loop 2 - W3SRCE", NDTO)
+!      CALL PRINT_MY_TIME("        Starting ACC loop 2 - W3SRCE", NDTO)
       DO IK=1, NK
         IS0    = (IK-1)*NTH
         DO ITH=2, NTH
