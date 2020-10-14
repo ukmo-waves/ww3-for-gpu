@@ -163,28 +163,32 @@
       COSU   = COS(USDIR)
       SINU   = SIN(USDIR)
 !
+!GPUNotes loop over directions
       DO ITH=1, NTH
         DIRF(ITH) = MAX ( 0. , (ECOS(ITH)*COSU+ESIN(ITH)*SINU) )**4
-        END DO
+      END DO
 !
       FAC    = SLNC1 * USTAR**4
       FF1    = FSPM * GRAV/(28.*USTAR)
       FF2    = FSHF * MIN(SIG(NK),FHIGH)
       FFILT  = MIN ( MAX(FF1,FF2) , 2.*SIG(NK) )
+!
+!GPUNotes loop over frequencies no dependence on above
       DO IK=1, NK
         RFR    = SIG(IK) / FFILT
         IF ( RFR .LT. 0.5 ) THEN
             WNF(IK) = 0.
           ELSE
             WNF(IK) = FAC / K(IK) * EXP(-RFR**(-4))
-          END IF
-        END DO
+        END IF
+      END DO
 !
 ! 2.  Compose source term -------------------------------------------- *
 !
+!GPUNotes loop over frequencies fills array using arrays from prior 2 loops
       DO IK=1, NK
         S(:,IK) = WNF(IK) * DIRF(:)
-        END DO
+      END DO
 !
       RETURN
 !

@@ -466,12 +466,12 @@
           ELSE
             PTURB =  1.
             PVISC =  0.
-            END IF
           END IF
+        END IF
       ELSE
         PTURB=1.
         PVISC=1.
-        END IF
+      END IF
  
 !
       IF (SSWELLF(2).EQ.0) THEN
@@ -487,7 +487,7 @@
         DELI1= MIN (1. ,XI-FLOAT(IND))
         DELI2= 1. - DELI1
         FW =FWTABLE(IND)*DELI2+FWTABLE(IND+1)*DELI1
-        END IF
+      END IF
 !
 ! 2.  Diagonal
 !
@@ -577,10 +577,10 @@
           IF ((SSWELLF(1).NE.0.AND.DSTAB(ISTAB,IS).LT.1E-7*SIG2(IS)) &
               .OR.SSWELLF(3).GT.0) THEN
 !
-              DVISC=SWELLCOEFV
-              DTURB=SWELLCOEFT*(FW*UORB+(FU+FUD*COSWIND)*USTP)
+            DVISC=SWELLCOEFV
+            DTURB=SWELLCOEFT*(FW*UORB+(FU+FUD*COSWIND)*USTP)
 !
-              DSTAB(ISTAB,IS) = DSTAB(ISTAB,IS) + PTURB*DTURB +  PVISC*DVISC
+            DSTAB(ISTAB,IS) = DSTAB(ISTAB,IS) + PTURB*DTURB +  PVISC*DVISC
           END IF
 !
 ! Sums up the wave-supported stress
@@ -615,9 +615,9 @@
       TEMP=0.
 !GPUNotes loop over directions
       DO ITH=1,NTH
-         IS=ITH+(NK-1)*NTH
-         COSWIND=(ECOS(IS)*COSU+ESIN(IS)*SINU)
-         TEMP=TEMP+A(IS)*(MAX(COSWIND,0.))**3
+        IS=ITH+(NK-1)*NTH
+        COSWIND=(ECOS(IS)*COSU+ESIN(IS)*SINU)
+        TEMP=TEMP+A(IS)*(MAX(COSWIND,0.))**3
       END DO
  
       TAUPX=TAUX-ABS(TTAUWSHELTER)*XSTRESS
@@ -637,10 +637,10 @@
       DELJ2=1. - DELJ1
       IF (TTAUWSHELTER.GT.0) THEN
         XK = CONST0*TEMP / DELTAIL
-         I = MIN (ILEVTAIL-1, INT(XK))
-         DELK1= MIN (1. ,XK-FLOAT(I))
-         DELK2=1. - DELK1
-         TAU1 =((TAUHFT2(IND,J,I)*DELI2+TAUHFT2(IND+1,J,I)*DELI1 )*DELJ2 &
+        I = MIN (ILEVTAIL-1, INT(XK))
+        DELK1= MIN (1. ,XK-FLOAT(I))
+        DELK2=1. - DELK1
+        TAU1 =((TAUHFT2(IND,J,I)*DELI2+TAUHFT2(IND+1,J,I)*DELI1 )*DELJ2 &
                +(TAUHFT2(IND,J+1,I)*DELI2+TAUHFT2(IND+1,J+1,I)*DELI1)*DELJ1)*DELK2 &
               +((TAUHFT2(IND,J,I+1)*DELI2+TAUHFT2(IND+1,J,I+1)*DELI1 )*DELJ2 &
                +(TAUHFT2(IND,J+1,I+1)*DELI2+TAUHFT2(IND+1,J+1,I+1)*DELI1)*DELJ1)*DELK1
@@ -883,7 +883,7 @@
  
         WHERE ( QBI .GT. 1. )
           QBI = 1.
-          END WHERE
+        END WHERE
  
         DEALLOCATE(K1,K2)
         DEALLOCATE(SIGTAB)
@@ -1018,30 +1018,30 @@
       DELTAUW = TAUWMAX/FLOAT(ITAUMAX)
 !GPUNotes loops over stress table dimensions and calculation iteration
       DO I=0,ITAUMAX
-         ZTAUW   = (REAL(I)*DELTAUW)**2
-         DO J=0,JUMAX
-            UTOP    = FLOAT(J)*DELU
-            CDRAG   = 0.0012875
-            WCD     = SQRT(CDRAG)
-            USTOLD  = UTOP*WCD
-            TAUOLD  = MAX(USTOLD**2, ZTAUW+EPS1)
-            DO ITER=1,NITER
-               X   = ZTAUW/TAUOLD
-               UST = SQRT(TAUOLD)
-               ZZ00=AALPHA*TAUOLD/GRAV
-               IF (ZZ0MAX.NE.0) ZZ00=MIN(ZZ00,ZZ0MAX)
-               ! Corrects roughness ZZ00 for quasi-linear effect
-               ZZ0 = ZZ00/(1.-X)**XM
-               !ZNU = 0.1*nu_air/UST  ! This was removed by Bidlot in 1996
-               !ZZ0 = MAX(ZNU,ZZ0)
-               F   = UST-KAPPA*UTOP/(ALOG(ZZWND/ZZ0))
-               DELF= 1.-KAPPA*UTOP/(ALOG(ZZWND/ZZ0))**2*2./UST &
-                        *(1.-(XM+1)*X)/(1.-X)
-               UST = UST-F/DELF
-               TAUOLD= MAX(UST**2., ZTAUW+EPS1)
-            END DO
-            TAUT(I,J)  = SQRT(TAUOLD)
-         END DO
+        ZTAUW   = (REAL(I)*DELTAUW)**2
+        DO J=0,JUMAX
+           UTOP    = FLOAT(J)*DELU
+           CDRAG   = 0.0012875
+           WCD     = SQRT(CDRAG)
+           USTOLD  = UTOP*WCD
+           TAUOLD  = MAX(USTOLD**2, ZTAUW+EPS1)
+           DO ITER=1,NITER
+             X   = ZTAUW/TAUOLD
+             UST = SQRT(TAUOLD)
+             ZZ00=AALPHA*TAUOLD/GRAV
+             IF (ZZ0MAX.NE.0) ZZ00=MIN(ZZ00,ZZ0MAX)
+             ! Corrects roughness ZZ00 for quasi-linear effect
+             ZZ0 = ZZ00/(1.-X)**XM
+             !ZNU = 0.1*nu_air/UST  ! This was removed by Bidlot in 1996
+             !ZZ0 = MAX(ZNU,ZZ0)
+             F   = UST-KAPPA*UTOP/(ALOG(ZZWND/ZZ0))
+             DELF= 1.-KAPPA*UTOP/(ALOG(ZZWND/ZZ0))**2*2./UST &
+                      *(1.-(XM+1)*X)/(1.-X)
+             UST = UST-F/DELF
+             TAUOLD= MAX(UST**2., ZTAUW+EPS1)
+          END DO
+          TAUT(I,J)  = SQRT(TAUOLD)
+        END DO
       END DO
       I=ITAUMAX
       J=JUMAX
@@ -1160,32 +1160,32 @@
 !
 !GPUNotes loops over stress table dimensions
       DO L=0,IALPHA
-         DO K=0,IUSTAR
-            UST      = MAX(REAL(K)*DELUST,0.000001)
-            ZZ00       = UST**2*AALPHA/GRAV
-            IF (ZZ0MAX.NE.0) ZZ00=MIN(ZZ00,ZZ0MAX)
-            ZZ0       = ZZ00*(1+FLOAT(L)*DELALP/AALPHA)
-            OMEGACC  = MAX(OMEGAC,X0*GRAV/UST)
-            YC       = OMEGACC*SQRT(ZZ0/GRAV)
-            DELY     = MAX((1.-YC)/REAL(JTOT),0.)
-            ! For a given value of UST and ALPHA,
-            ! the wave-supported stress is integrated all the way
-            ! to 0.05*g/UST
-            DO J=1,JTOT
-               Y        = YC+REAL(J-1)*DELY
-               OMEGA    = Y*SQRT(GRAV/ZZ0)
-               ! This is the deep water phase speed
-               CM       = GRAV/OMEGA
-               !this is the inverse wave age, shifted by ZZALP (tuning)
-               ZX       = UST/CM +ZZALP
-               ZARG     = MIN(KAPPA/ZX,20.)
-               ZMU      = MIN(GRAV*ZZ0/CM**2*EXP(ZARG),1.)
-               ZLOG     = MIN(ALOG(ZMU),0.)
-               ZBETA        = CONST1*ZMU*ZLOG**4
-               ! Power of Y in denominator should be FACHFE-4
-               TAUHFT(K,L)  = TAUHFT(K,L)+W(J)*ZBETA/Y*DELY
-            END DO
-         END DO
+        DO K=0,IUSTAR
+          UST      = MAX(REAL(K)*DELUST,0.000001)
+          ZZ00       = UST**2*AALPHA/GRAV
+          IF (ZZ0MAX.NE.0) ZZ00=MIN(ZZ00,ZZ0MAX)
+          ZZ0       = ZZ00*(1+FLOAT(L)*DELALP/AALPHA)
+          OMEGACC  = MAX(OMEGAC,X0*GRAV/UST)
+          YC       = OMEGACC*SQRT(ZZ0/GRAV)
+          DELY     = MAX((1.-YC)/REAL(JTOT),0.)
+          ! For a given value of UST and ALPHA,
+          ! the wave-supported stress is integrated all the way
+          ! to 0.05*g/UST
+          DO J=1,JTOT
+            Y        = YC+REAL(J-1)*DELY
+            OMEGA    = Y*SQRT(GRAV/ZZ0)
+            ! This is the deep water phase speed
+            CM       = GRAV/OMEGA
+            !this is the inverse wave age, shifted by ZZALP (tuning)
+            ZX       = UST/CM +ZZALP
+            ZARG     = MIN(KAPPA/ZX,20.)
+            ZMU      = MIN(GRAV*ZZ0/CM**2*EXP(ZARG),1.)
+            ZLOG     = MIN(ALOG(ZMU),0.)
+            ZBETA        = CONST1*ZMU*ZLOG**4
+            ! Power of Y in denominator should be FACHFE-4
+            TAUHFT(K,L)  = TAUHFT(K,L)+W(J)*ZBETA/Y*DELY
+          END DO
+        END DO
       END DO
       DEALLOCATE(W)
       RETURN
@@ -1700,6 +1700,7 @@
 !
 ! Sums the contributions to the directional MSS for all ITH
 !
+!GPUNotes loops over directions and sum iteration within IK loop above
               DO ITH=1,NTH
                 IS=ITH+(IK-1)*NTH
                 MSSLONG(IK,ITH) = K(IK)**2 * A(IS) * DDEN(IK) / CG(IK) ! contribution to MSS

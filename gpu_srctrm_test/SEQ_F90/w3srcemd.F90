@@ -467,13 +467,14 @@
 !XP     = 0.15
 !FACP   = XP / PI * 0.62E-3 * TPI**4 / GRAV**2
 !
-!GPUNotes loop over spectra
+!GPUNotes loop over frequencies
 !      CALL PRINT_MY_TIME("        Starting ACC loop 1 - W3SRCE", NDTO)
       DO IK=1, NK
         DAM(1+(IK-1)*NTH) = FACP / ( SIG(IK) * WN1(IK)**3 )
         WN2(1+(IK-1)*NTH) = WN1(IK)
       END DO
 !
+!GPUNotes loop over full spectrum
 !      CALL PRINT_MY_TIME("        Starting ACC loop 2 - W3SRCE", NDTO)
       DO IK=1, NK
         IS0    = (IK-1)*NTH
@@ -513,15 +514,15 @@
       TAUWX=0.
       TAUWY=0.
       IF ( IT .eq. 0 ) THEN
-          LLWS(:) = .TRUE.
-          USTAR=0.
-          USTDIR=0.
+         LLWS(:) = .TRUE.
+         USTAR=0.
+         USTDIR=0.
       ELSE
 !GPUNotes calls below will contain source term specific spectral loops
 !GPUNotes the sequencing is important (although maybe excessive?)
-       CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN, &
-                   AMAX, U10ABS, U10DIR, USTAR, USTDIR,            &
-                   TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
+        CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN, &
+                    AMAX, U10ABS, U10DIR, USTAR, USTDIR,            &
+                    TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
  
  
         CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
@@ -529,6 +530,7 @@
                  VSIN, VDIN, LLWS, IX, IY, BRLAMBDA )
       END IF
  
+!GPUNotes call below will contain source term specific spectral loops
       CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN, &
                    AMAX, U10ABS, U10DIR, USTAR, USTDIR,          &
                    TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
@@ -623,7 +625,7 @@
           VDIN(1:NSPECH) = ICESCALEIN * VDIN(1:NSPECH)
           VSDS(1:NSPECH) = ICESCALEDS * VSDS(1:NSPECH)
           VDDS(1:NSPECH) = ICESCALEDS * VDDS(1:NSPECH)
-          END IF
+        END IF
 !
         NKI    = MAX ( 2 , MIN ( NKH1 ,                           &
                  INT ( FACTI2 + FACTI1*LOG(MAX(1.E-7,FFXFI* FMEAN1)) ) ) )
@@ -642,7 +644,7 @@
                          1. + OFFSET*AFAC*MIN(0.,VD(IS)) ) ) )
 !          IF (IX == DEBUG_NODE) THEN
 !            WRITE(*,'(A20,I10,10F30.10)') 'TIME STEP COMP', IS, DAMAX, DAM(IS), XREL*SPECINIT(IS), AFILT, AFAC, DT
-!          ENDIF
+!          END IF
         END DO  ! end of loop on IS
 !
 !        WRITE(*,*) 'NODE_NUMBER', IX
@@ -699,7 +701,7 @@
             CALL SIGN_VSD_SEMI_IMPLICIT_WW3(SPEC,VS,VD)
           ELSE IF (optionCall .eq. 3) THEN
             CALL SIGN_VSD_SEMI_IMPLICIT_WW3(SPEC,VS,VD)
-          ENDIF
+          END IF
           VSIO=VS
           VDIO=VD
 !!/DEBUGSRC          IF (IX == DEBUG_NODE) WRITE(44,'(10EN15.4)') SUM(VS), SUM(VD), SUM(VSIN), SUM(VDIN), SUM(VSDS), SUM(VDDS), SUM(
@@ -914,31 +916,31 @@
 !GPUNotes actually maybe they are, think this is an indentation thing
 !GPUNotes which I have tried to address
         DO IK=1,NK
-           IS = 1+(IK-1)*NTH
+          IS = 1+(IK-1)*NTH
 !
 ! First part of ice term integration: dissipation part
 !
-           ATT=1.
-             SPEC(1+(IK-1)*NTH:NTH+(IK-1)*NTH) = ATT*SPEC2(1+(IK-1)*NTH:NTH+(IK-1)*NTH)
+          ATT=1.
+            SPEC(1+(IK-1)*NTH:NTH+(IK-1)*NTH) = ATT*SPEC2(1+(IK-1)*NTH:NTH+(IK-1)*NTH)
 !
 ! Second part of ice term integration: scattering including re-distribution in directions
 !
 ! 10.2  Fluxes of energy and momentum due to ice effects
 !
-           FACTOR = DDEN(IK)/CG1(IK)                    !Jacobian to get energy in band
-           FACTOR2= FACTOR*GRAV*WN1(IK)/SIG(IK)         ! coefficient to get momentum
-           DO ITH = 1,NTH
-             IS = ITH+(IK-1)*NTH
-             PHICE = PHICE + (SPEC(IS)-SPEC2(IS)) * FACTOR
-             COSI(1)=ECOS(IS)
-             COSI(2)=ESIN(IS)
-             TAUICE(:) = TAUICE(:) - (SPEC(IS)-SPEC2(IS))*FACTOR2*COSI(:)
-           END DO
-         END DO
-         PHICE =-1.*DWAT*GRAV*PHICE /DTG
-         TAUICE(:)=TAUICE(:)/DTG
-       ELSE
-       END IF
+          FACTOR = DDEN(IK)/CG1(IK)                    !Jacobian to get energy in band
+          FACTOR2= FACTOR*GRAV*WN1(IK)/SIG(IK)         ! coefficient to get momentum
+          DO ITH = 1,NTH
+            IS = ITH+(IK-1)*NTH
+            PHICE = PHICE + (SPEC(IS)-SPEC2(IS)) * FACTOR
+            COSI(1)=ECOS(IS)
+            COSI(2)=ESIN(IS)
+            TAUICE(:) = TAUICE(:) - (SPEC(IS)-SPEC2(IS))*FACTOR2*COSI(:)
+          END DO
+        END DO
+        PHICE =-1.*DWAT*GRAV*PHICE /DTG
+        TAUICE(:)=TAUICE(:)/DTG
+      ELSE
+      END IF
 !
 ! - - - - - - - - - - - - - - - - - - - - - -
 ! 11. Sea state dependent stress routine calls
