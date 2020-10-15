@@ -164,6 +164,7 @@
       SINU   = SIN(USDIR)
 !
 !GPUNotes loop over directions
+!$ACC KERNELS
       DO ITH=1, NTH
         DIRF(ITH) = MAX ( 0. , (ECOS(ITH)*COSU+ESIN(ITH)*SINU) )**4
       END DO
@@ -189,6 +190,7 @@
       DO IK=1, NK
         S(:,IK) = WNF(IK) * DIRF(:)
       END DO
+!$ACC END KERNELS
 !
       RETURN
 !
