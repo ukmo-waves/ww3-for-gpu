@@ -1206,7 +1206,6 @@
 !
           END IF
 
-
 ! End of interations for DTMAX < 1s
 !
 ! 3.8 Update global time step.
@@ -1496,7 +1495,6 @@
 ! Formats
 !
   101 FORMAT ('TIMESTAMP : ', A, F8.6)
-
   900 FORMAT (4X,I6,'|',I6,'| ', A19  ,' | ',A,' | ',A,' |')
   901 FORMAT (4X,I6,'|',I6,'| ',11X,A8,' | ',A,' | ',A,' |')
   902 FORMAT (2X,'--------+------+---------------------+'             &

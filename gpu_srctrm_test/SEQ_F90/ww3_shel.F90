@@ -328,7 +328,6 @@
 
       REAL(8)             :: sTime1, eTime1, T1, sTime2, eTime2, T2
       CHARACTER(LEN=26)   :: S1, S2
-
 !
 !/ ------------------------------------------------------------------- /
 !/
@@ -1862,7 +1861,6 @@
       CALL WAV_MY_WTIME(eTime1)
       T1 = eTime1 - sTime1
       S1 = 'W3SHEL calls W3WAVE -'
-
       WRITE(NDTO,101) S1, T1  
 !
       ! The following lines prevents us from trying to read past the end
@@ -1909,7 +1907,6 @@
       CALL WAV_MY_WTIME(eTime2)
       T2 = eTime2 - sTime2
       S2 = 'W3SHEL calls W3WDAS -'
-
       WRITE(NDTO,101) S2, T2  
 ! 7.e Check times
 !
@@ -1997,7 +1994,6 @@
 !
 ! Formats
   101 FORMAT ('TIMESTAMP : ', A, F10.6)
-
 !
   900 FORMAT (/15X,'      *** WAVEWATCH III Program shell ***      '/ &
                15X,'==============================================='/)
