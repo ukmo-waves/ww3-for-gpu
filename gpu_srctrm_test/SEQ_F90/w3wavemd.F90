@@ -1195,6 +1195,7 @@
             WRITE(NDTO,101) SIN4S, SIN4TOT
             SPR4S = 'Total of W3SPR4 subroutines - '
             WRITE(NDTO,101) SPR4S, SPR4TOT
+
 !
 ! This barrier is from older code versions. It has been removed in 3.11
 ! to optimize IO2/3 settings. May be needed on some systems still
@@ -1204,6 +1205,7 @@
 !!/MPI              CALL MPI_BARRIER (MPI_COMM_WCMP,IERR_MPI)
 !
           END IF
+
 
 ! End of interations for DTMAX < 1s
 !
@@ -1494,6 +1496,7 @@
 ! Formats
 !
   101 FORMAT ('TIMESTAMP : ', A, F8.6)
+
   900 FORMAT (4X,I6,'|',I6,'| ', A19  ,' | ',A,' | ',A,' |')
   901 FORMAT (4X,I6,'|',I6,'| ',11X,A8,' | ',A,' | ',A,' |')
   902 FORMAT (2X,'--------+------+---------------------+'             &
