@@ -264,22 +264,25 @@
 !
 ! 2.  Prepare auxiliary spectrum and arrays -------------------------- *
 !
+!GPUNotes loop over full spectrum
       DO IFR=1, NFR
         CONX = TPIINV / SIG(IFR) * CG(IFR)
         DO ITH=1, NTH
           ISP       = ITH + (IFR-1)*NTH
           UE (ISP) = A(ISP) / CONX
           CON(ISP) = CONX
-          END DO
         END DO
+      END DO
 !
+!GPUNotes loop over subset of frequencies and all directions
       DO IFR=NFR+1, NFRHGH
         DO ITH=1, NTH
           ISP      = ITH + (IFR-1)*NTH
           UE(ISP) = UE(ISP-NTH) * FACHFE
-          END DO
         END DO
+      END DO
 !
+!GPUNotes loop over subset of directions
       DO ISP=1-NTH, 0
         UE  (ISP) = 0.
         SA1 (ISP) = 0.
@@ -290,10 +293,11 @@
         DA2C(ISP) = 0.
         DA2P(ISP) = 0.
         DA2M(ISP) = 0.
-        END DO
+      END DO
 !
 ! 3.  Calculate interactions for extended spectrum ------------------- *
 !
+!GPUNotes loop over extended spectrum for nonlinear calcs
       DO ISP=1, NSPECX
 !
 ! 3.a Energy at interacting bins
@@ -328,13 +332,14 @@
         DA2P(ISP) = FACTOR * ( DAL1*E00 - DAL3*EM2 )
         DA2M(ISP) = FACTOR * ( DAL2*E00 - DAL3*EP2 )
 !
-        END DO
+      END DO
 !
 ! 4.  Put source and diagonal term together -------------------------- *
 !
 !!/DEBUGSRC     WRITE(740+IAPROC,*)  'W3SNL1 : sum(SA1)=', sum(SA1)
 !!/DEBUGSRC     WRITE(740+IAPROC,*)  'W3SNL1 : sum(SA2)=', sum(SA2)
 !!/DEBUGSRC     FLUSH(740+IAPROC)
+!GPUNotes loops over full spectrum
       DO ISP=1, NSPEC
 !
         S(ISP) = CON(ISP) * ( - 2. * ( SA1(ISP) + SA2(ISP) )       &
@@ -357,7 +362,7 @@
                 + SWG7 * ( DA1M(IC71(ISP)) + DA2M(IC72(ISP)) )     &
                 + SWG8 * ( DA1M(IC81(ISP)) + DA2M(IC82(ISP)) )
 !
-        END DO
+      END DO
 !!/DEBUGSRC     WRITE(740+IAPROC,*)  'W3SNL1 : sum(S)=', sum(S)
 !!/DEBUGSRC     WRITE(740+IAPROC,*)  'W3SNL1 : sum(D)=', sum(D)
 !!/DEBUGSRC     FLUSH(740+IAPROC)
@@ -541,6 +546,7 @@
 !
 ! 7.  Spectral addresses
 !
+!GPUNotes loop over partial frequencies
       DO IFR=1, NFRCHG
         IF1(IFR) =           IFR+IFRP
         IF2(IFR) =           IFR+IFRP1
@@ -550,8 +556,9 @@
         IF6(IFR) = MAX ( 0 , IFR-IFRP1 )
         IF7(IFR) =           IFR-IFRM
         IF8(IFR) =           IFR-IFRM1
-        END DO
+      END DO
 !
+!GPUNotes loop over directions
       DO ITH=1, NTH
         IT1(ITH) = ITH + ITHP
         IT2(ITH) = ITH + ITHP1
@@ -569,8 +576,9 @@
         IF ( IT6(ITH).LT. 1 ) IT6(ITH) = IT6(ITH) + NTH
         IF ( IT7(ITH).LT. 1 ) IT7(ITH) = IT7(ITH) + NTH
         IF ( IT8(ITH).LT. 1 ) IT8(ITH) = IT8(ITH) + NTH
-        END DO
+      END DO
 !
+!GPUNotes loop over partial spectrum
       DO ISP=1, NSPECX
         IFR       = 1 + (ISP-1)/NTH
         ITH       = 1 + MOD(ISP-1,NTH)
@@ -590,8 +598,9 @@
         IM22(ISP) = IT3(ITH) + (IF4(IFR)-1)*NTH
         IM23(ISP) = IT4(ITH) + (IF3(IFR)-1)*NTH
         IM24(ISP) = IT3(ITH) + (IF3(IFR)-1)*NTH
-        END DO
+      END DO
 !
+!GPUNotes loop over full spectrum
       DO ISP=1, NSPEC
         IFR       = 1 + (ISP-1)/NTH
         ITH       = 1 + MOD(ISP-1,NTH)
@@ -611,28 +620,30 @@
         IC62(ISP) = IT7(ITH) + (IF8(IFR)-1)*NTH
         IC72(ISP) = IT8(ITH) + (IF7(IFR)-1)*NTH
         IC82(ISP) = IT7(ITH) + (IF7(IFR)-1)*NTH
-        END DO
+      END DO
 !
       DEALLOCATE ( IF1, IF2, IF3, IF4, IF5, IF6, IF7, IF8,  &
                    IT1, IT2, IT3, IT4, IT5, IT6, IT7, IT8 )
 !
 ! 8.  Fill scaling array (f**11)
 !
+!GPUNotes loop over full spectrum
       DO IFR=1, NFR
         AF11A  = (SIG(IFR)*TPIINV)**11
         DO ITH=1, NTH
           AF11(ITH+(IFR-1)*NTH) = AF11A
-          END DO
         END DO
+      END DO
 !
       FR     = SIG(NFR)*TPIINV
+!GPUNotes loop over full spectrum
       DO IFR=NFR+1, NFRCHG
         FR     = FR * XFR
         AF11A  = FR**11
         DO ITH=1, NTH
           AF11(ITH+(IFR-1)*NTH) = AF11A
-          END DO
         END DO
+      END DO
 !
 ! 9.  Interpolation weights
 !
