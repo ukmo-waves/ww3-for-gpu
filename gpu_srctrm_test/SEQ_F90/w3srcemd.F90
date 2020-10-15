@@ -59,7 +59,7 @@
                           TAUWY, TAUOX, TAUOY, TAUWIX, TAUWIY, TAUWNX,&
                           TAUWNY, PHIAW, CHARN, TWS, PHIOC, WHITECAP, &
                           D50, PSIC, BEDFORM , PHIBBL, TAUBBL, TAUICE,&
-                          PHICE, COEF)
+                          PHICE, COEF, SIN4T, SPR4T)
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -368,7 +368,7 @@
       USE W3SRC4MD, ONLY : W3SPR4, W3SIN4, W3SDS4
       USE W3GDATMD, ONLY : ZZWND, FFXFM, FFXPM, FFXFA, FFXFI, FFXFD
       USE W3SNL1MD
-      USE W3PARALL, ONLY : PRINT_MY_TIME
+      USE W3PARALL, ONLY : WAV_MY_WTIME
 !/
       IMPLICIT NONE
 !/
@@ -395,6 +395,7 @@
                                  ICEF
       REAL, INTENT(OUT)       :: DTDYN, FCUT
       REAL, INTENT(IN)        :: COEF
+      REAL(8), INTENT(OUT)    :: SIN4T, SPR4T
 !/
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
@@ -437,10 +438,15 @@
       REAL                    :: DeltaSRC(NSPEC), MAXDAC(NSPEC)
  
 !/
- 
+!!LS  Newly added time varibles
+      REAL(8)                 :: sTime1, eTime1, sTime2, eTime2
+!      REAL(8)                 :: T1, T2
+      CHARACTER(LEN=30)       :: S1, S2
 !/
 !/ ------------------------------------------------------------------- /
 !/
+      SPR4T = 0.0
+      SIN4T = 0.0
 !
       DEPTH  = MAX ( DMIN , D_INP )
       IKS1 = 1
@@ -452,7 +458,7 @@
 !
       VSIN = 0.
       VDIN = 0.
- 
+    
       VSBT = 0.
       VDBT = 0.
 !
@@ -524,19 +530,30 @@
           USTAR=0.
           USTDIR=0.
       ELSE
+        CALL WAV_MY_WTIME(sTime1)
         CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN, &
                    AMAX, U10ABS, U10DIR, USTAR, USTDIR,            &
                    TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
- 
- 
+        CALL WAV_MY_WTIME(eTime1)
+        SPR4T = SPR4T + eTime1 - sTime1
+        !S1 = 'Call to W3SPR4 in W3SRCE -'
+        !WRITE(NDTO,101) S1, T1
+        CALL WAV_MY_WTIME(sTime2) 
         CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
                  U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,       &
                  VSIN, VDIN, LLWS, IX, IY, BRLAMBDA )
-        END IF
+        CALL WAV_MY_WTIME(eTime2)
+        SIN4T = SIN4T + eTime2 - sTime2
+        !S2 = 'Call to W3SIN4 in W3SRCE -'
+        !WRITE(NDTO,101) S2, T2
+      END IF
  
+      CALL WAV_MY_WTIME(sTime1)
       CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN, &
-                   AMAX, U10ABS, U10DIR, USTAR, USTDIR,          &
-                   TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
+                 AMAX, U10ABS, U10DIR, USTAR, USTDIR,            &
+                 TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
+      CALL WAV_MY_WTIME(eTime1)
+      SPR4T = SPR4T + eTime1 - sTime1
       TWS = 1./FMEANWS
 !
 ! 1.c2 Stores the initial data
@@ -567,11 +584,13 @@
 !
         CALL W3SLN1 (       WN1, FHIGH, USTAR, U10DIR , VSLN       )
 !
+        CALL WAV_MY_WTIME(sTime2) 
         CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
                  U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,       &
                  VSIN, VDIN, LLWS, IX, IY, BRLAMBDA )
- 
- 
+        CALL WAV_MY_WTIME(eTime2)
+        SIN4T = SIN4T + eTime2 - sTime2
+
 !
 ! 2.b Nonlinear interactions.
 !
@@ -731,43 +750,46 @@
 !              wave ->BBL  flux PHIBBL------------------------------- *
 !              wave ->ice  flux PHICE ------------------------------- *
 !
-       WHITECAP(3)=0.
-       HSTOT=0.
-       DO IK=IKS1, NK
-         FACTOR = DDEN(IK)/CG1(IK)                    !Jacobian to get energy in band
-         FACTOR2= FACTOR*GRAV*WN1(IK)/SIG(IK)         ! coefficient to get momentum
+        WHITECAP(3)=0.
+        HSTOT=0.
+        DO IK=IKS1, NK
+          FACTOR = DDEN(IK)/CG1(IK)                    !Jacobian to get energy in band
+          FACTOR2= FACTOR*GRAV*WN1(IK)/SIG(IK)         ! coefficient to get momentum
  
-         ! Wave direction is "direction to"
-         ! therefore there is a PLUS sign for the stress
-         DO ITH=1, NTH
-           IS   = (IK-1)*NTH + ITH
-           COSI(1)=ECOS(IS)
-           COSI(2)=ESIN(IS)
-           PHIAW = PHIAW + (VSIN(IS))* DT * FACTOR                    &
-             / MAX ( 1. , (1.-HDT*VDIN(IS))) ! semi-implict integration scheme
+          ! Wave direction is "direction to"
+          ! therefore there is a PLUS sign for the stress
+          DO ITH=1, NTH
+            IS   = (IK-1)*NTH + ITH
+            COSI(1)=ECOS(IS)
+            COSI(2)=ESIN(IS)
+            PHIAW = PHIAW + (VSIN(IS))* DT * FACTOR                    &
+              / MAX ( 1. , (1.-HDT*VDIN(IS))) ! semi-implict integration scheme
  
-           PHIBBL= PHIBBL- (VSBT(IS))* DT * FACTOR                    &
-             / MAX ( 1. , (1.-HDT*VDBT(IS))) ! semi-implict integration scheme
-           PHINL = PHINL + VSNL(IS)* DT * FACTOR                      &
-             / MAX ( 1. , (1.-HDT*VDNL(IS))) ! semi-implict integration scheme
-           IF (VSIN(IS).GT.0.) WHITECAP(3) = WHITECAP(3) + SPEC(IS)  * FACTOR
-           HSTOT = HSTOT + SPEC(IS) * FACTOR
-           END DO
-         END DO
-       WHITECAP(3)=4.*SQRT(WHITECAP(3))
-       HSTOT=4.*SQRT(HSTOT)
-       TAUWIX= TAUWIX+ TAUWX * DRAT *DT
-       TAUWIY= TAUWIY+ TAUWY * DRAT *DT
-       TAUWNX= TAUWNX+ TAUWAX * DRAT *DT
-       TAUWNY= TAUWNY+ TAUWAY * DRAT *DT
-       ! MISSING: TAIL TO BE ADDED ?
+            PHIBBL= PHIBBL- (VSBT(IS))* DT * FACTOR                    &
+              / MAX ( 1. , (1.-HDT*VDBT(IS))) ! semi-implict integration scheme
+            PHINL = PHINL + VSNL(IS)* DT * FACTOR                      &
+              / MAX ( 1. , (1.-HDT*VDNL(IS))) ! semi-implict integration scheme
+            IF (VSIN(IS).GT.0.) WHITECAP(3) = WHITECAP(3) + SPEC(IS)  * FACTOR
+            HSTOT = HSTOT + SPEC(IS) * FACTOR
+          END DO
+        END DO
+        WHITECAP(3)=4.*SQRT(WHITECAP(3))
+        HSTOT=4.*SQRT(HSTOT)
+        TAUWIX= TAUWIX+ TAUWX * DRAT *DT
+        TAUWIY= TAUWIY+ TAUWY * DRAT *DT
+        TAUWNX= TAUWNX+ TAUWAX * DRAT *DT
+        TAUWNY= TAUWNY+ TAUWAY * DRAT *DT
+        ! MISSING: TAIL TO BE ADDED ?
 !
 ! 6.  Add tail ------------------------------------------------------- *
 !   a Mean parameters
 !
-        CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN,&
-                   AMAX, U10ABS, U10DIR, USTAR, USTDIR,           &
+        CALL WAV_MY_WTIME(sTime1)
+        CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN, &
+                   AMAX, U10ABS, U10DIR, USTAR, USTDIR,            &
                    TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
+        CALL WAV_MY_WTIME(eTime1)
+        SPR4T = SPR4T + eTime1 - sTime1
 !
 ! Introduces a Long & Resio (JGR2007) type dependance on wave age
         FAGE   = FFXFA*TANH(0.3*U10ABS*FMEANWS*TPI/GRAV)
@@ -791,26 +813,29 @@
           DO ITH=1, NTH
             SPEC(ITH+(IK-1)*NTH) = SPEC(ITH+(IK-2)*NTH) * FACHFA         &
                        + 0.
-            END DO
           END DO
+        END DO
 !
 ! 6.e  Update wave-supported stress----------------------------------- *
 !
-        CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,      &
-                      U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY, &
-                      VSIN, VDIN, LLWS, IX, IY, BRLAMBDA )
+        CALL WAV_MY_WTIME(sTime2) 
+        CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
+                 U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,       &
+                 VSIN, VDIN, LLWS, IX, IY, BRLAMBDA )
+        CALL WAV_MY_WTIME(eTime2)
+        SIN4T = SIN4T + eTime2 - sTime2
  
 !
 ! 7.  Check if integration complete ---------------------------------- *
 !
-          IF (srce_call .eq. srce_imp_post) THEN
-            EXIT
-            ENDIF
-          IF ( DTTOT .GE. 0.9999*DTG ) THEN
-!            IF (IX == DEBUG_NODE) WRITE(*,*) 'DTTOT, DTG', DTTOT, DTG
-            EXIT
-            ENDIF
-        END DO ! INTEGRATIN LOOP
+        IF (srce_call .eq. srce_imp_post) THEN
+          EXIT
+        ENDIF
+        IF ( DTTOT .GE. 0.9999*DTG ) THEN
+!          IF (IX == DEBUG_NODE) WRITE(*,*) 'DTTOT, DTG', DTTOT, DTG
+          EXIT
+        ENDIF
+      END DO ! INTEGRATIN LOOP
 !
 ! ... End point dynamic integration - - - - - - - - - - - - - - - - - -
 !
@@ -890,11 +915,11 @@
 !
  
 !
-   SPEC2 = SPEC
+     SPEC2 = SPEC
 !
-   TAUICE(:) = 0.
-   PHICE = 0.
-   DO IK=1,NK
+     TAUICE(:) = 0.
+     PHICE = 0.
+     DO IK=1,NK
      IS = 1+(IK-1)*NTH
 !
 ! First part of ice term integration: dissipation part
@@ -945,6 +970,8 @@
       RETURN
 !
 ! Formats
+!
+  101 FORMAT ('TIMESTAMP : ', A, F8.6)
 !
  9006 FORMAT (' TEST W3SRCE : FHIGH (3X) : ',3F8.4/                   &
               ' ------------- NEW DYNAMIC INTEGRATION LOOP',          &

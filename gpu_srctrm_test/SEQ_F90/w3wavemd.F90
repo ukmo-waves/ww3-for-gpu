@@ -432,13 +432,13 @@
       INTEGER ITH_F
 
 !!LS  Newly added time varibles
-      REAL(8)                 :: sTime1, eTime1, T1 
-      CHARACTER(LEN=50)       :: S1
+      REAL(8)                 :: sTime1, eTime1, T1, SIN4TOT, SPR4TOT, &
+                                 SIN4T, SPR4T
+      CHARACTER(LEN=30)       :: S1
+      CHARACTER(LEN=34)       :: SIN4S, SPR4S
 !
 !/
- 
- 
- 
+
 !/ ------------------------------------------------------------------- /
 ! 0.  Initializations
  
@@ -451,9 +451,6 @@
       IF ( IWDATA .NE. IMOD ) CALL W3SETW ( IMOD, NDSE, NDST )
       IF ( IADATA .NE. IMOD ) CALL W3SETA ( IMOD, NDSE, NDST )
       IF ( IIDATA .NE. IMOD ) CALL W3SETI ( IMOD, NDSE, NDST )
- 
- 
- 
  
 !
       ALLOCATE(TAUWX(NSEAL), TAUWY(NSEAL))
@@ -1124,8 +1121,6 @@
 !
   370     CONTINUE
 
-!          CALL PRINT_MY_TIME("    Calculate and integrate source term -&
-!          & W3WAVE", NDTO)
           IF ( FLSOU ) THEN
 !
             D50=0.0002
@@ -1133,23 +1128,25 @@
             REFLED(:)=0
             PSIC=0.
 !
-              CALL WAV_MY_WTIME(sTime1)
-              DO JSEA=1, NSEAL
-                CALL INIT_GET_ISEA(ISEA, JSEA)
-                IX     = MAPSF(ISEA,1)
-                IY     = MAPSF(ISEA,2)
-                DELA=1.
-                DELX=1.
-                DELY=1.
+            SPR4TOT=0.
+            SIN4TOT=0.
+            CALL WAV_MY_WTIME(sTime1)
+            DO JSEA=1, NSEAL
+              CALL INIT_GET_ISEA(ISEA, JSEA)
+              IX     = MAPSF(ISEA,1)
+              IY     = MAPSF(ISEA,2)
+              DELA=1.
+              DELX=1.
+              DELY=1.
 !
  
  
-                IF ( MAPSTA(IY,IX) .EQ. 1 .AND. FLAGST(ISEA)) THEN
-                     TMP1   = WHITECAP(JSEA,1:4)
-                     TMP2   = BEDFORMS(JSEA,1:3)
-                     TMP3   = TAUBBL(JSEA,1:2)
-                     TMP4   = TAUICE(JSEA,1:2)
-                       CALL W3SRCE(srce_direct, IT, JSEA, IX, IY, IMOD, &
+              IF ( MAPSTA(IY,IX) .EQ. 1 .AND. FLAGST(ISEA)) THEN
+                   TMP1   = WHITECAP(JSEA,1:4)
+                   TMP2   = BEDFORMS(JSEA,1:3)
+                   TMP3   = TAUBBL(JSEA,1:2)
+                   TMP4   = TAUICE(JSEA,1:2)
+                   CALL W3SRCE(srce_direct, IT, JSEA, IX, IY, IMOD, &
                             VAoldDummy, VA(:,JSEA),                     &
                             VSioDummy, VDioDummy, SHAVETOTioDummy,      &
                             ALPHA(1:NK,JSEA), WN(1:NK,ISEA),            &
@@ -1167,25 +1164,30 @@
                             TAUWNY(JSEA),  PHIAW(JSEA), CHARN(JSEA),    &
                             TWS(JSEA), PHIOC(JSEA), TMP1, D50, PSIC,TMP2,&
                             PHIBBL(JSEA), TMP3, TMP4 , PHICE(JSEA),     &
-                            ASF(ISEA))
-                     WHITECAP(JSEA,1:4) = TMP1
-                     BEDFORMS(JSEA,1:3) = TMP2
-                     TAUBBL(JSEA,1:2) = TMP3
-                     TAUICE(JSEA,1:2) = TMP4
-                ELSE
-                    UST   (ISEA) = UNDEF
-                    USTDIR(ISEA) = UNDEF
-                    DTDYN (JSEA) = UNDEF
-                    FCUT  (JSEA) = UNDEF
-!                    VA(:,JSEA)  = 0.
-                END IF
-              END DO
+                            ASF(ISEA), SIN4T, SPR4T)
+                   SIN4TOT = SIN4TOT + SIN4T
+                   SPR4TOT = SPR4TOT + SPR4T
+                   WHITECAP(JSEA,1:4) = TMP1
+                   BEDFORMS(JSEA,1:3) = TMP2
+                   TAUBBL(JSEA,1:2) = TMP3
+                   TAUICE(JSEA,1:2) = TMP4
+              ELSE
+                   UST   (ISEA) = UNDEF
+                   USTDIR(ISEA) = UNDEF
+                   DTDYN (JSEA) = UNDEF
+                   FCUT  (JSEA) = UNDEF
+!                  VA(:,JSEA)  = 0.
+              END IF
+            END DO
  
             CALL WAV_MY_WTIME(eTime1)
             T1 = eTime1 - sTime1
-            S1 = 'Total time for source term loop, W3SRCE in W3WAVE -'
-            WRITE(NDTO,101) S1,T1
-!
+            S1 = 'Outer seapoint loop, W3SRCE - '
+            WRITE(NDTO,101) S1, T1
+            SIN4S = 'Total of W3SIN4 subroutines - '
+            WRITE(NDTO,101) SIN4S, SIN4TOT
+            SPR4S = 'Total of W3SPR4 subroutines - '
+            WRITE(NDTO,101) SPR4S, SPR4TOT
 !
 ! This barrier is from older code versions. It has been removed in 3.11
 ! to optimize IO2/3 settings. May be needed on some systems still
@@ -1483,7 +1485,7 @@
 !
 ! Formats
 !
-  101 FORMAT ('TIME DIFFERENCE: ', A, F8.4)
+  101 FORMAT ('TIMESTAMP : ', A, F8.6)
   900 FORMAT (4X,I6,'|',I6,'| ', A19  ,' | ',A,' | ',A,' |')
   901 FORMAT (4X,I6,'|',I6,'| ',11X,A8,' | ',A,' | ',A,' |')
   902 FORMAT (2X,'--------+------+---------------------+'             &
