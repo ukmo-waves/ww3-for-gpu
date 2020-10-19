@@ -1,0 +1,34 @@
+#!/bin/bash
+## The following comment lines are PBS resource requests:
+#PBS -l select=1:ncpus=1
+#PBS -q pascalq 
+#PBS -l walltime=120
+#PBS -o out/run_outf.out
+#PBS -e out/run_outf.err
+set -eu
+
+## Change directory to where job was submitted:
+#cd ${PBS_O_WORKDIR:-.}
+
+## link in the correct input files:
+ln -sf inp/ww3_outp.inp ./
+
+mv out/*.ww3 ./
+
+## run the ww3_outp program:
+../SEQ_F90/ww3_outp
+
+mv *.ww3 out/
+mkdir -p out/ww3_outp/
+rm -rf out/ww3_outp/*
+mv ww3.*.spc out/ww3_outp/
+
+differences=$(diff -q -U 0 out/checking_outp/ out/ww3_outp/ | grep -v ^@ | wc -l)
+
+if [ $differences != 0 ]
+then
+    echo "There are $differences different lines between checking_outp and ww3_outp."
+else
+    echo "There are no differences between checking_outp and this run."
+fi
+
