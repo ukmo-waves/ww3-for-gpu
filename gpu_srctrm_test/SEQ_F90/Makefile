@@ -79,7 +79,7 @@ $(OBJ)/%.o:%.F90
 
 ## Clean:
 clean: 
-	rm -f ww3_grid ww3_shel ww3_outf $(MOD)/*.mod $(OBJ)/* 
+	rm -f ww3_grid ww3_shel ww3_outf ww3_outp $(MOD)/*.mod $(OBJ)/* 
 
 
 ## Specific dependencies of each module:

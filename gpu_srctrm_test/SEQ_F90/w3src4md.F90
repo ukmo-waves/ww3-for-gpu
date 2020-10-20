@@ -66,7 +66,7 @@
       INTEGER, PARAMETER      :: IUSTAR=100,IALPHA=200, ILEVTAIL=50
       REAL                    :: TAUT(0:ITAUMAX,0:JUMAX), DELTAUW, DELU
 !$ACC DECLARE CREATE(DELTAUW, DELU, TAUT)
-      REAL                    :: ZZWND, AALPHA
+      REAL                    :: ZZWND, AALPHA 
 !$ACC DECLARE CREATE(ZZWND, AALPHA)
       ! Table for H.F. stress as a function of 2 variables
       REAL                    :: TAUHFT(0:IUSTAR,0:IALPHA), DELUST, DELALP
@@ -187,9 +187,9 @@
 !/
 !/ ------------------------------------------------------------------- /
 !/
+!
       ZZWND  = MPARS(1)%SRCPS%ZZWND
       AALPHA = MPARS(1)%SRCPS%AALPHA
-!
       UNZ    = MAX ( 0.01 , U )
       USTAR  = MAX ( 0.0001 , USTAR )
 !
@@ -269,13 +269,14 @@
 !
       TAUW = SQRT(TAUWX**2+TAUWY**2)
  
+!$ACC END KERNELS
       Z0=0.
       CALL CALC_USTAR(U,TAUW,USTAR,Z0,CHARN)
       UNZ    = MAX ( 0.01 , U )
       CD     = (USTAR/UNZ)**2
       USDIR = UDIR
 !
-!$ACC END KERNELS
+!!$ACC END KERNELS
 ! 6.  Final test output ---------------------------------------------- *
 !
       RETURN
@@ -1472,7 +1473,7 @@
 !-----------------------------------------------------------------------------!
 !$ACC ROUTINE SEQ
       USE CONSTANTS, ONLY: GRAV, KAPPA
-      !USE W3GDATMD,  ONLY: ZZWND, AALPHA
+!      USE W3GDATMD,  ONLY: ZZWND, AALPHA
       IMPLICIT NONE
       REAL, intent(in) :: WINDSPEED,TAUW
       REAL, intent(out) :: USTAR, Z0, CHARN
@@ -1480,6 +1481,7 @@
       REAL SQRTCDM1
       REAL XI,DELI1,DELI2,XJ,delj1,delj2
       REAL TAUW_LOCAL
+
       INTEGER IND,J
 !
       TAUW_LOCAL=MAX(MIN(TAUW,TAUWMAX),0.)
