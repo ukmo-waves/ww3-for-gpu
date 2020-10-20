@@ -65,6 +65,9 @@
       INTEGER, PARAMETER      :: ITAUMAX=200,JUMAX=200
       INTEGER, PARAMETER      :: IUSTAR=100,IALPHA=200, ILEVTAIL=50
       REAL                    :: TAUT(0:ITAUMAX,0:JUMAX), DELTAUW, DELU
+!$ACC DECLARE CREATE(DELTAUW, DELU, TAUT)
+      REAL                    :: ZZWND, AALPHA
+!$ACC DECLARE CREATE(ZZWND, AALPHA)
       ! Table for H.F. stress as a function of 2 variables
       REAL                    :: TAUHFT(0:IUSTAR,0:IALPHA), DELUST, DELALP
       ! Table for H.F. stress as a function of 3 variables
@@ -160,7 +163,7 @@
       USE CONSTANTS, ONLY: TPIINV
       USE W3GDATMD, ONLY: NK, NTH, NSPEC, SIG, DTH, DDEN, WWNMEANP, &
                           WWNMEANPTAIL, FTE, FTF, SSTXFTF, SSTXFTWN,&
-                          SSTXFTFTAIL, SSWELLF
+                          SSTXFTFTAIL, SSWELLF, MPARS
 !
       IMPLICIT NONE
 !/
@@ -184,6 +187,8 @@
 !/
 !/ ------------------------------------------------------------------- /
 !/
+      ZZWND  = MPARS(1)%SRCPS%ZZWND
+      AALPHA = MPARS(1)%SRCPS%AALPHA
 !
       UNZ    = MAX ( 0.01 , U )
       USTAR  = MAX ( 0.0001 , USTAR )
@@ -199,9 +204,11 @@
 ! 1.  Integral over directions and maximum --------------------------- *
 !
 !GPUNotes spectral loop
+!$ACC KERNELS 
+      EB(:)  = 0.
+      EB2(:) = 0.
+!$ACC LOOP INDEPENDENT GANG VECTOR(128)
       DO IK=1, NK
-        EB(IK)  = 0.
-        EB2(IK) = 0.
         DO ITH=1, NTH
           IS=ITH+(IK-1)*NTH
           EB(IK) = EB(IK) + A(ITH,IK)
@@ -209,10 +216,12 @@
           AMAX   = MAX ( AMAX , A(ITH,IK) )
         END DO
       END DO
+!$ACC END KERNELS
 !
 ! 2.  Integrate over directions -------------------------------------- *
 !
 !GPUNotes directions loop only
+!$ACC KERNELS
       DO IK=1, NK
         ALFA(IK) = 2. * DTH * SIG(IK) * EB(IK) * WN(IK)**3
         EB(IK)   = EB(IK) * DDEN(IK) / CG(IK)
@@ -266,6 +275,7 @@
       CD     = (USTAR/UNZ)**2
       USDIR = UDIR
 !
+!$ACC END KERNELS
 ! 6.  Final test output ---------------------------------------------- *
 !
       RETURN
@@ -1460,8 +1470,9 @@
 !
 ! 10. Source code :
 !-----------------------------------------------------------------------------!
+!$ACC ROUTINE SEQ
       USE CONSTANTS, ONLY: GRAV, KAPPA
-      USE W3GDATMD,  ONLY: ZZWND, AALPHA
+      !USE W3GDATMD,  ONLY: ZZWND, AALPHA
       IMPLICIT NONE
       REAL, intent(in) :: WINDSPEED,TAUW
       REAL, intent(out) :: USTAR, Z0, CHARN
@@ -2182,3 +2193,4 @@
  
  
       END MODULE W3SRC4MD
+

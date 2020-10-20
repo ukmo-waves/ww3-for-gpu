@@ -395,7 +395,6 @@
                                  ICEF
       REAL, INTENT(OUT)       :: DTDYN, FCUT
       REAL, INTENT(IN)        :: COEF
-      REAL(8), INTENT(OUT)    :: SIN4T, SPR4T
 !/
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
@@ -440,8 +439,8 @@
 !/
 !!LS  Newly added time varibles
       REAL(8)                 :: sTime1, eTime1, sTime2, eTime2
-!      REAL(8)                 :: T1, T2
       CHARACTER(LEN=30)       :: S1, S2
+      REAL(8), INTENT(OUT)    :: SIN4T, SPR4T
 !/
 !/ ------------------------------------------------------------------- /
 !/
@@ -464,7 +463,7 @@
 !
       ZWND   = ZZWND
 !
-       DRAT  = DAIR / DWAT
+      DRAT  = DAIR / DWAT
 !
 ! 1.  Preparations --------------------------------------------------- *
 !
@@ -472,23 +471,30 @@
 !
 !XP     = 0.15
 !FACP   = XP / PI * 0.62E-3 * TPI**4 / GRAV**2
-!
+
 !GPUNotes loop over frequencies
-!      CALL PRINT_MY_TIME("        Starting ACC loop 1 - W3SRCE", NDTO)
+!$ACC DATA COPY   (WN2, DAM)                                            &
+!$ACC      COPYIN (WN1, FACP, NTH, SIG)
+!$ACC KERNELS      
+!$ACC LOOP INDEPENDENT
       DO IK=1, NK
         DAM(1+(IK-1)*NTH) = FACP / ( SIG(IK) * WN1(IK)**3 )
         WN2(1+(IK-1)*NTH) = WN1(IK)
       END DO
-!
+!$ACC END KERNELS
+
 !GPUNotes loop over full spectrum
-!      CALL PRINT_MY_TIME("        Starting ACC loop 2 - W3SRCE", NDTO)
+!$ACC KERNELS      
+!$ACC LOOP INDEPENDENT COLLAPSE(2) GANG VECTOR
       DO IK=1, NK
-        IS0    = (IK-1)*NTH
         DO ITH=2, NTH
+          IS0    = (IK-1)*NTH
           DAM(ITH+IS0) = DAM(1+IS0)
           WN2(ITH+IS0) = WN2(1+IS0)
         END DO
       END DO
+!$ACC END KERNELS
+!$ACC END DATA
 !
 ! 1.b Prepare dynamic time stepping
 !
@@ -532,16 +538,12 @@
                    TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
         CALL WAV_MY_WTIME(eTime1)
         SPR4T = SPR4T + eTime1 - sTime1
-        !S1 = 'Call to W3SPR4 in W3SRCE -'
-        !WRITE(NDTO,101) S1, T1
         CALL WAV_MY_WTIME(sTime2) 
         CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
                  U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,       &
                  VSIN, VDIN, LLWS, IX, IY, BRLAMBDA )
         CALL WAV_MY_WTIME(eTime2)
         SIN4T = SIN4T + eTime2 - sTime2
-        !S2 = 'Call to W3SIN4 in W3SRCE -'
-        !WRITE(NDTO,101) S2, T2
       END IF
  
 !GPUNotes call below will contain source term specific spectral loops

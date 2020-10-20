@@ -6,6 +6,10 @@
 #PBS -e out/run_all.err
 #PBS -o out/run_all.out
 
+#cd ${PBS_O_WORKDIR}
+#module use /projects/metoffice/pgi-compiler/modulefiles
+#module load cuda10.2/toolkit/10.2.89 openmpi/3.1.5/2020 netcdf/4.7.3/openmpi-3.1.5/2020 
+
 ## run the ww3_grid program:
 ## link in the correct *.dev input files:
 ln -sf inp/ww3_grid.nml ./
