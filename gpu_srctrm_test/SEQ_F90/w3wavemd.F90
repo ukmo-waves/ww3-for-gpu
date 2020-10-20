@@ -1195,6 +1195,7 @@
             WRITE(NDTO,101) SIN4S, SIN4TOT
             SPR4S = 'Total of W3SPR4 subroutines - '
             WRITE(NDTO,101) SPR4S, SPR4TOT
+
 !
 ! This barrier is from older code versions. It has been removed in 3.11
 ! to optimize IO2/3 settings. May be needed on some systems still

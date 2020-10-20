@@ -34,11 +34,17 @@ OUTF_OBJS=$(addprefix $(OBJ)/, constants.o w3servmd.o w3timemd.o w3arrymd.o \
 	w3adatmd.o w3idatmd.o w3odatmd.o w3src4md.o w3snl1md.o w3iogrmd.o \
 	w3iogomd.o ww3_outf.o)
 
+OUTP_OBJS=$(addprefix $(OBJ)/, constants.o w3servmd.o w3timemd.o w3arrymd.o \
+	w3dispmd.o w3gsrumd.o wmmdatmd.o w3parall.o w3triamd.o w3gdatmd.o \
+	w3wdatmd.o w3adatmd.o w3idatmd.o w3odatmd.o w3flx1md.o w3sln1md.o \
+	w3src4md.o w3snl1md.o w3bullmd.o w3iogrmd.o w3iopomd.o w3partmd.o \
+	ww3_outp.o)
+
 
 .PHONY: all objdir moddir
 
 # By default, build both the ww3_shel, ww3_grid and ww3_outf targets below:
-all: ww3_shel ww3_grid ww3_outf
+all: ww3_shel ww3_grid ww3_outf ww3_outp
 
 ## Build and link the WW3_SHEL executable:
 ww3_shel: objdir moddir $(SHEL_OBJS)
@@ -48,9 +54,13 @@ ww3_shel: objdir moddir $(SHEL_OBJS)
 ww3_grid: objdir moddir $(GRID_OBJS)
 	$(FC) $(FFLAGS) $(LIBS) -o ww3_grid $(GRID_OBJS)
 
-## Build and link the WW3_GRID executable:
+## Build and link the WW3_OUTF executable:
 ww3_outf: objdir moddir $(OUTF_OBJS)
 	$(FC) $(FFLAGS) $(LIBS) -o ww3_outf $(OUTF_OBJS)
+
+## Build and link the WW3_OUTP executable:
+ww3_outp: objdir moddir $(OUTP_OBJS)
+	$(FC) $(FFLAGS) $(LIBS) -o ww3_outp $(OUTP_OBJS)
 
 objdir:
 	@mkdir -p obj
@@ -150,3 +160,6 @@ $(OBJ)/ww3_grid.o : ww3_grid.F90 w3macros.h $(OBJ)/constants.o $(OBJ)/w3arrymd.o
 $(OBJ)/ww3_shel.o : ww3_shel.F90 w3macros.h $(OBJ)/w3adatmd.o $(OBJ)/w3fldsmd.o $(OBJ)/w3gdatmd.o $(OBJ)/w3idatmd.o $(OBJ)/w3initmd.o $(OBJ)/w3iogomd.o $(OBJ)/w3iogrmd.o $(OBJ)/w3iopomd.o $(OBJ)/w3nmlshelmd.o $(OBJ)/w3odatmd.o $(OBJ)/w3servmd.o $(OBJ)/w3timemd.o $(OBJ)/w3wavemd.o $(OBJ)/w3wdasmd.o $(OBJ)/w3wdatmd.o 
 
 $(OBJ)/ww3_outf.o: ww3_outf.F90 w3macros.h $(OBJ)/constants.o $(OBJ)/w3adatmd.o $(OBJ)/w3arrymd.o $(OBJ)/w3gdatmd.o $(OBJ)/w3iogomd.o $(OBJ)/w3iogrmd.o $(OBJ)/w3odatmd.o $(OBJ)/w3servmd.o $(OBJ)/w3timemd.o $(OBJ)/w3wdatmd.o
+
+$(OBJ)/ww3_outp.o: ww3_outp.F90 w3macros.h  $(OBJ)/constants.o $(OBJ)/w3adatmd.o $(OBJ)/w3arrymd.o $(OBJ)/w3bullmd.o $(OBJ)/w3dispmd.o $(OBJ)/w3gdatmd.o $(OBJ)/w3iogrmd.o $(OBJ)/w3iopomd.o $(OBJ)/w3odatmd.o $(OBJ)/w3partmd.o $(OBJ)/w3servmd.o $(OBJ)/w3sln1md.o $(OBJ)/w3snl1md.o $(OBJ)/w3src4md.o $(OBJ)/w3timemd.o $(OBJ)/w3wdatmd.o
+
