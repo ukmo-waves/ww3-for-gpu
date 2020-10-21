@@ -269,14 +269,13 @@
 !
       TAUW = SQRT(TAUWX**2+TAUWY**2)
  
-!$ACC END KERNELS
       Z0=0.
       CALL CALC_USTAR(U,TAUW,USTAR,Z0,CHARN)
       UNZ    = MAX ( 0.01 , U )
       CD     = (USTAR/UNZ)**2
       USDIR = UDIR
 !
-!!$ACC END KERNELS
+!$ACC END KERNELS
 ! 6.  Final test output ---------------------------------------------- *
 !
       RETURN
