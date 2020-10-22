@@ -172,8 +172,8 @@
 !GPUNotes should I use create statement for some of these local
 !variables as don't think I need them on the CPU? 
 !$ACC DATA COPYIN (ECOS,ESIN,K,SIG)        &
-!$ACC      CREATE (DIRF,WNF)               
-!!$ACC      COPY   (S)
+!$ACC      CREATE (DIRF,WNF)               & 
+!$ACC      COPY   (S)
 !$ACC KERNELS
       DO ITH=1, NTH
         DIRF(ITH) = MAX ( 0. , (ECOS(ITH)*COSU+ESIN(ITH)*SINU) )**4

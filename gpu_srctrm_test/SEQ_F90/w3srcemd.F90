@@ -583,9 +583,7 @@
 ! 2.a Input.
 !
 !GPUNotes subroutine will contain source term specific spectral loops
-!$ACC DATA COPY (VSLN)
         CALL W3SLN1 (       WN1, FHIGH, USTAR, U10DIR , VSLN       )
-!$ACC END DATA
 !
 !GPUNotes subrotuine will contain source term specific spectral loops
         CALL WAV_MY_WTIME(sTime2) 
