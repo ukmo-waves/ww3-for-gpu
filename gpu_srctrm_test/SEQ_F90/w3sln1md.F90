@@ -163,25 +163,30 @@
       COSU   = COS(USDIR)
       SINU   = SIN(USDIR)
 !
-!GPUNotes loop over directions 
-!GPUNotes with kernels here ~20secs, without ~18 secs, no kernels ~15secs
-!$ACC ENTER DATA CREATE(DIRF)
-!!$ACC DATA COPYIN(USTAR,COSU,SINU,ECOS,ESIN)
-!$ACC KERNELS
-      DO ITH=1, NTH
-        DIRF(ITH) = MAX ( 0. , (ECOS(ITH)*COSU+ESIN(ITH)*SINU) )**4
-      END DO
-!$ACC END KERNELS
-!!$ACC END DATA
-!
       FAC    = SLNC1 * USTAR**4
       FF1    = FSPM * GRAV/(28.*USTAR)
       FF2    = FSHF * MIN(SIG(NK),FHIGH)
       FFILT  = MIN ( MAX(FF1,FF2) , 2.*SIG(NK) )
 !
-!GPUNotes loop over frequencies no dependence on above
-!$ACC DATA CREATE(WNF,RFR) COPYOUT(S)
+!GPUNotes loop over directions
+!GPUNotes should I use create statement for some of these local
+!variables as don't think I need them on the CPU? 
+!$ACC DATA COPYIN (ECOS,ESIN,K,SIG)        &
+!$ACC      CREATE (DIRF,WNF)               
+!!$ACC      COPY   (S)
 !$ACC KERNELS
+      DO ITH=1, NTH
+        DIRF(ITH) = MAX ( 0. , (ECOS(ITH)*COSU+ESIN(ITH)*SINU) )**4
+      END DO
+!
+!GPUNotes Moved below from original location below to top of code 
+!GPUNotes This avoids jumping in/out of kernels with serial code
+!      FAC    = SLNC1 * USTAR**4
+!      FF1    = FSPM * GRAV/(28.*USTAR)
+!      FF2    = FSHF * MIN(SIG(NK),FHIGH)
+!      FFILT  = MIN ( MAX(FF1,FF2) , 2.*SIG(NK) )
+!
+!GPUNotes loop over frequencies no dependence on above
       DO IK=1, NK
         RFR    = SIG(IK) / FFILT
         IF ( RFR .LT. 0.5 ) THEN
@@ -199,7 +204,6 @@
       END DO
 !$ACC END KERNELS
 !$ACC END DATA
-!$ACC EXIT DATA DELETE(DIRF)
 !
       RETURN
 !
