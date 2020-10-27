@@ -65,9 +65,12 @@
       INTEGER, PARAMETER      :: ITAUMAX=200,JUMAX=200
       INTEGER, PARAMETER      :: IUSTAR=100,IALPHA=200, ILEVTAIL=50
       REAL                    :: TAUT(0:ITAUMAX,0:JUMAX), DELTAUW, DELU
-!$ACC DECLARE CREATE(DELTAUW, DELU, TAUT)
-      REAL                    :: ZZWND, AALPHA 
-!$ACC DECLARE CREATE(ZZWND, AALPHA)
+!HACKA NOTES: Previously used DECLARE statement caused some issues with
+!             empty arrays being used instead of lookup tables. Kept the
+!             statement incase similar instaces are required in future. 
+!$ACC DECLARE COPYIN(TAUT(0:ITAUMAX,0:JUMAX),DELTAUW, DELU)
+!      REAL                    :: ZZWND, AALPHA 
+!!$ACC DECLARE CREATE(ZZWND, AALPHA)
       ! Table for H.F. stress as a function of 2 variables
       REAL                    :: TAUHFT(0:IUSTAR,0:IALPHA), DELUST, DELALP
       ! Table for H.F. stress as a function of 3 variables
@@ -160,11 +163,10 @@
 !
 !/ ------------------------------------------------------------------- /
       USE W3ODATMD, ONLY: IAPROC
-      USE CONSTANTS, ONLY: TPIINV
+      USE CONSTANTS, ONLY: TPIINV, GRAV, KAPPA
       USE W3GDATMD, ONLY: NK, NTH, NSPEC, SIG, DTH, DDEN, WWNMEANP, &
                           WWNMEANPTAIL, FTE, FTF, SSTXFTF, SSTXFTWN,&
-                          SSTXFTFTAIL, SSWELLF, MPARS
-!
+                          SSTXFTFTAIL, SSWELLF, ZZWND, AALPHA
       IMPLICIT NONE
 !/
 !/ ------------------------------------------------------------------- /
@@ -181,15 +183,20 @@
 !/ Local parameters
 !/
       INTEGER                 :: IS, IK, ITH
- 
       REAL                    :: TAUW, EBAND, EMEANWS,UNZ,            &
                                  EB(NK),EB2(NK),ALFA(NK)
 !/
+      REAL ZZWND_TMP, AALPHA_TMP
 !/ ------------------------------------------------------------------- /
+!/ Calc_ustar parameters (uniques)      
+      REAL SQRTCDM1
+      REAL XI,DELI1,DELI2,XJ,delj1,delj2
+      REAL TAUW_LOCAL
+      INTEGER IND,J
 !/
-!
-      ZZWND  = MPARS(1)%SRCPS%ZZWND
-      AALPHA = MPARS(1)%SRCPS%AALPHA
+!HACKA NOTES: Workaround to avoid using pointers from CPU on GPU.
+!      ZZWND  = MPARS(1)%SRCPS%ZZWND
+!      AALPHA = MPARS(1)%SRCPS%AALPHA
       UNZ    = MAX ( 0.01 , U )
       USTAR  = MAX ( 0.0001 , USTAR )
 !
@@ -201,9 +208,19 @@
       WNMEAN = 0.
       AMAX   = 0.
 !
+      ZZWND_TMP=ZZWND
+      AALPHA_TMP=AALPHA
 ! 1.  Integral over directions and maximum --------------------------- *
-!
-!GPUNotes spectral loop
+
+!HACKA NOTES: Create the data section for the GPU. Transfer data for all
+!             kernels in single statement, ideal situation is a single
+!             data structure over all kernels. 
+!$ACC DATA COPYIN (LLWS,NTH,A,SSTXFTFTAIL,SIG,FTE,SSTXFTWN)            &
+!$ACC      COPYIN (WWNMEANPTAIL,WWNMEANP,NK,CG,FTF,WN,DDEN)                 &
+!$ACC      COPY   (TAUT(0:ITAUMAX,0:JUMAX),DELTAUW,DELU)   &
+!$ACC      COPY   (AMAX,FMEANWS,WNMEAN,EMEAN,FMEAN,FMEAN1)       &
+!$ACC      COPY   (USTAR,TAUW,Z0,CHARN) &
+!$ACC      CREATE (EB, EB2) 
 !$ACC KERNELS 
       EB(:)  = 0.
       EB2(:) = 0.
@@ -216,12 +233,9 @@
           AMAX   = MAX ( AMAX , A(ITH,IK) )
         END DO
       END DO
-!$ACC END KERNELS
-!
 ! 2.  Integrate over directions -------------------------------------- *
 !
 !GPUNotes directions loop only
-!$ACC KERNELS
       DO IK=1, NK
         ALFA(IK) = 2. * DTH * SIG(IK) * EB(IK) * WN(IK)**3
         EB(IK)   = EB(IK) * DDEN(IK) / CG(IK)
@@ -264,18 +278,42 @@
                      / MAX ( 1.E-7 , EMEANWS ))**(1/(2.*WWNMEANPTAIL))
       END IF
  
-!
-! 5.  Cd and z0 ----------------------------------------------- *
+! 5.  Cd and z0 ------------------------------------------------------ *
 !
       TAUW = SQRT(TAUWX**2+TAUWY**2)
  
       Z0=0.
-      CALL CALC_USTAR(U,TAUW,USTAR,Z0,CHARN)
+!HACKA NOTES: CALC_USTAR is a routine that has caused some difficulties
+!             the ACC kernel has been moved inside to closely look at 
+!             the work being done on the GPU.
+      TAUW_LOCAL=MAX(MIN(TAUW,TAUWMAX),0.)
+      XI      = SQRT(TAUW_LOCAL)/DELTAUW
+      IND     = MIN ( ITAUMAX-1, INT(XI)) ! index for stress table
+      DELI1   = MIN(1.,XI - REAL(IND))  !interpolation coefficient for stress table
+      DELI2   = 1. - DELI1
+      XJ      = U/DELU
+      J       = MIN ( JUMAX-1, INT(XJ) )
+      DELJ1   = MIN(1.,XJ - REAL(J))
+      DELJ2   = 1. - DELJ1
+      USTAR=(TAUT(IND,J)*DELI2+TAUT(IND+1,J  )*DELI1)*DELJ2 &
+       + (TAUT(IND,J+1)*DELI2+TAUT(IND+1,J+1)*DELI1)*DELJ1
+
+! Determines roughness length
+!
+      SQRTCDM1  = MIN(U/USTAR,100.0)
+      Z0  = ZZWND_TMP*EXP(-KAPPA*SQRTCDM1)
+      IF (USTAR.GT.0.001) THEN
+        CHARN = GRAV*Z0/USTAR**2
+      ELSE
+        CHARN = AALPHA_TMP
+      END IF
+      
       UNZ    = MAX ( 0.01 , U )
       CD     = (USTAR/UNZ)**2
       USDIR = UDIR
 !
 !$ACC END KERNELS
+!$ACC END DATA
 ! 6.  Final test output ---------------------------------------------- *
 !
       RETURN
@@ -315,7 +353,7 @@
 !                   saturation dissipation (Ardhuin et al., 2008)
 !       SWELL     : negative wind input (Ardhuin et al. 2008)
 !
-!  3. Parameters :
+!/                  | WAVEWATCH III                SHOM |
 !
 !     Parameter list
 !     ----------------------------------------------------------------
@@ -1023,7 +1061,6 @@
       INTEGER I,J,ITER
       REAL ZTAUW,UTOP,CDRAG,WCD,USTOLD,TAUOLD
       REAL X,UST,ZZ0,ZNU,F,DELF,ZZ00
-!
       DELU    = UMAX/FLOAT(JUMAX)
       DELTAUW = TAUWMAX/FLOAT(ITAUMAX)
 !GPUNotes loops over stress table dimensions and calculation iteration
@@ -1482,7 +1519,22 @@
       REAL TAUW_LOCAL
 
       INTEGER IND,J
-!
+      REAL ZZWND_TMP, AALPHA_TMP
+
+!      ZZWND_TMP=ZZWND
+!      AALPHA_TMP=AALPHA
+!HACKA NOTES: The currently used workaround for dealing with pointers on
+!             the CPU, assign them to variables on the GPU. If the
+!             values are being updated will need to return the value to
+!             the pointer (not the case here).
+!HACKA NOTES: Nested data statement, this is allowed and helps with
+!             close analysis of data transfers as we can see information
+!             in the compiler output and NV_ACC_NOTIFY=2. 
+!!$ACC DATA COPY   (TAUT(0:ITAUMAX,0:JUMAX), ZZWND, AALPHA)    &
+!!$ACC      COPYIN (WINDSPEED, TAUW)            &
+!!$ACC      COPY   (USTAR,Z0,CHARN)
+!!$ACC KERNELS
+
       TAUW_LOCAL=MAX(MIN(TAUW,TAUWMAX),0.)
       XI      = SQRT(TAUW_LOCAL)/DELTAUW
       IND     = MIN ( ITAUMAX-1, INT(XI)) ! index for stress table
@@ -1494,17 +1546,19 @@
       DELJ2   = 1. - DELJ1
       USTAR=(TAUT(IND,J)*DELI2+TAUT(IND+1,J  )*DELI1)*DELJ2 &
        + (TAUT(IND,J+1)*DELI2+TAUT(IND+1,J+1)*DELI1)*DELJ1
-!
+
 ! Determines roughness length
 !
       SQRTCDM1  = MIN(WINDSPEED/USTAR,100.0)
-      Z0  = ZZWND*EXP(-KAPPA*SQRTCDM1)
+      Z0  = ZZWND_TMP*EXP(-KAPPA*SQRTCDM1)
       IF (USTAR.GT.0.001) THEN
         CHARN = GRAV*Z0/USTAR**2
       ELSE
-        CHARN = AALPHA
-        END IF
+        CHARN = AALPHA_TMP
+      END IF
 !
+!!$ACC END KERNELS
+!!$ACC END DATA
       RETURN
       END SUBROUTINE CALC_USTAR
 !/ ------------------------------------------------------------------- /
