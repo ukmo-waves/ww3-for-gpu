@@ -175,6 +175,7 @@
 !$ACC      CREATE (DIRF,WNF)               & 
 !$ACC      COPY   (S)
 !$ACC KERNELS
+!$ACC LOOP GANG, VECTOR(128)
       DO ITH=1, NTH
         DIRF(ITH) = MAX ( 0. , (ECOS(ITH)*COSU+ESIN(ITH)*SINU) )**4
       END DO
@@ -187,6 +188,7 @@
 !      FFILT  = MIN ( MAX(FF1,FF2) , 2.*SIG(NK) )
 !
 !GPUNotes loop over frequencies no dependence on above
+!$ACC LOOP GANG, VECTOR(128)
       DO IK=1, NK
         RFR    = SIG(IK) / FFILT
         IF ( RFR .LT. 0.5 ) THEN
@@ -199,8 +201,14 @@
 ! 2.  Compose source term -------------------------------------------- *
 !
 !GPUNotes loop over frequencies fills array using arrays from prior 2 loops
+!$ACC LOOP GANG VECTOR(128) COLLAPSE(2)
       DO IK=1, NK
-        S(:,IK) = WNF(IK) * DIRF(:)
+!GPUNotes replaced array format below with loop in order to use ACC LOOP
+!statement
+!        S(:,IK) = WNF(IK) * DIRF(:)
+        DO ITH=1, NTH
+          S(ITH,IK) = WNF(IK) * DIRF(ITH)
+        END DO
       END DO
 !$ACC END KERNELS
 !$ACC END DATA

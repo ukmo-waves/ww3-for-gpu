@@ -583,7 +583,11 @@
 ! 2.a Input.
 !
 !GPUNotes subroutine will contain source term specific spectral loops
+!GPUNotes using COPY rather than CREATE for now as VSLN used in a
+!GPUNotes later loop
+!$ACC DATA CREATE (VSLN)
         CALL W3SLN1 (       WN1, FHIGH, USTAR, U10DIR , VSLN       )
+!!$ACC END DATA
 !
 !GPUNotes subrotuine will contain source term specific spectral loops
         CALL WAV_MY_WTIME(sTime2) 
@@ -652,6 +656,8 @@
         VS = 0
         VD = 0
 !GPUNotes spectral loop up to frequency cut off
+!GPUNotes added kernels here to test treatment of VSLN
+!$ACC KERNELS
         DO IS=IS1, NSPECH
           VS(IS) = VSLN(IS) + VSIN(IS) + VSNL(IS)  &
                  + VSDS(IS) + VSBT(IS)
@@ -665,6 +671,9 @@
 !            WRITE(*,'(A20,I10,10F30.10)') 'TIME STEP COMP', IS, DAMAX, DAM(IS), XREL*SPECINIT(IS), AFILT, AFAC, DT
 !          END IF
         END DO  ! end of loop on IS
+!$ACC END KERNELS
+!$ACC END DATA
+!$GPUNotes Moved END DATA region for VSLN
 !
 !        WRITE(*,*) 'NODE_NUMBER', IX
 !        IF (IX == DEBUG_NODE) WRITE(*,*) 'TIMINGS 1', DT
