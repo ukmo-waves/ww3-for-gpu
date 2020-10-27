@@ -8,6 +8,6 @@ rm -fr out/ww3_outp/
 rm -fr out/ww3_outf/
 rm -f ST4TABUHF2.bin
 rm -f run_shel.time
-rm *err*
-rm prof
-rm temp
+rm -f *err*
+rm -f prof
+rm -f temp
