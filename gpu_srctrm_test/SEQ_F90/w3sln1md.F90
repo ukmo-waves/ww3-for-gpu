@@ -158,6 +158,12 @@
 !/ ------------------------------------------------------------------- /
 !/
 !
+!GPUNotes now running entire subroutine on GPU
+!$ACC DATA COPYIN (ECOS,ESIN,K,SIG)        &
+!$ACC      COPYIN (FSPM,FSHF,SLNC1,NTH,NK) &
+!$ACC      CREATE (DIRF,WNF)               & 
+!$ACC      COPY   (S)
+!$ACC KERNELS
 ! 1.  Set up factors ------------------------------------------------- *
 !
       COSU   = COS(USDIR)
@@ -169,12 +175,6 @@
       FFILT  = MIN ( MAX(FF1,FF2) , 2.*SIG(NK) )
 !
 !GPUNotes loop over directions
-!GPUNotes should I use create statement for some of these local
-!variables as don't think I need them on the CPU? 
-!$ACC DATA COPYIN (ECOS,ESIN,K,SIG)        &
-!$ACC      CREATE (DIRF,WNF)               & 
-!$ACC      COPY   (S)
-!$ACC KERNELS
 !$ACC LOOP GANG, VECTOR(128)
       DO ITH=1, NTH
         DIRF(ITH) = MAX ( 0. , (ECOS(ITH)*COSU+ESIN(ITH)*SINU) )**4
