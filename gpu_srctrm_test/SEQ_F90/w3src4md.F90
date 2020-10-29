@@ -68,9 +68,7 @@
 !HACKA NOTES: Previously used DECLARE statement caused some issues with
 !             empty arrays being used instead of lookup tables. Kept the
 !             statement incase similar instaces are required in future. 
-!$ACC DECLARE COPYIN(TAUT(0:ITAUMAX,0:JUMAX),DELTAUW, DELU)
 !      REAL                    :: ZZWND, AALPHA 
-!!$ACC DECLARE CREATE(ZZWND, AALPHA)
       ! Table for H.F. stress as a function of 2 variables
       REAL                    :: TAUHFT(0:IUSTAR,0:IALPHA), DELUST, DELALP
       ! Table for H.F. stress as a function of 3 variables
@@ -163,7 +161,7 @@
 !
 !/ ------------------------------------------------------------------- /
       USE W3ODATMD, ONLY: IAPROC
-      USE CONSTANTS, ONLY: TPIINV, GRAV, KAPPA
+      USE CONSTANTS, ONLY: TPIINV
       USE W3GDATMD, ONLY: NK, NTH, NSPEC, SIG, DTH, DDEN, WWNMEANP, &
                           WWNMEANPTAIL, FTE, FTF, SSTXFTF, SSTXFTWN,&
                           SSTXFTFTAIL, SSWELLF, ZZWND, AALPHA
@@ -188,11 +186,6 @@
 !/
       REAL ZZWND_TMP, AALPHA_TMP
 !/ ------------------------------------------------------------------- /
-!/ Calc_ustar parameters (uniques)      
-      REAL SQRTCDM1
-      REAL XI,DELI1,DELI2,XJ,delj1,delj2
-      REAL TAUW_LOCAL
-      INTEGER IND,J
 !/
 !HACKA NOTES: Workaround to avoid using pointers from CPU on GPU.
 !      ZZWND  = MPARS(1)%SRCPS%ZZWND
@@ -283,36 +276,15 @@
       TAUW = SQRT(TAUWX**2+TAUWY**2)
  
       Z0=0.
+!$ACC END KERNELS
 !HACKA NOTES: CALC_USTAR is a routine that has caused some difficulties
 !             the ACC kernel has been moved inside to closely look at 
 !             the work being done on the GPU.
-      TAUW_LOCAL=MAX(MIN(TAUW,TAUWMAX),0.)
-      XI      = SQRT(TAUW_LOCAL)/DELTAUW
-      IND     = MIN ( ITAUMAX-1, INT(XI)) ! index for stress table
-      DELI1   = MIN(1.,XI - REAL(IND))  !interpolation coefficient for stress table
-      DELI2   = 1. - DELI1
-      XJ      = U/DELU
-      J       = MIN ( JUMAX-1, INT(XJ) )
-      DELJ1   = MIN(1.,XJ - REAL(J))
-      DELJ2   = 1. - DELJ1
-      USTAR=(TAUT(IND,J)*DELI2+TAUT(IND+1,J  )*DELI1)*DELJ2 &
-       + (TAUT(IND,J+1)*DELI2+TAUT(IND+1,J+1)*DELI1)*DELJ1
-
-! Determines roughness length
-!
-      SQRTCDM1  = MIN(U/USTAR,100.0)
-      Z0  = ZZWND_TMP*EXP(-KAPPA*SQRTCDM1)
-      IF (USTAR.GT.0.001) THEN
-        CHARN = GRAV*Z0/USTAR**2
-      ELSE
-        CHARN = AALPHA_TMP
-      END IF
-      
+      CALL CALC_USTAR(U,TAUW,USTAR,Z0,CHARN)
       UNZ    = MAX ( 0.01 , U )
       CD     = (USTAR/UNZ)**2
       USDIR = UDIR
 !
-!$ACC END KERNELS
 !$ACC END DATA
 ! 6.  Final test output ---------------------------------------------- *
 !
@@ -353,7 +325,7 @@
 !                   saturation dissipation (Ardhuin et al., 2008)
 !       SWELL     : negative wind input (Ardhuin et al. 2008)
 !
-!/                  | WAVEWATCH III                SHOM |
+!  3. Parameters :
 !
 !     Parameter list
 !     ----------------------------------------------------------------
@@ -1507,9 +1479,8 @@
 !
 ! 10. Source code :
 !-----------------------------------------------------------------------------!
-!$ACC ROUTINE SEQ
       USE CONSTANTS, ONLY: GRAV, KAPPA
-!      USE W3GDATMD,  ONLY: ZZWND, AALPHA
+      USE W3GDATMD,  ONLY: ZZWND, AALPHA
       IMPLICIT NONE
       REAL, intent(in) :: WINDSPEED,TAUW
       REAL, intent(out) :: USTAR, Z0, CHARN
@@ -1521,8 +1492,8 @@
       INTEGER IND,J
       REAL ZZWND_TMP, AALPHA_TMP
 
-!      ZZWND_TMP=ZZWND
-!      AALPHA_TMP=AALPHA
+      ZZWND_TMP=ZZWND
+      AALPHA_TMP=AALPHA
 !HACKA NOTES: The currently used workaround for dealing with pointers on
 !             the CPU, assign them to variables on the GPU. If the
 !             values are being updated will need to return the value to
@@ -1530,10 +1501,10 @@
 !HACKA NOTES: Nested data statement, this is allowed and helps with
 !             close analysis of data transfers as we can see information
 !             in the compiler output and NV_ACC_NOTIFY=2. 
-!!$ACC DATA COPY   (TAUT(0:ITAUMAX,0:JUMAX), ZZWND, AALPHA)    &
-!!$ACC      COPYIN (WINDSPEED, TAUW)            &
-!!$ACC      COPY   (USTAR,Z0,CHARN)
-!!$ACC KERNELS
+!$ACC DATA COPY   (TAUT(0:ITAUMAX,0:JUMAX))    &
+!$ACC      COPYIN (WINDSPEED, TAUW)            &
+!$ACC      COPY   (USTAR,Z0,CHARN)
+!$ACC KERNELS
 
       TAUW_LOCAL=MAX(MIN(TAUW,TAUWMAX),0.)
       XI      = SQRT(TAUW_LOCAL)/DELTAUW
@@ -1557,8 +1528,8 @@
         CHARN = AALPHA_TMP
       END IF
 !
-!!$ACC END KERNELS
-!!$ACC END DATA
+!$ACC END KERNELS
+!$ACC END DATA
       RETURN
       END SUBROUTINE CALC_USTAR
 !/ ------------------------------------------------------------------- /
