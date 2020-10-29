@@ -199,9 +199,9 @@
 ! 1.  Integral over directions and maximum --------------------------- *
 !
 !GPUNotes spectral loop
+      EB(:)  = 0.
+      EB2(:) = 0.
       DO IK=1, NK
-        EB(IK)  = 0.
-        EB2(IK) = 0.
         DO ITH=1, NTH
           IS=ITH+(IK-1)*NTH
           EB(IK) = EB(IK) + A(ITH,IK)
@@ -254,7 +254,6 @@
         FMEANWS  = TPIINV *( MAX ( 1.E-7 , FMEANWS )                       &
                      / MAX ( 1.E-7 , EMEANWS ))**(1/(2.*WWNMEANPTAIL))
       END IF
- 
 !
 ! 5.  Cd and z0 ----------------------------------------------- *
 !
@@ -427,14 +426,23 @@
 !
 ! 1.b  estimation of surface orbital velocity and displacement
 !
+!$ACC DATA CREATE  (EB, EBX, EBY)  &
+!$ACC      COPYIN  (NTH, NK, A, SIG, DDEN, CG, SSWELLF) &
+!$ACC      COPYOUT (UORB, AORB, RE)
+! TODO: UORB/AORB can be CREATE later...
+
+!$ACC KERNELS
       UORB=0.
       AORB=0.
  
 !GPUNotes spectral loop
+! CB - can't collapse loop here as EB(X/Y) are rumming over IK loop
+!$ACC LOOP GANG REDUCTION(+:UORB,AORB)
       DO IK=1, NK
         EB  = 0.
         EBX = 0.
         EBY = 0.
+!$ACC LOOP VECTOR(128) REDUCTION(+:EB)
         DO ITH=1, NTH
            IS=ITH+(IK-1)*NTH
            EB  = EB  + A(IS)
@@ -445,12 +453,15 @@
         UORB = UORB + EB *SIG(IK)**2 * DDEN(IK) / CG(IK)
         AORB = AORB + EB             * DDEN(IK) / CG(IK)  !deep water only
       END DO
- 
+!$ACC END KERNELS
+
+!$ACC KERNELS
       UORB  = 2*SQRT(UORB)                  ! significant orbital amplitude
       AORB1 = 2*AORB**(1-0.5*SSWELLF(6))    ! half the significant wave height ... if SWELLF(6)=1
       !WRITE(740+IAPROC,*) EB, EBX, EBY, UORB, AORB1, NU_AIR, 4*UORB*AORB1/NU_AIR
       !CALL FLUSH(740+IAPROC)
       RE = 4*UORB*AORB1 / NU_AIR           ! Reynolds number
+!$ACC END KERNELS
 !
 ! Defines the swell dissipation based on the "Reynolds number"
 !
@@ -510,14 +521,19 @@
       CONST0=BBETA*DRAT/(kappa**2)
 !
 !GPUNotes loops over full spectrum
+!$ACC DATA  COPYIN (K, DDEN, DDEN2, SIG2, ZZALP, TTAUWSHELTER, ESIN, ECOS, SSINTHP) &
+!$ACC      COPYOUT (LLWS) &
+!$ACC         COPY (STRESSSTAB, STRESSSTABN, DSTAB)
+!$ACC KERNELS
+!$ACC LOOP GANG INDEPENDENT 
       DO IK=1, NK
         TAUPX=TAUX-ABS(TTAUWSHELTER)*STRESSSTAB(ISTAB,1)
         TAUPY=TAUY-ABS(TTAUWSHELTER)*STRESSSTAB(ISTAB,2)
 ! With MIN and MAX the bug should disappear.... but where did it come from?
         USTP=MIN((TAUPX**2+TAUPY**2)**0.25,MAX(UST,0.3))
         USDIRP=ATAN2(TAUPY,TAUPX)
-        COSU   = COS(USDIRP)
-        SINU   = SIN(USDIRP)
+        COSU   = COS(USDIRP) ! CB - these lines are problematic as the LAST 
+        SINU   = SIN(USDIRP) ! CB - value is used later outside the loop
         IS=1+(IK-1)*NTH
         CM=K(IS)/SIG2(IS) !inverse of phase speed
         UCN=USTP*CM+ZZALP  !this is the inverse wave age
@@ -537,6 +553,7 @@
         SWELLCOEFV=-SSWELLF(5)*DRAT*2*K(IS)*SQRT(2*NU_AIR*SIG2(IS))
         SWELLCOEFT=-DRAT*SSWELLF(1)*16*SIG2(IS)**2/GRAV
 !
+!$ACC LOOP VECTOR INDEPENDENT
         DO ITH=1,NTH
           IS=ITH+(IK-1)*NTH
           COSWIND=(ECOS(IS)*COSU+ESIN(IS)*SINU)
@@ -597,6 +614,9 @@
           END IF
         END DO
       END DO
+!$ACC END KERNELS
+!$ACC END DATA
+!$ACC END DATA
 !
       D(:)=DSTAB(3,:)
       XSTRESS=STRESSSTAB (3,1)
