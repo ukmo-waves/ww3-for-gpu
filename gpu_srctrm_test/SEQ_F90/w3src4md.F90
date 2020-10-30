@@ -164,7 +164,7 @@
       USE CONSTANTS, ONLY: TPIINV
       USE W3GDATMD, ONLY: NK, NTH, NSPEC, SIG, DTH, DDEN, WWNMEANP, &
                           WWNMEANPTAIL, FTE, FTF, SSTXFTF, SSTXFTWN,&
-                          SSTXFTFTAIL, SSWELLF, ZZWND, AALPHA
+                          SSTXFTFTAIL, SSWELLF, MPARS
       IMPLICIT NONE
 !/
 !/ ------------------------------------------------------------------- /
@@ -184,12 +184,26 @@
       REAL                    :: TAUW, EBAND, EMEANWS,UNZ,            &
                                  EB(NK),EB2(NK),ALFA(NK)
 !/
-      REAL ZZWND_TMP, AALPHA_TMP
 !/ ------------------------------------------------------------------- /
 !/
-!HACKA NOTES: Workaround to avoid using pointers from CPU on GPU.
+!HACKA NOTES: Workaround to avoid using pointers from CPU on GPU. These
+!             are no longer needed as MPARS data component is now being
+!             brought onto the GPU. Will be removed in next commit. 
 !      ZZWND  = MPARS(1)%SRCPS%ZZWND
-!      AALPHA = MPARS(1)%SRCPS%AALPHA
+!      AALPHA = MPARS(1)%SRCPS%AALPHA  
+!      ZZWND_TMP=ZZWND
+!      AALPHA_TMP=AALPHA
+
+!HACKA NOTES: Create the data section for the GPU. Transfer data for all
+!             kernels in single statement, ideal situation is a single
+!             data structure over all kernels. 
+!$ACC DATA COPYIN (LLWS,NTH,A,SSTXFTFTAIL,SIG,FTE,SSTXFTWN)            &
+!$ACC      COPYIN (WWNMEANPTAIL,WWNMEANP,NK,CG,FTF,WN,DDEN)                 &
+!$ACC      COPY (EB, EB2) 
+!HACKA NOTES: ENTER DATA brings the data explicitely onto the GPU, this
+!             will stay here untill an EXIT DATA COPYOUT. 
+!$ACC ENTER DATA COPYIN(MPARS(1))
+!$ACC KERNELS 
       UNZ    = MAX ( 0.01 , U )
       USTAR  = MAX ( 0.0001 , USTAR )
 !
@@ -201,20 +215,7 @@
       WNMEAN = 0.
       AMAX   = 0.
 !
-      ZZWND_TMP=ZZWND
-      AALPHA_TMP=AALPHA
 ! 1.  Integral over directions and maximum --------------------------- *
-
-!HACKA NOTES: Create the data section for the GPU. Transfer data for all
-!             kernels in single statement, ideal situation is a single
-!             data structure over all kernels. 
-!$ACC DATA COPYIN (LLWS,NTH,A,SSTXFTFTAIL,SIG,FTE,SSTXFTWN)            &
-!$ACC      COPYIN (WWNMEANPTAIL,WWNMEANP,NK,CG,FTF,WN,DDEN)                 &
-!$ACC      COPY   (TAUT(0:ITAUMAX,0:JUMAX),DELTAUW,DELU)   &
-!$ACC      COPY   (AMAX,FMEANWS,WNMEAN,EMEAN,FMEAN,FMEAN1)       &
-!$ACC      COPY   (USTAR,TAUW,Z0,CHARN) &
-!$ACC      CREATE (EB, EB2) 
-!$ACC KERNELS 
       EB(:)  = 0.
       EB2(:) = 0.
 !$ACC LOOP INDEPENDENT GANG VECTOR(128)
@@ -279,7 +280,8 @@
 !$ACC END KERNELS
 !HACKA NOTES: CALC_USTAR is a routine that has caused some difficulties
 !             the ACC kernel has been moved inside to closely look at 
-!             the work being done on the GPU.
+!             the work being done on the GPU. No need to declare as a
+!             routine because it is not within a loop.
       CALL CALC_USTAR(U,TAUW,USTAR,Z0,CHARN)
       UNZ    = MAX ( 0.01 , U )
       CD     = (USTAR/UNZ)**2
@@ -1480,7 +1482,7 @@
 ! 10. Source code :
 !-----------------------------------------------------------------------------!
       USE CONSTANTS, ONLY: GRAV, KAPPA
-      USE W3GDATMD,  ONLY: ZZWND, AALPHA
+      USE W3GDATMD,  ONLY: MPARS
       IMPLICIT NONE
       REAL, intent(in) :: WINDSPEED,TAUW
       REAL, intent(out) :: USTAR, Z0, CHARN
@@ -1490,22 +1492,13 @@
       REAL TAUW_LOCAL
 
       INTEGER IND,J
-      REAL ZZWND_TMP, AALPHA_TMP
-
-      ZZWND_TMP=ZZWND
-      AALPHA_TMP=AALPHA
-!HACKA NOTES: The currently used workaround for dealing with pointers on
-!             the CPU, assign them to variables on the GPU. If the
-!             values are being updated will need to return the value to
-!             the pointer (not the case here).
-!HACKA NOTES: Nested data statement, this is allowed and helps with
-!             close analysis of data transfers as we can see information
-!             in the compiler output and NV_ACC_NOTIFY=2. 
-!$ACC DATA COPY   (TAUT(0:ITAUMAX,0:JUMAX))    &
-!$ACC      COPYIN (WINDSPEED, TAUW)            &
-!$ACC      COPY   (USTAR,Z0,CHARN)
+      REAL :: ZZWND, AALPHA
+!HACKA NOTES: TAUT has to be specified, due to the fact that IND and J
+!             change the compiler will load incorrect indices implicitely.
+!$ACC DATA COPY   (TAUT(:,:)) 
 !$ACC KERNELS
-
+      ZZWND = MPARS(1)%SRCPS%ZZWND
+      AALPHA = MPARS(1)%SRCPS%AALPHA
       TAUW_LOCAL=MAX(MIN(TAUW,TAUWMAX),0.)
       XI      = SQRT(TAUW_LOCAL)/DELTAUW
       IND     = MIN ( ITAUMAX-1, INT(XI)) ! index for stress table
@@ -1521,11 +1514,11 @@
 ! Determines roughness length
 !
       SQRTCDM1  = MIN(WINDSPEED/USTAR,100.0)
-      Z0  = ZZWND_TMP*EXP(-KAPPA*SQRTCDM1)
+      Z0  = ZZWND*EXP(-KAPPA*SQRTCDM1)
       IF (USTAR.GT.0.001) THEN
         CHARN = GRAV*Z0/USTAR**2
       ELSE
-        CHARN = AALPHA_TMP
+        CHARN = AALPHA
       END IF
 !
 !$ACC END KERNELS
