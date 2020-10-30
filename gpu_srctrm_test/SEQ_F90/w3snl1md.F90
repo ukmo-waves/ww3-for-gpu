@@ -265,9 +265,15 @@
 ! 2.  Prepare auxiliary spectrum and arrays -------------------------- *
 !
 !GPUNotes loop over full spectrum
+!$ACC DATA COPY  (CON,UE) &
+!$ACC      COPYIN(CG,SIG,NTH,A,FACHFE) &
+!$ACC      COPYIN(DA2C,DA2M,DA1P,DA1C,DA1M,SA1,SA2,DA2P)
+!$ACC KERNELS
+!$ACC LOOP INDEPENDENT COLLAPSE(2)
       DO IFR=1, NFR
-        CONX = TPIINV / SIG(IFR) * CG(IFR)
+        !CONX = TPIINV / SIG(IFR) * CG(IFR)
         DO ITH=1, NTH
+          CONX = TPIINV / SIG(IFR) * CG(IFR)
           ISP       = ITH + (IFR-1)*NTH
           UE (ISP) = A(ISP) / CONX
           CON(ISP) = CONX
@@ -276,11 +282,14 @@
 !
 !GPUNotes loop over subset of frequencies and all directions
       DO IFR=NFR+1, NFRHGH
+!$ACC LOOP INDEPENDENT
         DO ITH=1, NTH
           ISP      = ITH + (IFR-1)*NTH
           UE(ISP) = UE(ISP-NTH) * FACHFE
         END DO
       END DO
+!$ACC END KERNELS
+!$ACC END DATA
 !
 !GPUNotes loop over subset of directions
       DO ISP=1-NTH, 0
@@ -294,6 +303,8 @@
         DA2P(ISP) = 0.
         DA2M(ISP) = 0.
       END DO
+!!$ACC END KERNELS
+!!$ACC END DATA
 !
 ! 3.  Calculate interactions for extended spectrum ------------------- *
 !
