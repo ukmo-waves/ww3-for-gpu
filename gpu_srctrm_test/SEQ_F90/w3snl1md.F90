@@ -266,29 +266,24 @@
 !$ACC      COPYIN(DAL1,IM14,IM21,IM22,IM23,IP14,IP21,IP22,IP23) &
 !$ACC      COPYIN(IC82,AWG4,IM11,AWG5,IM12,AWG6,IM13,AWG7,IM24) &
 !$ACC      COPYIN(AF11,IP11,AWG1,IP12,AWG2,IP13,AWG3) &
-!$ACC      CREATE(CON,UE) &
+!$ACC      CREATE(CON,UE,CONS) &
 !$ACC      CREATE(DA2C,DA2M,DA1P,DA1C,DA1M,SA1,SA2,DA2P)
+!GPUNotes To make whole routine run effectively on kernels I so have
+!GPUNotes to run the serial section below in a separate kernel to
+!GPUNotes the other parallel parts. This prevents last two loop sections
+!GPUNotes becoming serial... Not sure why..
 !$ACC KERNELS
 ! 1.  Calculate prop. constant --------------------------------------- *
 !
       X      = MAX ( KDCON*KDMEAN , KDMN )
       X2     = MAX ( -1.E15, SNLS3*X)
       CONS   = SNLC1 * ( 1. + SNLS1/X * (1.-SNLS2*X) * EXP(X2) )
+!$ACC END KERNELS
 !
 ! 2.  Prepare auxiliary spectrum and arrays -------------------------- *
 !
 !GPUNotes loop over full spectrum
-!!$ACC DATA COPYOUT  (S,D) &
-!!$ACC      COPYIN(CG,SIG,NTH,A,FACHFE) &
-!!$ACC      CREATE(CON,UE) &
-!!$ACC      CREATE(DA2C,DA2M,DA1P,DA1C,DA1M,SA1,SA2,DA2P) &
-!!$ACC      COPYIN(AWG8,SWG1,SWG2,SWG3,SWG4,SWG5,SWG6,SWG7,SWG8) &
-!!$ACC      COPYIN(IP24,DAL3,IC11,IC12,IC21,IC22,IC31,IC32,IC41,IC42) &
-!!$ACC      COPYIN(IC51,IC52,IC61,IC62,IC71,IC72,IC81,IC82,DAL2) &
-!!$ACC      COPYIN(DAL1,IM14,IM21,IM22,IM23,IP14,IP21,IP22,IP23) &
-!!$ACC      COPYIN(IC82,AWG4,IM11,AWG5,IM12,AWG6,IM13,AWG7,IM24) &
-!!$ACC      COPYIN(AF11,IP11,AWG1,IP12,AWG2,IP13,AWG3)
-!!$ACC KERNELS
+!$ACC KERNELS
 !$ACC LOOP INDEPENDENT COLLAPSE(2)
       DO IFR=1, NFR
         !CONX = TPIINV / SIG(IFR) * CG(IFR)
@@ -300,16 +295,25 @@
         END DO
       END DO
 !
+!!GPUNotes loop over subset of frequencies and all directions
+!!GPUNotes the commented code below uses the original code
+!!GPUNotes which could only parallelise over the inner loop
+!      DO IFR=NFR+1, NFRHGH
+!!$ACC LOOP INDEPENDENT
+!        DO ITH=1, NTH
+!          ISP      = ITH + (IFR-1)*NTH
+!          UE(ISP) = UE(ISP-NTH) * FACHFE
+!        END DO
+!      END DO
 !GPUNotes loop over subset of frequencies and all directions
+!GPUNotes refactored code
+!$ACC LOOP INDEPENDENT COLLAPSE(2)
       DO IFR=NFR+1, NFRHGH
-!$ACC LOOP INDEPENDENT
         DO ITH=1, NTH
           ISP      = ITH + (IFR-1)*NTH
-          UE(ISP) = UE(ISP-NTH) * FACHFE
+          UE(ISP) = UE((NFR-1)*NTH+ITH) * (FACHFE)**(IFR-NFR)
         END DO
       END DO
-!!$ACC END KERNELS
-!!$ACC END DATA
 !
 !GPUNotes loop over subset of directions
       DO ISP=1-NTH, 0

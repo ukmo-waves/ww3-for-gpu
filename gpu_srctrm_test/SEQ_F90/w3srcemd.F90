@@ -597,7 +597,10 @@
 ! 2.b Nonlinear interactions.
 !
 !GPUnotes subruoutine will contain source term specific spectral loops
+!$ACC DATA COPY(VSNL,VDNL) &
+!$ACC      COPYIN(SPEC,CG1,WNMEAN,DEPTH)
         CALL W3SNL1 ( SPEC, CG1, WNMEAN*DEPTH,        VSNL, VDNL )
+!$ACC END DATA
 !
 ! 2.c Dissipation... except for ST4
 ! 2.c1   as in source term package
