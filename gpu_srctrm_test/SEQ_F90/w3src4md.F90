@@ -65,10 +65,6 @@
       INTEGER, PARAMETER      :: ITAUMAX=200,JUMAX=200
       INTEGER, PARAMETER      :: IUSTAR=100,IALPHA=200, ILEVTAIL=50
       REAL                    :: TAUT(0:ITAUMAX,0:JUMAX), DELTAUW, DELU
-!HACKA NOTES: Previously used DECLARE statement caused some issues with
-!             empty arrays being used instead of lookup tables. Kept the
-!             statement incase similar instaces are required in future. 
-!      REAL                    :: ZZWND, AALPHA 
       ! Table for H.F. stress as a function of 2 variables
       REAL                    :: TAUHFT(0:IUSTAR,0:IALPHA), DELUST, DELALP
       ! Table for H.F. stress as a function of 3 variables
@@ -164,7 +160,7 @@
       USE CONSTANTS, ONLY: TPIINV
       USE W3GDATMD, ONLY: NK, NTH, NSPEC, SIG, DTH, DDEN, WWNMEANP, &
                           WWNMEANPTAIL, FTE, FTF, SSTXFTF, SSTXFTWN,&
-                          SSTXFTFTAIL, SSWELLF, MPARS
+                          SSTXFTFTAIL, SSWELLF
       IMPLICIT NONE
 !/
 !/ ------------------------------------------------------------------- /
@@ -186,23 +182,14 @@
 !/
 !/ ------------------------------------------------------------------- /
 !/
-!HACKA NOTES: Workaround to avoid using pointers from CPU on GPU. These
-!             are no longer needed as MPARS data component is now being
-!             brought onto the GPU. Will be removed in next commit. 
-!      ZZWND  = MPARS(1)%SRCPS%ZZWND
-!      AALPHA = MPARS(1)%SRCPS%AALPHA  
-!      ZZWND_TMP=ZZWND
-!      AALPHA_TMP=AALPHA
-
 !HACKA NOTES: Create the data section for the GPU. Transfer data for all
 !             kernels in single statement, ideal situation is a single
 !             data structure over all kernels. 
-!$ACC DATA COPYIN (LLWS,NTH,A,SSTXFTFTAIL,SIG,FTE,SSTXFTWN)            &
-!$ACC      COPYIN (WWNMEANPTAIL,WWNMEANP,NK,CG,FTF,WN,DDEN)                 &
-!$ACC      COPY (EB, EB2) 
-!HACKA NOTES: ENTER DATA brings the data explicitely onto the GPU, this
-!             will stay here untill an EXIT DATA COPYOUT. 
-!$ACC ENTER DATA COPYIN(MPARS(1))
+!$ACC DATA COPYIN (LLWS,NTH,A,SSTXFTFTAIL,SIG,FTE,SSTXFTWN)            & 
+!$ACC      COPYIN (WWNMEANPTAIL,WWNMEANP,NK,CG,FTF,WN,DDEN)            &
+!$ACC      COPY   (EB,EB2)                                             &
+!$ACC      COPYOUT(EMEAN, FMEAN, FMEAN1, WNMEAN, AMAX, FMEANWS)                 
+
 !$ACC KERNELS 
       UNZ    = MAX ( 0.01 , U )
       USTAR  = MAX ( 0.0001 , USTAR )
@@ -467,7 +454,6 @@
         UORB = UORB + EB *SIG(IK)**2 * DDEN(IK) / CG(IK)
         AORB = AORB + EB             * DDEN(IK) / CG(IK)  !deep water only
       END DO
- 
       UORB  = 2*SQRT(UORB)                  ! significant orbital amplitude
       AORB1 = 2*AORB**(1-0.5*SSWELLF(6))    ! half the significant wave height ... if SWELLF(6)=1
       !WRITE(740+IAPROC,*) EB, EBX, EBY, UORB, AORB1, NU_AIR, 4*UORB*AORB1/NU_AIR
@@ -1493,9 +1479,11 @@
 
       INTEGER IND,J
       REAL :: ZZWND, AALPHA
-!HACKA NOTES: TAUT has to be specified, due to the fact that IND and J
-!             change the compiler will load incorrect indices implicitely.
-!$ACC DATA COPY   (TAUT(:,:)) 
+!HACKA NOTES: The full TAUT has to be specified, due to the fact that 
+!             IND and J change between the declartion and application
+!             the compiler will load incorrect indices implicitely.
+!$ACC DATA COPYIN (TAUT(:,:),MPARS(1)) &
+!$ACC      COPYOUT(USTAR) 
 !$ACC KERNELS
       ZZWND = MPARS(1)%SRCPS%ZZWND
       AALPHA = MPARS(1)%SRCPS%AALPHA

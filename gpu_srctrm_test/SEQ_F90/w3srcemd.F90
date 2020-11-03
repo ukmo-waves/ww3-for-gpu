@@ -523,6 +523,9 @@
 !
 ! 1.c Set mean parameters
 !
+!$ACC DATA COPY   (SPEC, CG1, WN1, LLWS)                              & 
+!$ACC      COPYIN (U10ABS, U10DIR) &
+!$ACC      COPY (USTDIR,USTAR)
       TAUWX=0.
       TAUWY=0.
       IF ( IT .eq. 0 ) THEN
@@ -533,26 +536,29 @@
 !GPUNotes calls to W3PSR4 and W3SIN4 below will contain source term specific spectral loops
 !GPUNotes the sequencing is important (although maybe excessive?)
         CALL WAV_MY_WTIME(sTime1)
-        CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN, &
-                   AMAX, U10ABS, U10DIR, USTAR, USTDIR,            &
+        CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN,     &
+                   AMAX, U10ABS, U10DIR, USTAR, USTDIR,                &
                    TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
         CALL WAV_MY_WTIME(eTime1)
         SPR4T = SPR4T + eTime1 - sTime1
+!$ACC UPDATE HOST(USTAR)
         CALL WAV_MY_WTIME(sTime2) 
-        CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
-                 U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,       &
+        CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,         &
+                 U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,         &
                  VSIN, VDIN, LLWS, IX, IY, BRLAMBDA )
         CALL WAV_MY_WTIME(eTime2)
+!$ACC UPDATE DEVICE(LLWS)
         SIN4T = SIN4T + eTime2 - sTime2
       END IF
  
 !GPUNotes call below will contain source term specific spectral loops
       CALL WAV_MY_WTIME(sTime1)
-      CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN, &
-                 AMAX, U10ABS, U10DIR, USTAR, USTDIR,            &
+      CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN,       &
+                 AMAX, U10ABS, U10DIR, USTAR, USTDIR,                  &
                  TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
       CALL WAV_MY_WTIME(eTime1)
       SPR4T = SPR4T + eTime1 - sTime1
+!$ACC END DATA
       TWS = 1./FMEANWS
 !
 ! 1.c2 Stores the initial data
@@ -799,11 +805,15 @@
 !   a Mean parameters
 !
 !GPUNotes source term specific loops over spectrum in this call
+!$ACC DATA COPY   (SPEC, CG1, WN1, LLWS)                               &
+!$ACC      COPYIN (U10ABS, U10DIR)                                     &
+!$ACC      COPY (USTDIR,USTAR)
         CALL WAV_MY_WTIME(sTime1)
         CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN, &
                    AMAX, U10ABS, U10DIR, USTAR, USTDIR,            &
                    TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
         CALL WAV_MY_WTIME(eTime1)
+!$ACC END DATA
         SPR4T = SPR4T + eTime1 - sTime1
 !
 ! Introduces a Long & Resio (JGR2007) type dependance on wave age
