@@ -541,17 +541,17 @@
                    TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
         CALL WAV_MY_WTIME(eTime1)
         SPR4T = SPR4T + eTime1 - sTime1
-!$ACC UPDATE HOST(USTAR)
+!$ACC UPDATE HOST(USTAR,USTDIR)
         CALL WAV_MY_WTIME(sTime2) 
         CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,         &
                  U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,         &
                  VSIN, VDIN, LLWS, IX, IY, BRLAMBDA )
         CALL WAV_MY_WTIME(eTime2)
-!$ACC UPDATE DEVICE(LLWS)
         SIN4T = SIN4T + eTime2 - sTime2
       END IF
  
 !GPUNotes call below will contain source term specific spectral loops
+!$ACC UPDATE DEVICE(LLWS)
       CALL WAV_MY_WTIME(sTime1)
       CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN,       &
                  AMAX, U10ABS, U10DIR, USTAR, USTDIR,                  &
