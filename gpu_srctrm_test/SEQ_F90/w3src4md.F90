@@ -401,8 +401,10 @@
       REAL                    :: COSWIND, XSTRESS, YSTRESS, TAUHF
       REAL TEMP, TEMP2
       INTEGER IND,J,I,ISTAB
-      REAL DSTAB(3,NSPEC), DVISC, DTURB
-      REAL STRESSSTAB(3,2),STRESSSTABN(3,2)
+      !REAL DSTAB(3,NSPEC), DVISC, DTURB
+      REAL DSTAB(NSPEC), DVISC, DTURB
+      !REAL STRESSSTAB(3,2),STRESSSTABN(3,2)
+      REAL STRESSSTAB1, STRESSSTAB2, STRESSSTABN1,STRESSSTABN2
 !/
 !/ ------------------------------------------------------------------- /
 !/
@@ -414,8 +416,18 @@
       !set in another place, but seems to solve some bugs with certain
       !compilers.
       DSTAB =0.
-      STRESSSTAB =0.
-      STRESSSTABN =0.
+      !STRESSSTAB =0.
+      !STRESSSTABN =0.
+
+      ! ChrisB: STRESSSTAB[N] is a 2D array and does not reduce
+      ! properly in an ACC loop. Only element 3 is ever using in
+      ! the first dimension and the second dimension is size 2.
+      ! Splitting into two seperate scalars simplifies the handling
+      ! in ACC reduce operations.
+      STRESSSTAB1 = 0.
+      STRESSSTAB2 = 0.
+      STRESSSTABN1 = 0.
+      STRESSSTABN1 = 0.
 !
 ! 1.a  estimation of surface roughness parameters
 !
@@ -426,23 +438,25 @@
 !
 ! 1.b  estimation of surface orbital velocity and displacement
 !
-!$ACC DATA CREATE  (EB, EBX, EBY)  &
-!$ACC      COPYIN  (NTH, NK, A, SIG, DDEN, CG, SSWELLF) &
-!$ACC      COPYOUT (UORB, AORB, RE)
-! TODO: UORB/AORB can be CREATE later...
+!$ACC DATA  COPYIN (DDEN, A, NK, NTH, SIG, CG, SSWELLF)   &
+!$ACC       copyin (fwtable) &
+!$ACC      COPYOUT (UORB, AORB, RE)       &
+!$ACC      COPYOUT ( pturb, pvisc, fw, fu, fud )
 
+
+!! !$ACC      CREATE  (EB, EBX, EBY)  ! This causes differences...
+                                      ! EB[X/Y] need to be private?
 !$ACC KERNELS
       UORB=0.
       AORB=0.
  
-!GPUNotes spectral loop
-! CB - can't collapse loop here as EB(X/Y) are rumming over IK loop
-!$ACC LOOP GANG REDUCTION(+:UORB,AORB)
+!!$ACC LOOP REDUCTION(+:UORB,AORB) !! This causes different results...why?
       DO IK=1, NK
         EB  = 0.
         EBX = 0.
         EBY = 0.
-!$ACC LOOP VECTOR(128) REDUCTION(+:EB)
+!$ACC LOOP INDEPENDENT REDUCTION(+:EB)
+! This loop still ends up being a serial kernel. Why?
         DO ITH=1, NTH
            IS=ITH+(IK-1)*NTH
            EB  = EB  + A(IS)
@@ -453,15 +467,12 @@
         UORB = UORB + EB *SIG(IK)**2 * DDEN(IK) / CG(IK)
         AORB = AORB + EB             * DDEN(IK) / CG(IK)  !deep water only
       END DO
-!$ACC END KERNELS
 
-!$ACC KERNELS
       UORB  = 2*SQRT(UORB)                  ! significant orbital amplitude
       AORB1 = 2*AORB**(1-0.5*SSWELLF(6))    ! half the significant wave height ... if SWELLF(6)=1
-      !WRITE(740+IAPROC,*) EB, EBX, EBY, UORB, AORB1, NU_AIR, 4*UORB*AORB1/NU_AIR
-      !CALL FLUSH(740+IAPROC)
       RE = 4*UORB*AORB1 / NU_AIR           ! Reynolds number
-!$ACC END KERNELS
+!!$ACC END KERNELS
+!!$ACC END DATA
 !
 ! Defines the swell dissipation based on the "Reynolds number"
 !
@@ -497,8 +508,10 @@
         IND  = MIN (SIZEFWTABLE-1, INT(XI))
         DELI1= MIN (1. ,XI-FLOAT(IND))
         DELI2= 1. - DELI1
-        FW =FWTABLE(IND)*DELI2+FWTABLE(IND+1)*DELI1
+        FW = FWTABLE(IND)*DELI2+FWTABLE(IND+1)*DELI1
       END IF
+!$ACC END KERNELS
+!$ACC END DATA
 !
 ! 2.  Diagonal
 !
@@ -513,22 +526,36 @@
 !
 ! Loop over the resolved part of the spectrum
 !
-      STRESSSTAB(ISTAB,:)=0.
-      STRESSSTABN(ISTAB,:)=0.
+      !STRESSSTAB(ISTAB,:)=0.
+      !STRESSSTABN(ISTAB,:)=0.
+      STRESSSTAB1 = 0. ! Already zeroed at L418, but what the hell...
+      STRESSSTAB2 = 0.
+      STRESSSTABN1 = 0.
+      STRESSSTABN1 = 0.
 !
 ! Coupling coefficient times density ratio DRAT
 !
       CONST0=BBETA*DRAT/(kappa**2)
 !
 !GPUNotes loops over full spectrum
-!$ACC DATA  COPYIN (K, DDEN, DDEN2, SIG2, ZZALP, TTAUWSHELTER, ESIN, ECOS, SSINTHP) &
-!$ACC      COPYOUT (LLWS) &
-!$ACC         COPY (STRESSSTAB, STRESSSTABN, DSTAB)
+!!$ACC DATA COPYIN (NTH, SSINTHP, TTAUWSHELTER, ZZALP) & ! scalars
+!!$ACC      COPYIN (ECOS, SIG2, A, ESIN, SSWELLF)      & ! arrays
+!!$ACC      COPYIN (K, CG, DDEN2, SIG)                 & ! arrays
+!!$ACC      COPY   (DSTAB, LLWS)                       &
+!!$ACC      COPY   (STRESSSTABN2, STRESSSTABN1, STRESSSTAB2, STRESSSTAB1) &
+
+! WHY does adding the above explicit COPY statements change the results
+! (slightly more values have a small rounding/truncation difference)???
+!$ACC DATA COPYIN(NTH, SSINTHP)                  &  ! scalars
+!$ACC      COPYIN(ECOS, SIG2, A, ESIN, sSWELLF)  &  ! arrays
+!$ACC      COPY  (DSTAB)  &
+!$ACC      COPYOUT(XSTRESS, YSTRESS, TAUWNX, TAUWNY, COSU, SINU )
 !$ACC KERNELS
-!$ACC LOOP GANG INDEPENDENT 
       DO IK=1, NK
-        TAUPX=TAUX-ABS(TTAUWSHELTER)*STRESSSTAB(ISTAB,1)
-        TAUPY=TAUY-ABS(TTAUWSHELTER)*STRESSSTAB(ISTAB,2)
+        !TAUPX=TAUX-ABS(TTAUWSHELTER)*STRESSSTAB(ISTAB,1)
+        !TAUPY=TAUY-ABS(TTAUWSHELTER)*STRESSSTAB(ISTAB,2)
+        TAUPX=TAUX-ABS(TTAUWSHELTER)*STRESSSTAB1
+        TAUPY=TAUY-ABS(TTAUWSHELTER)*STRESSSTAB2
 ! With MIN and MAX the bug should disappear.... but where did it come from?
         USTP=MIN((TAUPX**2+TAUPY**2)**0.25,MAX(UST,0.3))
         USDIRP=ATAN2(TAUPY,TAUPX)
@@ -552,8 +579,10 @@
 !
         SWELLCOEFV=-SSWELLF(5)*DRAT*2*K(IS)*SQRT(2*NU_AIR*SIG2(IS))
         SWELLCOEFT=-DRAT*SSWELLF(1)*16*SIG2(IS)**2/GRAV
-!
-!$ACC LOOP VECTOR INDEPENDENT
+
+!!$ACC KERNELS
+!$ACC LOOP INDEPENDENT &
+!$ACC      REDUCTION(+:STRESSSTAB1, STRESSSTAB2, STRESSSTABN1, STRESSSTABN2)
         DO ITH=1,NTH
           IS=ITH+(IK-1)*NTH
           COSWIND=(ECOS(IS)*COSU+ESIN(IS)*SINU)
@@ -570,14 +599,16 @@
               ! The source term Sp is beta * omega * X**2
               ! as given by Janssen 1991 eq. 19
               ! Note that this is slightly diffent from ECWAM code CY45R2 where ZLOG is replaced by ??
-              DSTAB(ISTAB,IS) = CONST*EXP(ZLOG)*ZLOG**4*UCN*UCN*COSWIND**SSINTHP
+              !DSTAB(ISTAB,IS) = CONST*EXP(ZLOG)*ZLOG**4*UCN*UCN*COSWIND**SSINTHP
+              DSTAB(IS) = CONST*EXP(ZLOG)*ZLOG**4*UCN*UCN*COSWIND**SSINTHP
  
               ! Below is an example with breaking probability feeding back to the input...
               !DSTAB(ISTAB,IS) = CONST*EXP(ZLOG)*ZLOG**4  &
               !                  *UCN*UCN*COSWIND**SSINTHP *(1+BRLAMBDA(IS)*20*SSINBR)
               LLWS(IS)=.TRUE.
             ELSE
-              DSTAB(ISTAB,IS) = 0.
+              !DSTAB(ISTAB,IS) = 0.
+              DSTAB(IS) = 0.
               LLWS(IS)=.FALSE.
             END IF
 !
@@ -587,42 +618,70 @@
               LLWS(IS)=.TRUE.
             END IF
           ELSE  ! (COSWIND.LE.0.01)
-            DSTAB(ISTAB,IS) = 0.
+            !DSTAB(ISTAB,IS) = 0.
+            DSTAB(IS) = 0.
             LLWS(IS)=.FALSE.
           END IF
 !
-          IF ((SSWELLF(1).NE.0.AND.DSTAB(ISTAB,IS).LT.1E-7*SIG2(IS)) &
+          !IF ((SSWELLF(1).NE.0.AND.DSTAB(ISTAB,IS).LT.1E-7*SIG2(IS)) &
+          IF ((SSWELLF(1).NE.0.AND.DSTAB(IS).LT.1E-7*SIG2(IS)) &
               .OR.SSWELLF(3).GT.0) THEN
 !
             DVISC=SWELLCOEFV
             DTURB=SWELLCOEFT*(FW*UORB+(FU+FUD*COSWIND)*USTP)
 !
-            DSTAB(ISTAB,IS) = DSTAB(ISTAB,IS) + PTURB*DTURB +  PVISC*DVISC
+            !DSTAB(ISTAB,IS) = DSTAB(ISTAB,IS) + PTURB*DTURB +  PVISC*DVISC
+            DSTAB(IS) = DSTAB(IS) + PTURB*DTURB +  PVISC*DVISC
           END IF
 !
 ! Sums up the wave-supported stress
 !
           ! Wave direction is "direction to"
           ! therefore there is a PLUS sign for the stress
-          TEMP2=CONST2*DSTAB(ISTAB,IS)*A(IS)
-          IF (DSTAB(ISTAB,IS).LT.0) THEN
-            STRESSSTABN(ISTAB,1)=STRESSSTABN(ISTAB,1)+TEMP2*ECOS(IS)
-            STRESSSTABN(ISTAB,2)=STRESSSTABN(ISTAB,2)+TEMP2*ESIN(IS)
+          !TEMP2=CONST2*DSTAB(ISTAB,IS)*A(IS)
+          TEMP2=CONST2*DSTAB(IS)*A(IS)
+          !IF (DSTAB(ISTAB,IS).LT.0) THEN
+          IF (DSTAB(IS).LT.0) THEN
+            !STRESSSTABN(ISTAB,1)=STRESSSTABN(ISTAB,1)+TEMP2*ECOS(IS)
+            !STRESSSTABN(ISTAB,2)=STRESSSTABN(ISTAB,2)+TEMP2*ESIN(IS)
+            STRESSSTABN1=STRESSSTABN1+TEMP2*ECOS(IS)
+            STRESSSTABN2=STRESSSTABN2+TEMP2*ESIN(IS)
           ELSE
-            STRESSSTAB(ISTAB,1)=STRESSSTAB(ISTAB,1)+TEMP2*ECOS(IS)
-            STRESSSTAB(ISTAB,2)=STRESSSTAB(ISTAB,2)+TEMP2*ESIN(IS)
+            !STRESSSTAB(ISTAB,1)=STRESSSTAB(ISTAB,1)+TEMP2*ECOS(IS)
+            !STRESSSTAB(ISTAB,2)=STRESSSTAB(ISTAB,2)+TEMP2*ESIN(IS)
+            STRESSSTAB1=STRESSSTAB1+TEMP2*ECOS(IS)
+            STRESSSTAB2=STRESSSTAB2+TEMP2*ESIN(IS)
           END IF
         END DO
+!!$ACC END KERNELS
       END DO
+!!$ACC END KERNELS
+
+
+      !------------
+      ! ChrisB: Need to repeat code from lines 548 - 554 here
+      ! as COSU and SINU need to be the last calculated 
+      ! values from the IK loop
+      TAUPX=TAUX-ABS(TTAUWSHELTER)*STRESSSTAB1
+      TAUPY=TAUY-ABS(TTAUWSHELTER)*STRESSSTAB2
+      USDIRP=ATAN2(TAUPY,TAUPX)
+      COSU   = COS(USDIRP) ! CB - these lines are problematic as the LAST 
+      SINU   = SIN(USDIRP) ! CB - value is used later outside the loop
+      !------------
+
 !$ACC END KERNELS
 !$ACC END DATA
-!$ACC END DATA
 !
-      D(:)=DSTAB(3,:)
-      XSTRESS=STRESSSTAB (3,1)
-      YSTRESS=STRESSSTAB (3,2)
-      TAUWNX =STRESSSTABN(3,1)
-      TAUWNY =STRESSSTABN(3,2)
+      !D(:)=DSTAB(3,:)
+      D(:)=DSTAB(:)
+      !XSTRESS=STRESSSTAB (3,1)
+      !YSTRESS=STRESSSTAB (3,2)
+      !TAUWNX =STRESSSTABN(3,1)
+      !TAUWNY =STRESSSTABN(3,2)
+      XSTRESS=STRESSSTAB1
+      YSTRESS=STRESSSTAB2
+      TAUWNX =STRESSSTABN1
+      TAUWNY =STRESSSTABN2
       S = D * A
 !
 ! ... Test output of arrays
