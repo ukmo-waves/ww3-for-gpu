@@ -1655,6 +1655,7 @@
       END IF
 !
 ! 2.   Estimation of spontaneous breaking
+!$ACC KERNELS
 !
       IF ( (SSDSBCK-SSDSC(1)).LE.0 ) THEN
 !
@@ -1673,6 +1674,7 @@
         BTH(:) = 0.
  
 !GPUNotes Loops over full spectrum
+!$ACC LOOP SEQ PRIVATE(BTH)
         DO  IK=IK1, NK
  
           FACSAT=SIG(IK)*K(IK)**3*DTH
@@ -1684,8 +1686,6 @@
           IF (SSDSDTH.GE.180) THEN  ! integrates around full circle
             BTH(IS0+1:IS0+NTH)=BTH0(IK)
           ELSE
- 
- 
 !
 ! straining effect: first finds the mean direction of mss, then applies cos^2
 !                   straining
@@ -1701,9 +1701,11 @@
 ! Sums the contributions to the directional MSS for all ITH
 !
 !GPUNotes loops over directions and sum iteration within IK loop above
+!$ACC LOOP INDEPENDENT
               DO ITH=1,NTH
                 IS=ITH+(IK-1)*NTH
                 MSSLONG(IK,ITH) = K(IK)**2 * A(IS) * DDEN(IK) / CG(IK) ! contribution to MSS
+!$ACC LOOP INDEPENDENT
                 DO JTH=-NTHSUM,NTHSUM
                    ITH2 = 1+MOD(ITH-1+JTH+NTH,NTH)
                    MSSSUM2(IK:NK,ITH2) = MSSSUM2(IK:NK,ITH2)+MSSLONG(IK,ITH)*WTHSUM(ABS(JTH)+1)
@@ -1735,6 +1737,7 @@
             END IF ! SSDSC(8).GT.0) THEN
  
 !GPUNotes loop over directions
+!$ACC LOOP PRIVATE(BTH)
             DO ITH=1,NTH            ! partial integration
  
               IS=ITH+(IK-1)*NTH
@@ -1753,6 +1756,7 @@
                         +MSSSUM(IKC,2)*ES2(1+ABS(ITH-IMSSMAX (IKC)))
 !
                 FACSTRAIN=1+SSDSC(8)*SQRT(MSSTH)+SSDSC(11)*SQRT(MSSSUM2(IKC,ITH))
+!$ACC ATOMIC WRITE
                 FACSAT=SIG(IK)*K(IK)**3*DTH*FACSTRAIN
               END IF
  
@@ -1769,7 +1773,6 @@
             END IF
           END IF
  
- 
         END DO !NK END
 !
 !   Optional smoothing of B and B0 over frequencies
@@ -1779,43 +1782,51 @@
           BTHS(:)=BTH(:)
           NSMOOTH(:)=1
 !GPUNotes loops over full spectrum - assume need to be sequential
+!$ACC LOOP INDEPENDENT
           DO IK=1, SSDSBRFDF
             BTH0S(1+SSDSBRFDF)=BTH0S(1+SSDSBRFDF)+BTH0(IK)
             NSMOOTH(1+SSDSBRFDF)=NSMOOTH(1+SSDSBRFDF)+1
+!$ACC LOOP INDEPENDENT
             DO ITH=1,NTH
               IS=ITH+(IK-1)*NTH
               BTHS(ITH+SSDSBRFDF*NTH)=BTHS(ITH+SSDSBRFDF*NTH)+BTH(IS)
             END DO
           END DO
+!$ACC LOOP INDEPENDENT
           DO IK=IK1+1+SSDSBRFDF,1+2*SSDSBRFDF
             BTH0S(1+SSDSBRFDF)=BTH0S(1+SSDSBRFDF)+BTH0(IK)
             NSMOOTH(1+SSDSBRFDF)=NSMOOTH(1+SSDSBRFDF)+1
+!$ACC LOOP INDEPENDENT
             DO ITH=1,NTH
               IS=ITH+(IK-1)*NTH
               BTHS(ITH+SSDSBRFDF*NTH)=BTHS(ITH+SSDSBRFDF*NTH)+BTH(IS)
             END DO
           END DO
+!$ACC LOOP INDEPENDENT
           DO IK=SSDSBRFDF,IK1,-1
             BTH0S(IK)=BTH0S(IK+1)-BTH0(IK+SSDSBRFDF+1)
             NSMOOTH(IK)=NSMOOTH(IK+1)-1
+!$ACC LOOP INDEPENDENT
             DO ITH=1,NTH
               IS=ITH+(IK-1)*NTH
               BTHS(IS)=BTHS(IS+NTH)-BTH(IS+(SSDSBRFDF+1)*NTH)
             END DO
           END DO
-!
+!$ACC LOOP INDEPENDENT
           DO IK=IK1+1+SSDSBRFDF,NK-SSDSBRFDF
             BTH0S(IK)=BTH0S(IK-1)-BTH0(IK-SSDSBRFDF-1)+BTH0(IK+SSDSBRFDF)
             NSMOOTH(IK)=NSMOOTH(IK-1)
+!$ACC LOOP INDEPENDENT
             DO ITH=1,NTH
               IS=ITH+(IK-1)*NTH
               BTHS(IS)=BTHS(IS-NTH)-BTH(IS-(SSDSBRFDF+1)*NTH)+BTH(IS+(SSDSBRFDF)*NTH)
             END DO
           END DO
-!
+!$ACC LOOP INDEPENDENT
           DO IK=NK-SSDSBRFDF+1,NK
             BTH0S(IK)=BTH0S(IK-1)-BTH0(IK-SSDSBRFDF)
             NSMOOTH(IK)=NSMOOTH(IK-1)-1
+!$ACC LOOP INDEPENDENT
             DO ITH=1,NTH
               IS=ITH+(IK-1)*NTH
               BTHS(IS)=BTHS(IS-NTH)-BTH(IS-(SSDSBRFDF+1)*NTH)
@@ -1834,6 +1845,7 @@
 !  2.a.2  Computes spontaneous breaking dissipation rate
 !
 !GPUNotes Loop over ferquencies
+!$ACC LOOP INDEPENDENT
         DO  IK=IK1, NK
 !
 !  Correction of saturation level for shallow-water kinematics
@@ -1876,11 +1888,13 @@
         PB = PB * 28.16
 !/
       END IF ! End of test for (Ardhuin et al. 2010)'s spontaneous dissipation source term
+!$ACC END KERNELS
 !
 ! 2.b             Computes spontaneous breaking for T500 //////////////
 !
 !GPUNotes Not sure that the loops in 2b are activated for the source
 !GPUNotes term test
+!$ACC KERNELS
       IF (SSDSBCK.GT.0) THEN ! test for (Filipot et al. 2010)'s disspation source term
         E1 = 0.
         HS = 0.
@@ -1893,6 +1907,7 @@
 !GPUNotes loops over full spectrum
         DO IK=IK1, NK
           E1(IK)=0.
+!$ACC LOOP INDEPENDENT
           DO ITH=1,NTH
             IS=ITH+(IK-1)*NTH
             E1(IK)=E1(IK)+(A(IS)*SIG(IK))*DTH
@@ -1982,6 +1997,7 @@
         S2 = 0.
         NTIMES = 0
 !GPUNotes loop over freqeuncies
+!$ACC LOOP INDEPENDENT
         DO IKL=1, NKL
           IF (EFDF(IKL) .GT. 0.) THEN
             S1(IKL:IKSUP(IKL))    = S1(IKL:IKSUP(IKL)) + &
@@ -2008,6 +2024,7 @@
 !
         ASUM = 0.
 !GPUNotes loop over frequencies
+!$ACC LOOP PRIVATE(PB2,DDIAG)
         DO IK = 1, NK
           ASUM = (SUM(A(((IK-1)*NTH+1):(IK*NTH)))*DTH)
           IF (ASUM.GT.1.E-8) THEN
@@ -2027,12 +2044,14 @@
         PB = (1-SSDSC(1))*PB2*A + SSDSC(1)*PB
 !
       END IF   ! END OF TEST ON SSDSBCK
+!$ACC END KERNELS
 !
 ! 3.   Computes Lambda from breaking probability
 !
 ! Compute Lambda = PB* l(k,th)
 ! with l(k,th)=1/(2*pi²)= the breaking crest density
 !
+!$ACC KERNELS
       BRLAMBDA = PB / (2.*PI**2.)
 !
 !/ ------------------------------------------------------------------- /
@@ -2040,9 +2059,11 @@
 !/ ------------------------------------------------------------------- /
 !
 ! loop over spectrum
+
 !
 !GPUNotes Loops over the full spectrum
       SBKT(:)=0.
+!$ACC LOOP SEQ COLLAPSE(2)
       DO  IK=IK1, NK
         DO ITH=1,NTH
           IS=ITH+(IK-1)*NTH
@@ -2076,9 +2097,11 @@
           DDIAG(IS) = DDIAG(IS) + (SSDSC(3)*RENEWALFREQ+DTURB)
         END DO
       END DO
+!$ACC END KERNELS
 !
 ! COMPUTES SOURCES TERM from diagonal term
 !
+!$ACC KERNELS
       SRHS = DDIAG * A
       !IF(IX == DEBUG_NODE) WRITE(*,'(A10,4F20.10)') 'ST4 DISSIP 2', SUM(SRHS), SUM(DDIAG), SSDSC(3)*RENEWALFREQ, DTURB
 !
@@ -2086,6 +2109,7 @@
 !
       IF (SSDSC(1).GT.0) THEN
 !GPUNotes loops over partial spectrum
+!$ACC LOOP INDEPENDENT COLLAPSE(3)
         DO IK2 = IK1+DIKCUMUL, NK
           DO IK = IK2-DIKCUMUL, IK2-1
             DO ITH=1,NTH
@@ -2109,6 +2133,7 @@
         END DO
       END IF
  
+!$ACC END KERNELS
         !IF(IX == DEBUG_NODE) WRITE(*,'(A10,4F20.10)') 'ST4 DISSIP 3', SUM(SRHS), SUM(DDIAG), SUM(A)
 !
 !  COMPUTES WHITECAP PARAMETERS
