@@ -730,6 +730,9 @@
                 DELU, DELALP, TAUT, TAUHFT, TAUHFT2,             &
                 IKTAB, DCKI, QBI, SATINDICES, SATWEIGHTS,        &
                 DIKCUMUL, CUMULW
+!Use enter data to avoid creating a data structure, only use single
+!data transfer. Placed here to copy over to GPU as soon as it is 
+!read on CPU. 
         END IF
 !
 ! ... Nonlinear interactions

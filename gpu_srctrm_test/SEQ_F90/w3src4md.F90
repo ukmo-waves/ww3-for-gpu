@@ -184,7 +184,6 @@
 !/
 !/ ------------------------------------------------------------------- /
 !/
-!
       UNZ    = MAX ( 0.01 , U )
       USTAR  = MAX ( 0.0001 , USTAR )
 !
@@ -400,10 +399,10 @@
       REAL                    :: CONST, CONST0, CONST2, TAU1
       REAL X,ZARG,ZLOG,UST
       REAL                    :: COSWIND, XSTRESS, YSTRESS, TAUHF
-      REAL TEMP, TEMP2
-      INTEGER IND,J,I,ISTAB
-      REAL DSTAB(3,NSPEC), DVISC, DTURB
-      REAL STRESSSTAB(3,2),STRESSSTABN(3,2)
+      REAL                    :: TEMP, TEMP2
+      INTEGER                 :: IND=SIZEFWTABLE-1,J,I,ISTAB
+      REAL                    :: DSTAB(3,NSPEC), DVISC, DTURB
+      REAL                    :: STRESSSTAB(3,2),STRESSSTABN(3,2)
 !/
 !/ ------------------------------------------------------------------- /
 !/
@@ -414,9 +413,9 @@
       !JDM: Initializing values to zero, they shouldn't be used unless
       !set in another place, but seems to solve some bugs with certain
       !compilers.
-      DSTAB =0.
-      STRESSSTAB =0.
-      STRESSSTABN =0.
+      DSTAB = 0.
+      STRESSSTAB = 0.
+      STRESSSTABN = 0.
 !
 ! 1.a  estimation of surface roughness parameters
 !
@@ -426,7 +425,6 @@
       FACLN2 = LOG(Z0NOZ)
 !
 ! 1.b  estimation of surface orbital velocity and displacement
-!
       UORB=0.
       AORB=0.
  
@@ -445,7 +443,6 @@
         UORB = UORB + EB *SIG(IK)**2 * DDEN(IK) / CG(IK)
         AORB = AORB + EB             * DDEN(IK) / CG(IK)  !deep water only
       END DO
- 
       UORB  = 2*SQRT(UORB)                  ! significant orbital amplitude
       AORB1 = 2*AORB**(1-0.5*SSWELLF(6))    ! half the significant wave height ... if SWELLF(6)=1
       !WRITE(740+IAPROC,*) EB, EBX, EBY, UORB, AORB1, NU_AIR, 4*UORB*AORB1/NU_AIR
@@ -472,8 +469,6 @@
         PTURB=1.
         PVISC=1.
       END IF
- 
-!
       IF (SSWELLF(2).EQ.0) THEN
         FW=MAX(ABS(SSWELLF(3)),0.)
         FU=0.
@@ -486,9 +481,8 @@
         IND  = MIN (SIZEFWTABLE-1, INT(XI))
         DELI1= MIN (1. ,XI-FLOAT(IND))
         DELI2= 1. - DELI1
-        FW =FWTABLE(IND)*DELI2+FWTABLE(IND+1)*DELI1
+        FW = FWTABLE(IND)*DELI2+FWTABLE(IND+1)*DELI1
       END IF
-!
 ! 2.  Diagonal
 !
 ! Here AS is the air-sea temperature difference in degrees. Expression given by
@@ -507,7 +501,7 @@
 !
 ! Coupling coefficient times density ratio DRAT
 !
-      CONST0=BBETA*DRAT/(kappa**2)
+      CONST0=BBETA*DRAT/(KAPPA**2)
 !
 !GPUNotes loops over full spectrum
       DO IK=1, NK
@@ -1491,8 +1485,7 @@
         CHARN = GRAV*Z0/USTAR**2
       ELSE
         CHARN = AALPHA
-        END IF
-!
+      END IF
       RETURN
       END SUBROUTINE CALC_USTAR
 !/ ------------------------------------------------------------------- /

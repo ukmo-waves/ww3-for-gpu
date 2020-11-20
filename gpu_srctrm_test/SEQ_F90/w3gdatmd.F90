@@ -605,14 +605,14 @@
       INTEGER,    PARAMETER   :: NDTAB=2000
 !/
 !/ Data structures
-!/
+      
 !/ Grid type
       TYPE GRID          ! this is the geographical grid with all associated parameters
         INTEGER          :: GTYPE
         INTEGER          :: RSTYPE = -1
         INTEGER          :: ICLOSE
         INTEGER          :: NX, NY, NSEA, NSEAL, TRFLAG
-        INTEGER, POINTER :: MAPSTA(:,:), MAPST2(:,:),            &
+        INTEGER, ALLOCATABLE :: MAPSTA(:,:), MAPST2(:,:),            &
                             MAPFS(:,:), MAPSF(:,:)
 !
         REAL             :: SX, SY, X0, Y0, DTCFL, DTCFLI, DTMAX,      &
@@ -624,27 +624,27 @@
         REAL(8)          :: GRIDSHIFT ! see notes in WMGHGH
  
  
-        REAL   , POINTER :: ZB(:)     ! BOTTOM GRID, DEFINED ON ISEA
-        REAL   , POINTER :: CLATS(:)  ! COS(LAT), DEFINED ON SEA POINTS
-        REAL   , POINTER :: CLATIS(:) ! INVERSE OF COS(LAT) DEFINED ON ISEA
-        REAL   , POINTER :: CTHG0S(:) ! TAN(Y)/R, DEFINED ON ISEA
+        REAL   , ALLOCATABLE :: ZB(:)     ! BOTTOM GRID, DEFINED ON ISEA
+        REAL   , ALLOCATABLE :: CLATS(:)  ! COS(LAT), DEFINED ON SEA POINTS
+        REAL   , ALLOCATABLE :: CLATIS(:) ! INVERSE OF COS(LAT) DEFINED ON ISEA
+        REAL   , ALLOCATABLE :: CTHG0S(:) ! TAN(Y)/R, DEFINED ON ISEA
  
-        REAL   , POINTER :: TRNX(:,:), TRNY(:,:) ! TRANSPARENCY INFORMATION ON IX,IY
-        REAL, POINTER         :: SPCBAC(:,:), ANGARC(:)
+        REAL   , ALLOCATABLE :: TRNX(:,:), TRNY(:,:) ! TRANSPARENCY INFORMATION ON IX,IY
+        REAL   , ALLOCATABLE :: SPCBAC(:,:), ANGARC(:)
         REAL   , POINTER :: XGRD(:,:), YGRD(:,:) ! X AND Y DEFINED ON IX,IY
-        REAL   , POINTER :: DXDP(:,:), DXDQ(:,:) ! DX/DP & DX/DQ DEFINED ON IX,IY
-        REAL   , POINTER :: DYDP(:,:), DYDQ(:,:) ! DY/DP & DY/DQ DEFINED ON IX,IY
-        REAL   , POINTER :: DPDX(:,:), DPDY(:,:) ! DP/DX & DP/DY DEFINED ON IX,IY
-        REAL   , POINTER :: DQDX(:,:), DQDY(:,:) ! DQ/DX & DQ/DY DEFINED ON IX,IY
-        REAL   , POINTER :: GSQRT(:,:) ! SQRT(G) DEFINED ON IX,IY
-        REAL   , POINTER :: HPFAC(:,:) ! H_P = SQRT(G_PP) DEFINED ON IX,IY
-        REAL   , POINTER :: HQFAC(:,:) ! H_Q = SQRT(G_QQ) DEFINED ON IX,IY
+        REAL   , ALLOCATABLE :: DXDP(:,:), DXDQ(:,:) ! DX/DP & DX/DQ DEFINED ON IX,IY
+        REAL   , ALLOCATABLE :: DYDP(:,:), DYDQ(:,:) ! DY/DP & DY/DQ DEFINED ON IX,IY
+        REAL   , ALLOCATABLE :: DPDX(:,:), DPDY(:,:) ! DP/DX & DP/DY DEFINED ON IX,IY
+        REAL   , ALLOCATABLE :: DQDX(:,:), DQDY(:,:) ! DQ/DX & DQ/DY DEFINED ON IX,IY
+        REAL   , ALLOCATABLE :: GSQRT(:,:) ! SQRT(G) DEFINED ON IX,IY
+        REAL   , ALLOCATABLE :: HPFAC(:,:) ! H_P = SQRT(G_PP) DEFINED ON IX,IY
+        REAL   , ALLOCATABLE :: HQFAC(:,:) ! H_Q = SQRT(G_QQ) DEFINED ON IX,IY
  
         LOGICAL          :: GINIT, FLDRY, FLCX, FLCY, FLCTH, FLCK, FLSOU, IICEDISP,&
                             IICESMOOTH
         LOGICAL          :: FLAGLL
         LOGICAL          :: CMPRTRCK
-        LOGICAL, POINTER :: FLAGST(:)
+        LOGICAL, ALLOCATABLE :: FLAGST(:)
         CHARACTER(LEN=30):: GNAME
         CHARACTER(LEN=13):: FILEXT
         LOGICAL          :: GUGINIT
@@ -659,13 +659,13 @@
 !
         INTEGER               :: NTRI
         DOUBLE PRECISION, POINTER         :: XYB(:,:)
-        INTEGER, POINTER      :: TRIGP(:,:)
-        REAL(8), POINTER      :: LEN(:,:),SI(:), IEN(:,:)
+        INTEGER, ALLOCATABLE :: TRIGP(:,:)
+        REAL(8), ALLOCATABLE:: LEN(:,:),SI(:), IEN(:,:)
  
         REAL                  :: MAXX, MAXY, DXYMAX
-        REAL, POINTER         :: ANGLE(:,:),ANGLE0(:,:)
+        REAL, ALLOCATABLE     :: ANGLE(:,:),ANGLE0(:,:)
         INTEGER               :: COUNTRI,COUNTOT,NNZ, NBEDGE
-        INTEGER, POINTER      :: CCON(:), COUNTCON(:), IE_CELL(:), &
+        INTEGER, ALLOCATABLE  :: CCON(:), COUNTCON(:), IE_CELL(:), &
                                  POS_CELL(:), IOBP(:), IOBPD(:,:), IOBDP(:), IOBPA(:),   &
                                  IAA(:), JAA(:), POSI(:,:), INDEX_CELL(:),       &
                                  I_DIAG(:), JA_IE(:,:,:)
@@ -678,10 +678,10 @@
 !
       TYPE SGRD   ! this is the spectral grid with all parameters that vary with freq. and direction
         INTEGER               :: NK=0, NK2=0, NTH=0, NSPEC=0
-        INTEGER, POINTER      :: MAPWN(:), MAPTH(:)
+        INTEGER, ALLOCATABLE  :: MAPWN(:), MAPTH(:)
         REAL                  :: DTH=0., XFR=0., FR1=0., FTE=0., FTF=0., FTWN=0., FTTR=0., &
                                  FTWL=0., FACTI1=0., FACTI2=0., FACHFA=0., FACHFE=0.
-        REAL, POINTER         :: TH(:), ESIN(:), ECOS(:), ES2(:),     &
+        REAL, ALLOCATABLE     :: TH(:), ESIN(:), ECOS(:), ES2(:),     &
                                  ESC(:), EC2(:), SIG(:), SIG2(:),     &
                                  DSIP(:), DSII(:), DDEN(:), DDEN2(:)
         LOGICAL               :: SINIT=.FALSE.
@@ -711,11 +711,12 @@
         REAL                       :: WWNMEANPTAIL, SSTXFTFTAIL
 !
         INTEGER               :: SSWELLFPAR, SSDSISO, SSDSBRFDF
-        INTEGER,  POINTER     :: IKTAB(:,:), SATINDICES(:,:)
-        REAL,     POINTER     :: DCKI(:,:), SATWEIGHTS(:,:),CUMULW(:,:),QBI(:,:)
+        INTEGER, ALLOCATABLE  :: IKTAB(:,:), SATINDICES(:,:)
+        REAL,    ALLOCATABLE  :: DCKI(:,:), SATWEIGHTS(:,:),          &
+                                 CUMULW(:,:), QBI(:,:), SSWELLF(:),   &
+                                 SSDSC(:)
         REAL                  :: AALPHA, BBETA, ZZ0MAX, ZZ0RAT, ZZALP,&
-                                 SSINTHP, TTAUWSHELTER, SSWELLF(1:7), &
-                                 SSDSC(1:11), SSDSBR,                 &
+                                 SSINTHP, TTAUWSHELTER, SSDSBR,       &
                                  SSDSP, WWNMEANP, SSTXFTF, SSTXFTWN,  &
                                  FFXPM, FFXFM, FFXFA, FFXFI, FFXFD,   &
                                  SSDSBRF1, SSDSBRF2, SSDSBINT,SSDSBCK,&
@@ -856,7 +857,7 @@
       REAL   , POINTER :: CTHG0S(:) ! TAN(Y)/R, DEFINED ON ISEA
  
       REAL   , POINTER :: TRNX(:,:), TRNY(:,:) ! TRANSPARENCY INFORMATION ON IX,IY
-      REAL, POINTER         :: SPCBAC(:,:), ANGARC(:)
+      REAL   , POINTER :: SPCBAC(:,:), ANGARC(:)
       REAL   , POINTER :: XGRD(:,:), YGRD(:,:) ! X AND Y DEFINED ON IX,IY
       REAL   , POINTER :: DXDP(:,:), DXDQ(:,:) ! DX/DP & DX/DQ DEFINED ON IX,IY
       REAL   , POINTER :: DYDP(:,:), DYDQ(:,:) ! DY/DP & DY/DQ DEFINED ON IX,IY
@@ -912,15 +913,17 @@
 !/
 !/ Data aliasses for structure SRCP(S)
 !/
-      INTEGER, POINTER        :: SSWELLFPAR, SSDSISO,SSDSBRFDF,       &
-                                 IKTAB(:,:), SATINDICES(:,:),SSDSDIK
-      REAL, POINTER           :: DCKI(:,:), SATWEIGHTS(:,:),CUMULW(:,:),QBI(:,:)
+      INTEGER, POINTER        :: SSWELLFPAR, SSDSISO, SSDSBRFDF,      &
+                                 IKTAB(:,:), SATINDICES(:,:), SSDSDIK
+      REAL, POINTER           :: DCKI(:,:), SATWEIGHTS(:,:),          &
+                                 CUMULW(:,:), QBI(:,:),               &
+                                 SSDSC(:), SSWELLF(:)
       REAL, POINTER           :: ZZWND, AALPHA, BBETA, ZZ0MAX, ZZ0RAT,&
                                  ZZALP, FFXFA, FFXFI, FFXFD,          &
                                  FFXFM, FFXPM, SSDSBRF1, SSDSBRF2,    &
                                  SSDSBINT, SSDSBCK, SSDSHCK, SSDSABK, &
                                  SSDSPBK, SSINBR,SSINTHP,TTAUWSHELTER,&
-                                 SSWELLF(:), SSDSC(:), SSDSBR,        &
+                                 SSDSBR,        &
                                  SSDSP, WWNMEANP, SSTXFTF, SSTXFTWN,  &
                                  SSDSBR2, SSDSCOS, SSDSDTH, SSDSBM(:)
       REAL, POINTER           :: WWNMEANPTAIL, SSTXFTFTAIL
@@ -1375,7 +1378,7 @@
 !
 !/ ------------------------------------------------------------------- /
       USE W3SERVMD, ONLY: EXTCDE
-  USE CONSTANTS, ONLY: RADE
+      USE CONSTANTS, ONLY: RADE
 !
       IMPLICIT NONE
 !
@@ -1389,7 +1392,7 @@
 !/ Local parameters
 !/
       INTEGER, SAVE           :: MK2, MSPEC
-  INTEGER                  :: SDSNTH
+      INTEGER                 :: SDSNTH
 !/
 !
 ! -------------------------------------------------------------------- /
@@ -1457,6 +1460,8 @@
       ALLOCATE ( MPARS(IMOD)%SRCPS%IKTAB(MK,NDTAB), &
                  MPARS(IMOD)%SRCPS%DCKI(NKHS,NKD),  &
                  MPARS(IMOD)%SRCPS%QBI(NKHS,NKD),   &
+                 MPARS(IMOD)%SRCPS%SSWELLF(1:7),    &
+                 MPARS(IMOD)%SRCPS%SSDSC(1:11),     &
                  STAT=ISTAT                         )
       CHECK_ALLOC_STATUS ( ISTAT )
       SDSNTH  = MTH/2-1 !MIN(NINT(SSDSDTH/(DTH*RADE)),MTH/2-1)
@@ -1474,7 +1479,7 @@
 ! -------------------------------------------------------------------- /
 ! 3.  Point to allocated arrays
 !
-      CALL W3SETG ( IMOD, NDSE, NDST )
+      CALL W3SETG ( IMOD, NDSE, NDST)
 #if defined(TEST_W3GDATMD) || defined(TEST_W3GDATMD_W3DIMS)
       WRITE (NDST,9002)
 #endif
