@@ -433,9 +433,9 @@
 
 !!LS  Newly added time varibles
       REAL(8)                 :: sTime1, eTime1, T1, SIN4TOT, SPR4TOT, &
-                                 SIN4T, SPR4T
+                                 SIN4T, SPR4T, SDS4T, SDS4TOT
       CHARACTER(LEN=30)       :: S1
-      CHARACTER(LEN=34)       :: SIN4S, SPR4S
+      CHARACTER(LEN=34)       :: SIN4S, SPR4S, SDS4S
 !
 !/
 
@@ -1137,6 +1137,7 @@
 !
             SPR4TOT=0.
             SIN4TOT=0.
+            SDS4TOT=0.
 !GPUNotes Outer seapoint loop for source term calculations
             CALL WAV_MY_WTIME(sTime1)
             DO JSEA=1, NSEAL
@@ -1170,9 +1171,10 @@
                             TAUWNY(JSEA),  PHIAW(JSEA), CHARN(JSEA),    &
                             TWS(JSEA), PHIOC(JSEA), TMP1, D50, PSIC,TMP2,&
                             PHIBBL(JSEA), TMP3, TMP4 , PHICE(JSEA),     &
-                            ASF(ISEA), SIN4T, SPR4T)
+                            ASF(ISEA), SIN4T, SPR4T, SDS4T)
                 SIN4TOT = SIN4TOT + SIN4T
                 SPR4TOT = SPR4TOT + SPR4T
+                SDS4TOT = SDS4TOT + SDS4T
                 WHITECAP(JSEA,1:4) = TMP1
                 BEDFORMS(JSEA,1:3) = TMP2
                 TAUBBL(JSEA,1:2) = TMP3
@@ -1195,6 +1197,8 @@
             WRITE(NDTO,101) SIN4S, SIN4TOT
             SPR4S = 'Total of W3SPR4 subroutines - '
             WRITE(NDTO,101) SPR4S, SPR4TOT
+            SDS4S = 'Total of W3SDS4 subroutines - '
+            WRITE(NDTO,101) SDS4S, SDS4TOT
 
 !
 ! This barrier is from older code versions. It has been removed in 3.11
@@ -1494,7 +1498,7 @@
 !
 ! Formats
 !
-  101 FORMAT ('TIMESTAMP : ', A, F8.6)
+  101 FORMAT ('TIMESTAMP : ', A, F12.6)
   900 FORMAT (4X,I6,'|',I6,'| ', A19  ,' | ',A,' | ',A,' |')
   901 FORMAT (4X,I6,'|',I6,'| ',11X,A8,' | ',A,' | ',A,' |')
   902 FORMAT (2X,'--------+------+---------------------+'             &
