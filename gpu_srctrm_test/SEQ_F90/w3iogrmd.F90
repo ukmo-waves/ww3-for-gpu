@@ -684,6 +684,7 @@
           READ (NDSM,END=801,ERR=802,IOSTAT=IERR)                     &
                 FACP, XREL, XFLT, FXFM, FXPM, XFT, XFC, FACSD, FHMAX, &
                 FFACBERG, DELAB, FWTABLE
+!$ACC ENTER DATA COPYIN(FWTABLE)
         END IF
 !
 ! Source term parameters --------------------------------------------- *
@@ -733,6 +734,7 @@
 !Use enter data to avoid creating a data structure, only use single
 !data transfer. Placed here to copy over to GPU as soon as it is 
 !read on CPU. 
+!$ACC ENTER DATA COPYIN(TAUT, TAUHFT, TAUHFT2)
         END IF
 !
 ! ... Nonlinear interactions

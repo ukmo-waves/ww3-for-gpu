@@ -179,8 +179,8 @@
 !/
       INTEGER                 :: IS, IK, ITH
  
-      REAL                    :: TAUW, EBAND, EMEANWS,UNZ,            &
-                                 EB(NK),EB2(NK),ALFA(NK)
+      REAL                    :: TAUW, EBAND, EMEANWS, UNZ,           &
+                                 EB(NK), EB2(NK), ALFA(NK)
 !/
 !/ ------------------------------------------------------------------- /
 !/
@@ -264,7 +264,6 @@
       UNZ    = MAX ( 0.01 , U )
       CD     = (USTAR/UNZ)**2
       USDIR = UDIR
-!
 ! 6.  Final test output ---------------------------------------------- *
 !
       RETURN
@@ -355,7 +354,7 @@
 !     !/T1  Print arrays.
 !
 ! 10. Source code :
-!
+!/ ------------------------------------------------------------------- /
 !/ ------------------------------------------------------------------- /
       USE CONSTANTS, ONLY: GRAV,nu_air,KAPPA,TPI,FWTABLE,SIZEFWTABLE, &
                            DELAB,ABMIN
@@ -409,6 +408,8 @@
 !
 !      CALL PRINT_MY_TIME("    Calculate input source terms",NDTO)
 ! 1.  Preparations
+!$ACC DATA CREATE(PVISC,PTURB)
+!$ACC KERNELS
 !
       !JDM: Initializing values to zero, they shouldn't be used unless
       !set in another place, but seems to solve some bugs with certain
@@ -656,7 +657,8 @@
         TAUWX=TAUWX*TAUWB/TAUW
         TAUWY=TAUWY*TAUWB/TAUW
       END IF
-!
+!$ACC END KERNELS
+!$ACC END DATA
       RETURN
 !
 ! Formats
@@ -1464,7 +1466,8 @@
       REAL XI,DELI1,DELI2,XJ,delj1,delj2
       REAL TAUW_LOCAL
       INTEGER IND,J
-!
+
+!$ACC KERNELS
       TAUW_LOCAL=MAX(MIN(TAUW,TAUWMAX),0.)
       XI      = SQRT(TAUW_LOCAL)/DELTAUW
       IND     = MIN ( ITAUMAX-1, INT(XI)) ! index for stress table
@@ -1486,6 +1489,7 @@
       ELSE
         CHARN = AALPHA
       END IF
+!$ACC END KERNELS
       RETURN
       END SUBROUTINE CALC_USTAR
 !/ ------------------------------------------------------------------- /
