@@ -59,7 +59,7 @@
                           TAUWY, TAUOX, TAUOY, TAUWIX, TAUWIY, TAUWNX,&
                           TAUWNY, PHIAW, CHARN, TWS, PHIOC, WHITECAP, &
                           D50, PSIC, BEDFORM , PHIBBL, TAUBBL, TAUICE,&
-                          PHICE, COEF, SIN4T, SPR4T)
+                          PHICE, COEF, SIN4T, SPR4T, SDS4T)
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -395,7 +395,7 @@
                                  ICEF
       REAL, INTENT(OUT)       :: DTDYN, FCUT
       REAL, INTENT(IN)        :: COEF
-      REAL(8), INTENT(OUT)    :: SIN4T, SPR4T
+      REAL(8), INTENT(OUT)    :: SIN4T, SPR4T, SDS4T
 !/
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
@@ -439,14 +439,16 @@
  
 !/
 !!LS  Newly added time varibles
-      REAL(8)                 :: sTime1, eTime1, sTime2, eTime2
+      REAL(8)                 :: sTime1, eTime1, sTime2, eTime2,     &
+                                 sTime3, eTime3
 !      REAL(8)                 :: T1, T2
-      CHARACTER(LEN=30)       :: S1, S2
+!      CHARACTER(LEN=30)       :: S1, S2, S3
 !/
 !/ ------------------------------------------------------------------- /
 !/
       SPR4T = 0.0
       SIN4T = 0.0
+      SDS4T = 0.0
 !
       DEPTH  = MAX ( DMIN , D_INP )
       IKS1 = 1
@@ -603,9 +605,14 @@
 ! 2.c1   as in source term package
 !
 !GPUNotes subroutine will contain source term specific spectral loops
+!$ACC DATA COPYIN (SPEC, WN1, CG1, USTAR, USTDIR, DEPTH)             &
+!$ACC      COPYOUT(VSDS, VDDS, IX, IY, BRLAMBDA, WHITECAP)
+        CALL WAV_MY_WTIME(sTime3)
         CALL W3SDS4 ( SPEC, WN1, CG1, USTAR, USTDIR, DEPTH, VSDS,    &
                       VDDS, IX, IY, BRLAMBDA, WHITECAP )
- 
+        CALL WAV_MY_WTIME(eTime3)
+        SDS4T = SDS4T + eTime3 - sTime3
+!$ACC END DATA
  
 !
 ! 2.c2   optional dissipation parameterisations

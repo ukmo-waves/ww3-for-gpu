@@ -1630,6 +1630,7 @@
 ! 0.  Pre-Initialization to zero out arrays. All arrays should be reset
 !     within the computation, but these are helping with some bugs
 !     found in certain compilers
+!$ACC KERNELS
       NSMOOTH=0
       S1=0.; E1=0.
       NTIMES=0;IKSUP=0;IMSSMAX=0
@@ -1653,6 +1654,7 @@
       ELSE
         WTHSUM(1)=2*SSDSC(10)
       END IF
+!$ACC END KERNELS
 !
 ! 2.   Estimation of spontaneous breaking
 !$ACC KERNELS
@@ -1888,13 +1890,11 @@
         PB = PB * 28.16
 !/
       END IF ! End of test for (Ardhuin et al. 2010)'s spontaneous dissipation source term
-!$ACC END KERNELS
 !
 ! 2.b             Computes spontaneous breaking for T500 //////////////
 !
 !GPUNotes Not sure that the loops in 2b are activated for the source
 !GPUNotes term test
-!$ACC KERNELS
       IF (SSDSBCK.GT.0) THEN ! test for (Filipot et al. 2010)'s disspation source term
         E1 = 0.
         HS = 0.
@@ -2044,14 +2044,12 @@
         PB = (1-SSDSC(1))*PB2*A + SSDSC(1)*PB
 !
       END IF   ! END OF TEST ON SSDSBCK
-!$ACC END KERNELS
 !
 ! 3.   Computes Lambda from breaking probability
 !
 ! Compute Lambda = PB* l(k,th)
 ! with l(k,th)=1/(2*pi²)= the breaking crest density
 !
-!$ACC KERNELS
       BRLAMBDA = PB / (2.*PI**2.)
 !
 !/ ------------------------------------------------------------------- /
@@ -2097,11 +2095,9 @@
           DDIAG(IS) = DDIAG(IS) + (SSDSC(3)*RENEWALFREQ+DTURB)
         END DO
       END DO
-!$ACC END KERNELS
 !
 ! COMPUTES SOURCES TERM from diagonal term
 !
-!$ACC KERNELS
       SRHS = DDIAG * A
       !IF(IX == DEBUG_NODE) WRITE(*,'(A10,4F20.10)') 'ST4 DISSIP 2', SUM(SRHS), SUM(DDIAG), SSDSC(3)*RENEWALFREQ, DTURB
 !
