@@ -368,7 +368,6 @@
       USE W3SRC4MD, ONLY : W3SPR4, W3SIN4, W3SDS4
       USE W3GDATMD, ONLY : ZZWND, FFXFM, FFXPM, FFXFA, FFXFI, FFXFD
       USE W3SNL1MD
-      USE W3PARALL, ONLY : WAV_MY_WTIME
 !/
       IMPLICIT NONE
 !/
@@ -528,30 +527,30 @@
       ELSE
 !GPUNotes calls to W3PSR4 and W3SIN4 below will contain source term specific spectral loops
 !GPUNotes the sequencing is important (although maybe excessive?)
-        CALL WAV_MY_WTIME(sTime1)
+        CALL CPU_TIME(sTime1)
         CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN, &
                    AMAX, U10ABS, U10DIR, USTAR, USTDIR,            &
                    TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
-        CALL WAV_MY_WTIME(eTime1)
+        CALL CPU_TIME(eTime1)
         SPR4T = SPR4T + eTime1 - sTime1
         !S1 = 'Call to W3SPR4 in W3SRCE -'
         !WRITE(NDTO,101) S1, T1
-        CALL WAV_MY_WTIME(sTime2) 
+        CALL CPU_TIME(sTime2) 
         CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
                  U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,       &
                  VSIN, VDIN, LLWS, IX, IY, BRLAMBDA )
-        CALL WAV_MY_WTIME(eTime2)
+        CALL CPU_TIME(eTime2)
         SIN4T = SIN4T + eTime2 - sTime2
         !S2 = 'Call to W3SIN4 in W3SRCE -'
         !WRITE(NDTO,101) S2, T2
       END IF
  
 !GPUNotes call below will contain source term specific spectral loops
-      CALL WAV_MY_WTIME(sTime1)
+      CALL CPU_TIME(sTime1)
       CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN, &
                  AMAX, U10ABS, U10DIR, USTAR, USTDIR,            &
                  TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
-      CALL WAV_MY_WTIME(eTime1)
+      CALL CPU_TIME(eTime1)
       SPR4T = SPR4T + eTime1 - sTime1
       TWS = 1./FMEANWS
 !
@@ -588,11 +587,11 @@
         CALL W3SLN1 (       WN1, FHIGH, USTAR, U10DIR , VSLN       )
 !
 !GPUNotes subrotuine will contain source term specific spectral loops
-        CALL WAV_MY_WTIME(sTime2) 
+        CALL CPU_TIME(sTime2) 
         CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
                  U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,       &
                  VSIN, VDIN, LLWS, IX, IY, BRLAMBDA )
-        CALL WAV_MY_WTIME(eTime2)
+        CALL CPU_TIME(eTime2)
         SIN4T = SIN4T + eTime2 - sTime2
 
 !
@@ -607,10 +606,10 @@
 !GPUNotes subroutine will contain source term specific spectral loops
 !$ACC DATA COPYIN (SPEC, WN1, CG1, USTAR, USTDIR, DEPTH)             &
 !$ACC      COPYOUT(VSDS, VDDS, IX, IY, BRLAMBDA, WHITECAP)
-        CALL WAV_MY_WTIME(sTime3)
+        CALL CPU_TIME(sTime3)
         CALL W3SDS4 ( SPEC, WN1, CG1, USTAR, USTDIR, DEPTH, VSDS,    &
                       VDDS, IX, IY, BRLAMBDA, WHITECAP )
-        CALL WAV_MY_WTIME(eTime3)
+        CALL CPU_TIME(eTime3)
         SDS4T = SDS4T + eTime3 - sTime3
 !$ACC END DATA
  
@@ -804,11 +803,11 @@
 !   a Mean parameters
 !
 !GPUNotes source term specific loops over spectrum in this call
-        CALL WAV_MY_WTIME(sTime1)
+        CALL CPU_TIME(sTime1)
         CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN, &
                    AMAX, U10ABS, U10DIR, USTAR, USTDIR,            &
                    TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
-        CALL WAV_MY_WTIME(eTime1)
+        CALL CPU_TIME(eTime1)
         SPR4T = SPR4T + eTime1 - sTime1
 !
 ! Introduces a Long & Resio (JGR2007) type dependance on wave age
@@ -840,11 +839,11 @@
 ! 6.e  Update wave-supported stress----------------------------------- *
 !
 ! GPUNotes source term specific loops over spectrum in this call
-        CALL WAV_MY_WTIME(sTime2) 
+        CALL CPU_TIME(sTime2) 
         CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
                  U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,       &
                  VSIN, VDIN, LLWS, IX, IY, BRLAMBDA )
-        CALL WAV_MY_WTIME(eTime2)
+        CALL CPU_TIME(eTime2)
         SIN4T = SIN4T + eTime2 - sTime2
  
 !

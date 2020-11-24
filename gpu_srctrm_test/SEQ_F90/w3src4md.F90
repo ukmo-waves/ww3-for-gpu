@@ -1630,6 +1630,7 @@
 ! 0.  Pre-Initialization to zero out arrays. All arrays should be reset
 !     within the computation, but these are helping with some bugs
 !     found in certain compilers
+!$ACC DATA COPYOUT(BRLAMBDA, DDIAG, WHITECAP, SRHS)
 !$ACC KERNELS
       NSMOOTH=0
       S1=0.; E1=0.
@@ -2129,16 +2130,15 @@
         END DO
       END IF
  
-!$ACC END KERNELS
         !IF(IX == DEBUG_NODE) WRITE(*,'(A10,4F20.10)') 'ST4 DISSIP 3', SUM(SRHS), SUM(DDIAG), SUM(A)
 !
 !  COMPUTES WHITECAP PARAMETERS
 !
+      WHITECAP(1:2) = 0.
       IF ( .NOT. (FLOGRD(5,7).OR.FLOGRD(5,8) ) ) THEN
-        RETURN
+        GOTO 1000 
       END IF
 !
-      WHITECAP(1:2) = 0.
 !
 ! precomputes integration of Lambda over direction
 ! times wavelength times a (a=5 in Reul&Chapron JGR 2003) times dk
@@ -2172,6 +2172,7 @@
           TMAX = 5.  * 2*PI/SIG(IK)
           DT   = TMAX / 50
           MFT  = 0.
+!$ACC LOOP SEQ
           DO IT = 1, 50
 ! integration over time of foam persistance
             T = FLOAT(IT) * DT
@@ -2191,7 +2192,9 @@
       END IF
 !
 ! End of output computing
-!
+1000  CONTINUE
+!$ACC END KERNELS
+!$ACC END DATA
       RETURN
 !
 ! Formats

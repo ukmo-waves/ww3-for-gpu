@@ -4,7 +4,8 @@ OBJ=obj
 
 ## PGI Fortran:
 FC=nvfortran
-FFLAGS= -module $(MOD) -O2 #-acc -ta=tesla,managed,cuda10.2 -Minfo=acc
+#FFLAGS= -module $(MOD) -O2 -acc -ta=tesla,managed,cuda10.2 -Minfo=acc  # Both lines work
+FFLAGS= -module $(MOD) -O2 -acc -ta=tesla,cuda10.2 -Minfo=acc
 LIBS=
 
 ## GNU Fortran
