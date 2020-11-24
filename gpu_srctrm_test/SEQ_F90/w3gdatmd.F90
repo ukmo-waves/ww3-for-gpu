@@ -715,13 +715,13 @@
         REAL,    ALLOCATABLE  :: DCKI(:,:), SATWEIGHTS(:,:),          &
                                  CUMULW(:,:), QBI(:,:), SSWELLF(:),   &
                                  SSDSC(:)
-        REAL                  :: AALPHA, BBETA, ZZ0MAX, ZZ0RAT, ZZALP,&
-                                 SSINTHP, TTAUWSHELTER, SSDSBR,       &
-                                 SSDSP, WWNMEANP, SSTXFTF, SSTXFTWN,  &
+        REAL                  :: SSDSBR, SSDSP, WWNMEANP, SSTXFTF, SSTXFTWN,  &
                                  FFXPM, FFXFM, FFXFA, FFXFI, FFXFD,   &
                                  SSDSBRF1, SSDSBRF2, SSDSBINT,SSDSBCK,&
-                                 SSDSHCK, SSDSABK, SSDSPBK, SSINBR
-        REAL                  :: ZZWND
+                                 SSDSHCK, SSDSABK, SSDSPBK 
+        REAL, ALLOCATABLE     :: ZZWND, AALPHA, BBETA, ZZALP,         &
+                                 TTAUWSHELTER, SSINTHP, SSINBR, ZZ0RAT&
+                                 ,ZZ0MAX
         REAL                  :: SSDSCOS, SSDSDTH, SSDSBR2, SSDSBM(0:4)
 !
       END TYPE SRCP
@@ -1462,6 +1462,15 @@
                  MPARS(IMOD)%SRCPS%QBI(NKHS,NKD),   &
                  MPARS(IMOD)%SRCPS%SSWELLF(1:7),    &
                  MPARS(IMOD)%SRCPS%SSDSC(1:11),     &
+                 MPARS(IMOD)%SRCPS%ZZWND,           &
+                 MPARS(IMOD)%SRCPS%AALPHA,          &
+                 MPARS(IMOD)%SRCPS%BBETA,           &
+                 MPARS(IMOD)%SRCPS%ZZALP,           &
+                 MPARS(IMOD)%SRCPS%TTAUWSHELTER,    &
+                 MPARS(IMOD)%SRCPS%SSINTHP,         &
+                 MPARS(IMOD)%SRCPS%SSINBR,          &
+                 MPARS(IMOD)%SRCPS%ZZ0RAT,          &
+                 MPARS(IMOD)%SRCPS%ZZ0MAX,          &
                  STAT=ISTAT                         )
       CHECK_ALLOC_STATUS ( ISTAT )
       SDSNTH  = MTH/2-1 !MIN(NINT(SSDSDTH/(DTH*RADE)),MTH/2-1)
