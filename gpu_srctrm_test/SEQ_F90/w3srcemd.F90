@@ -446,6 +446,7 @@
 !/
       SPR4T = 0.0
       SIN4T = 0.0
+!$ACC KERNELS      
 !
       DEPTH  = MAX ( DMIN , D_INP )
       IKS1 = 1
@@ -473,18 +474,13 @@
 !FACP   = XP / PI * 0.62E-3 * TPI**4 / GRAV**2
 
 !GPUNotes loop over frequencies
-!$ACC DATA COPY   (WN2, DAM)                                            &
-!$ACC      COPYIN (WN1, FACP, NTH, SIG)
-!$ACC KERNELS      
 !$ACC LOOP INDEPENDENT
       DO IK=1, NK
         DAM(1+(IK-1)*NTH) = FACP / ( SIG(IK) * WN1(IK)**3 )
         WN2(1+(IK-1)*NTH) = WN1(IK)
       END DO
-!$ACC END KERNELS
 
 !GPUNotes loop over full spectrum
-!$ACC KERNELS      
 !$ACC LOOP INDEPENDENT COLLAPSE(2) GANG VECTOR
       DO IK=1, NK
         DO ITH=2, NTH
@@ -493,8 +489,6 @@
           WN2(ITH+IS0) = WN2(1+IS0)
         END DO
       END DO
-!$ACC END KERNELS
-!$ACC END DATA
 !
 ! 1.b Prepare dynamic time stepping
 !
@@ -523,15 +517,17 @@
 !
 ! 1.c Set mean parameters
 !
-!$ACC DATA COPY   (SPEC, CG1, WN1, LLWS)                              & 
-!$ACC      COPYIN (U10ABS, U10DIR) &
-!$ACC      COPY (USTDIR,USTAR)
       TAUWX=0.
       TAUWY=0.
+!$ACC END KERNELS
+!$ACC DATA COPY   (SPEC, CG1, WN1, LLWS, USTDIR, USTAR)                 & 
+!$ACC      COPYIN (U10ABS, U10DIR) 
       IF ( IT .eq. 0 ) THEN
+!$ACC KERNELS
          LLWS(:) = .TRUE.
          USTAR=0.
          USTDIR=0.
+!$ACC END KERNELS
       ELSE
 !GPUNotes calls to W3PSR4 and W3SIN4 below will contain source term specific spectral loops
 !GPUNotes the sequencing is important (although maybe excessive?)
@@ -805,9 +801,8 @@
 !   a Mean parameters
 !
 !GPUNotes source term specific loops over spectrum in this call
-!$ACC DATA COPY   (SPEC, CG1, WN1, LLWS)                               &
-!$ACC      COPYIN (U10ABS, U10DIR)                                     &
-!$ACC      COPY (USTDIR,USTAR)
+!$ACC DATA COPY   (SPEC, CG1, WN1, LLWS, USTDIR, USTAR)                &
+!$ACC      COPYIN (U10ABS, U10DIR)                                     
         CALL WAV_MY_WTIME(sTime1)
         CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN, &
                    AMAX, U10ABS, U10DIR, USTAR, USTDIR,            &

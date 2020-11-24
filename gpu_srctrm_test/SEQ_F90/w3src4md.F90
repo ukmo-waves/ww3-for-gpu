@@ -185,11 +185,6 @@
 !HACKA NOTES: Create the data section for the GPU. Transfer data for all
 !             kernels in single statement, ideal situation is a single
 !             data structure over all kernels. 
-!$ACC DATA COPYIN (LLWS,NTH,A,SSTXFTFTAIL,SIG,FTE,SSTXFTWN)            & 
-!$ACC      COPYIN (WWNMEANPTAIL,WWNMEANP,NK,CG,FTF,WN,DDEN)            &
-!$ACC      COPY   (EB,EB2)                                             &
-!$ACC      COPYOUT(EMEAN, FMEAN, FMEAN1, WNMEAN, AMAX, FMEANWS)                 
-
 !$ACC KERNELS 
       UNZ    = MAX ( 0.01 , U )
       USTAR  = MAX ( 0.0001 , USTAR )
@@ -211,7 +206,7 @@
           IS=ITH+(IK-1)*NTH
           EB(IK) = EB(IK) + A(ITH,IK)
           IF (LLWS(IS)) EB2(IK) = EB2(IK) + A(ITH,IK)
-          AMAX   = MAX ( AMAX , A(ITH,IK) )
+          AMAX   = MAX (AMAX, A(ITH,IK))
         END DO
       END DO
 ! 2.  Integrate over directions -------------------------------------- *
@@ -274,7 +269,6 @@
       CD     = (USTAR/UNZ)**2
       USDIR = UDIR
 !
-!$ACC END DATA
 ! 6.  Final test output ---------------------------------------------- *
 !
       RETURN
@@ -1468,7 +1462,7 @@
 ! 10. Source code :
 !-----------------------------------------------------------------------------!
       USE CONSTANTS, ONLY: GRAV, KAPPA
-      USE W3GDATMD,  ONLY: MPARS
+      USE W3GDATMD,  ONLY: AALPHA, ZZWND
       IMPLICIT NONE
       REAL, intent(in) :: WINDSPEED,TAUW
       REAL, intent(out) :: USTAR, Z0, CHARN
@@ -1478,15 +1472,8 @@
       REAL TAUW_LOCAL
 
       INTEGER IND,J
-      REAL :: ZZWND, AALPHA
-!HACKA NOTES: The full TAUT has to be specified, due to the fact that 
-!             IND and J change between the declartion and application
-!             the compiler will load incorrect indices implicitely.
-!$ACC DATA COPYIN (TAUT(:,:),MPARS(1)) &
-!$ACC      COPYOUT(USTAR) 
+!$ACC DATA COPYOUT(USTAR)
 !$ACC KERNELS
-      ZZWND = MPARS(1)%SRCPS%ZZWND
-      AALPHA = MPARS(1)%SRCPS%AALPHA
       TAUW_LOCAL=MAX(MIN(TAUW,TAUWMAX),0.)
       XI      = SQRT(TAUW_LOCAL)/DELTAUW
       IND     = MIN ( ITAUMAX-1, INT(XI)) ! index for stress table

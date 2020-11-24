@@ -376,6 +376,7 @@
           NTH    = MTH
           NK2    = NK + 2
           NSPEC  = NK * NTH
+!$ACC ENTER DATA COPYIN(NK, NTH)
 !
           IF ( IDTST .NE. IDSTR ) THEN
               IF ( IAPROC .EQ. NAPERR )                               &
@@ -630,6 +631,7 @@
                MAPWN, MAPTH, DTH, TH, ESIN, ECOS, ES2, ESC, EC2,      &
                XFR, FR1, SIG, SIG2, DSIP, DSII, DDEN, DDEN2, FTE,     &
                FTF, FTWN, FTTR, FTWL, FACTI1, FACTI2, FACHFA, FACHFE
+!$ACC ENTER DATA COPYIN(DDEN, SIG, FTF, FTE)
         END IF
  
 !
@@ -730,6 +732,8 @@
                 DELU, DELALP, TAUT, TAUHFT, TAUHFT2,             &
                 IKTAB, DCKI, QBI, SATINDICES, SATWEIGHTS,        &
                 DIKCUMUL, CUMULW
+!$ACC ENTER DATA COPYIN(TAUT, SSTXFTFTAIL, WWNMEANP, WWNMEANPTAIL)&
+!$ACC            COPYIN(SSTXFTWN)
         END IF
 !
 ! ... Nonlinear interactions
