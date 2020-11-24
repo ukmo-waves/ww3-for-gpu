@@ -376,6 +376,7 @@
           NTH    = MTH
           NK2    = NK + 2
           NSPEC  = NK * NTH
+!$ACC ENTER DATA COPYIN(NTH, NK)
 !
           IF ( IDTST .NE. IDSTR ) THEN
               IF ( IAPROC .EQ. NAPERR )                               &
@@ -630,6 +631,7 @@
                MAPWN, MAPTH, DTH, TH, ESIN, ECOS, ES2, ESC, EC2,      &
                XFR, FR1, SIG, SIG2, DSIP, DSII, DDEN, DDEN2, FTE,     &
                FTF, FTWN, FTTR, FTWL, FACTI1, FACTI2, FACHFA, FACHFE
+!$ACC ENTER DATA COPYIN(DDEN, ES2, ESIN, ECOS, DTH, SIG, EC2)
         END IF
  
 !
@@ -734,7 +736,9 @@
 !Use enter data to avoid creating a data structure, only use single
 !data transfer. Placed here to copy over to GPU as soon as it is 
 !read on CPU. 
-!$ACC ENTER DATA COPYIN(TAUT, TAUHFT, TAUHFT2)
+!$ACC ENTER DATA COPYIN(TAUT, TAUHFT, TAUHFT2, QBI, IKTAB, DCKI) &
+!$ACC            COPYIN(SSDSC, SSDSISO, SSDSBR,SSDSBRFDF, CUMULW)&
+!$ACC            COPYIN(SATINDICES, SATWEIGHTS, SSDSDTH, SSDSP)  
         END IF
 !
 ! ... Nonlinear interactions
