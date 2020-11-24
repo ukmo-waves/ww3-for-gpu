@@ -631,7 +631,7 @@
                MAPWN, MAPTH, DTH, TH, ESIN, ECOS, ES2, ESC, EC2,      &
                XFR, FR1, SIG, SIG2, DSIP, DSII, DDEN, DDEN2, FTE,     &
                FTF, FTWN, FTTR, FTWL, FACTI1, FACTI2, FACHFA, FACHFE
-!$ACC ENTER DATA COPYIN(DDEN, SIG, FTF, FTE)
+!$ACC ENTER DATA COPYIN(DDEN, ES2, ESIN, ECOS, DTH, SIG, EC2, FTF, FTE)
         END IF
  
 !
@@ -686,6 +686,7 @@
           READ (NDSM,END=801,ERR=802,IOSTAT=IERR)                     &
                 FACP, XREL, XFLT, FXFM, FXPM, XFT, XFC, FACSD, FHMAX, &
                 FFACBERG, DELAB, FWTABLE
+!$ACC ENTER DATA COPYIN(FWTABLE)
         END IF
 !
 ! Source term parameters --------------------------------------------- *
@@ -732,8 +733,17 @@
                 DELU, DELALP, TAUT, TAUHFT, TAUHFT2,             &
                 IKTAB, DCKI, QBI, SATINDICES, SATWEIGHTS,        &
                 DIKCUMUL, CUMULW
-!$ACC ENTER DATA COPYIN(TAUT, SSTXFTFTAIL, WWNMEANP, WWNMEANPTAIL)&
+
+!Use enter data to avoid creating a data structure, only use single
+!data transfer. Placed here to copy over to GPU as soon as it is 
+!read on CPU. 
+
+!$ACC ENTER DATA COPYIN(TAUT, TAUHFT, TAUHFT2, QBI, IKTAB, DCKI) &
+!$ACC            COPYIN(SSDSC, SSDSISO, SSDSBR,SSDSBRFDF, CUMULW)&
+!$ACC            COPYIN(SATINDICES, SATWEIGHTS, SSDSDTH, SSDSP)  &
+!$ACC            COPYIN(SSTXFTFTAIL, WWNMEANP, WWNMEANPTAIL)     &
 !$ACC            COPYIN(SSTXFTWN)
+
         END IF
 !
 ! ... Nonlinear interactions
@@ -748,11 +758,6 @@
 !
       IF ( FLTEST ) WRITE (NDST,9051) SNLC1, LAM,                &
                            KDCON, KDMN, SNLS1, SNLS2, SNLS3
-!
-      IF ( .NOT. WRITE ) CALL INSNL1 ( IGRD )
-!
-! Layered barriers needed for file management in xnl_init
-!
 ! ... Bottom friction ...
 !
 ! ... Depth induced breaking ...

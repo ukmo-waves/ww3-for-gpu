@@ -177,14 +177,11 @@
 !/ Local parameters
 !/
       INTEGER                 :: IS, IK, ITH
-      REAL                    :: TAUW, EBAND, EMEANWS,UNZ,            &
-                                 EB(NK),EB2(NK),ALFA(NK)
 !/
+      REAL                    :: TAUW, EBAND, EMEANWS, UNZ,           &
+                                 EB(NK), EB2(NK), ALFA(NK)
 !/ ------------------------------------------------------------------- /
 !/
-!HACKA NOTES: Create the data section for the GPU. Transfer data for all
-!             kernels in single statement, ideal situation is a single
-!             data structure over all kernels. 
 !$ACC KERNELS 
       UNZ    = MAX ( 0.01 , U )
       USTAR  = MAX ( 0.0001 , USTAR )
@@ -265,10 +262,11 @@
 !             the work being done on the GPU. No need to declare as a
 !             routine because it is not within a loop.
       CALL CALC_USTAR(U,TAUW,USTAR,Z0,CHARN)
+!$ACC KERNELS
       UNZ    = MAX ( 0.01 , U )
       CD     = (USTAR/UNZ)**2
       USDIR = UDIR
-!
+!$ACC END KERNELS
 ! 6.  Final test output ---------------------------------------------- *
 !
       RETURN
@@ -359,7 +357,7 @@
 !     !/T1  Print arrays.
 !
 ! 10. Source code :
-!
+!/ ------------------------------------------------------------------- /
 !/ ------------------------------------------------------------------- /
       USE CONSTANTS, ONLY: GRAV,nu_air,KAPPA,TPI,FWTABLE,SIZEFWTABLE, &
                            DELAB,ABMIN
@@ -403,10 +401,10 @@
       REAL                    :: CONST, CONST0, CONST2, TAU1
       REAL X,ZARG,ZLOG,UST
       REAL                    :: COSWIND, XSTRESS, YSTRESS, TAUHF
-      REAL TEMP, TEMP2
-      INTEGER IND,J,I,ISTAB
-      REAL DSTAB(3,NSPEC), DVISC, DTURB
-      REAL STRESSSTAB(3,2),STRESSSTABN(3,2)
+      REAL                    :: TEMP, TEMP2
+      INTEGER                 :: IND=SIZEFWTABLE-1,J,I,ISTAB
+      REAL                    :: DSTAB(3,NSPEC), DVISC, DTURB
+      REAL                    :: STRESSSTAB(3,2),STRESSSTABN(3,2)
 !/
 !/ ------------------------------------------------------------------- /
 !/
@@ -417,9 +415,9 @@
       !JDM: Initializing values to zero, they shouldn't be used unless
       !set in another place, but seems to solve some bugs with certain
       !compilers.
-      DSTAB =0.
-      STRESSSTAB =0.
-      STRESSSTABN =0.
+      DSTAB = 0.
+      STRESSSTAB = 0.
+      STRESSSTABN = 0.
 !
 ! 1.a  estimation of surface roughness parameters
 !
@@ -429,7 +427,6 @@
       FACLN2 = LOG(Z0NOZ)
 !
 ! 1.b  estimation of surface orbital velocity and displacement
-!
       UORB=0.
       AORB=0.
  
@@ -474,8 +471,6 @@
         PTURB=1.
         PVISC=1.
       END IF
- 
-!
       IF (SSWELLF(2).EQ.0) THEN
         FW=MAX(ABS(SSWELLF(3)),0.)
         FU=0.
@@ -488,9 +483,8 @@
         IND  = MIN (SIZEFWTABLE-1, INT(XI))
         DELI1= MIN (1. ,XI-FLOAT(IND))
         DELI2= 1. - DELI1
-        FW =FWTABLE(IND)*DELI2+FWTABLE(IND+1)*DELI1
+        FW = FWTABLE(IND)*DELI2+FWTABLE(IND+1)*DELI1
       END IF
-!
 ! 2.  Diagonal
 !
 ! Here AS is the air-sea temperature difference in degrees. Expression given by
@@ -509,7 +503,7 @@
 !
 ! Coupling coefficient times density ratio DRAT
 !
-      CONST0=BBETA*DRAT/(kappa**2)
+      CONST0=BBETA*DRAT/(KAPPA**2)
 !
 !GPUNotes loops over full spectrum
       DO IK=1, NK
@@ -664,7 +658,6 @@
         TAUWX=TAUWX*TAUWB/TAUW
         TAUWY=TAUWY*TAUWB/TAUW
       END IF
-!
       RETURN
 !
 ! Formats
