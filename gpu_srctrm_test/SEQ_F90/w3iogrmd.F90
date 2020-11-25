@@ -751,13 +751,18 @@
       IF ( WRITE ) THEN
           WRITE (NDSM)                                           &
                 SNLC1, LAM, KDCON, KDMN, SNLS1, SNLS2, SNLS3
-        ELSE
+      ELSE
           READ (NDSM,END=801,ERR=802,IOSTAT=IERR)                &
                 SNLC1, LAM, KDCON, KDMN, SNLS1, SNLS2, SNLS3
-        END IF
+      END IF
 !
       IF ( FLTEST ) WRITE (NDST,9051) SNLC1, LAM,                &
                            KDCON, KDMN, SNLS1, SNLS2, SNLS3
+!
+      IF ( .NOT. WRITE ) CALL INSNL1 ( IGRD )
+!
+! Layered barriers needed for file management in xnl_init
+!
 ! ... Bottom friction ...
 !
 ! ... Depth induced breaking ...
