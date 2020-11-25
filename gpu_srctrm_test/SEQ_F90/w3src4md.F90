@@ -179,12 +179,11 @@
 !/
       INTEGER                 :: IS, IK, ITH
  
-      REAL                    :: TAUW, EBAND, EMEANWS,UNZ,            &
-                                 EB(NK),EB2(NK),ALFA(NK)
+      REAL                    :: TAUW, EBAND, EMEANWS, UNZ,           &
+                                 EB(NK), EB2(NK), ALFA(NK)
 !/
 !/ ------------------------------------------------------------------- /
 !/
-!
       UNZ    = MAX ( 0.01 , U )
       USTAR  = MAX ( 0.0001 , USTAR )
 !
@@ -264,7 +263,6 @@
       UNZ    = MAX ( 0.01 , U )
       CD     = (USTAR/UNZ)**2
       USDIR = UDIR
-!
 ! 6.  Final test output ---------------------------------------------- *
 !
       RETURN
@@ -355,7 +353,7 @@
 !     !/T1  Print arrays.
 !
 ! 10. Source code :
-!
+!/ ------------------------------------------------------------------- /
 !/ ------------------------------------------------------------------- /
       USE CONSTANTS, ONLY: GRAV,nu_air,KAPPA,TPI,FWTABLE,SIZEFWTABLE, &
                            DELAB,ABMIN
@@ -399,11 +397,9 @@
       REAL                    :: CONST, CONST0, CONST2, TAU1
       REAL X,ZARG,ZLOG,UST
       REAL                    :: COSWIND, XSTRESS, YSTRESS, TAUHF
-      REAL TEMP, TEMP2
-      INTEGER IND,J,I,ISTAB
-      !REAL DSTAB(3,NSPEC), DVISC, DTURB
+      REAL                    :: TEMP, TEMP2
+      INTEGER                 :: IND=SIZEFWTABLE-1,J,I,ISTAB
       REAL DSTAB(NSPEC), DVISC, DTURB
-      !REAL STRESSSTAB(3,2),STRESSSTABN(3,2)
       REAL STRESSSTAB1, STRESSSTAB2, STRESSSTABN1,STRESSSTABN2
 !/
 !/ ------------------------------------------------------------------- /
@@ -416,8 +412,6 @@
       !set in another place, but seems to solve some bugs with certain
       !compilers.
       DSTAB =0.
-      !STRESSSTAB =0.
-      !STRESSSTABN =0.
 
       ! ChrisB: STRESSSTAB[N] is a 2D array and does not reduce
       ! properly in an ACC loop. Only element 3 is ever using in
@@ -439,13 +433,11 @@
 ! 1.b  estimation of surface orbital velocity and displacement
 !
 !$ACC DATA  COPYIN (DDEN, A, NK, NTH, SIG, CG, SSWELLF)   &
-!$ACC       copyin (fwtable) &
-!$ACC      COPYOUT (UORB, AORB, RE)       &
-!$ACC      COPYOUT ( pturb, pvisc, fw, fu, fud )
+!$ACC       COPYIN (fwtable) &
+!$ACC       COPYOUT(UORB, AORB, RE)       &
+!$ACC       COPYOUT( pturb, pvisc, fw, fu, fud )
 
 
-!! !$ACC      CREATE  (EB, EBX, EBY)  ! This causes differences...
-                                      ! EB[X/Y] need to be private?
 !$ACC KERNELS
       UORB=0.
       AORB=0.
@@ -467,12 +459,9 @@
         UORB = UORB + EB *SIG(IK)**2 * DDEN(IK) / CG(IK)
         AORB = AORB + EB             * DDEN(IK) / CG(IK)  !deep water only
       END DO
-
       UORB  = 2*SQRT(UORB)                  ! significant orbital amplitude
       AORB1 = 2*AORB**(1-0.5*SSWELLF(6))    ! half the significant wave height ... if SWELLF(6)=1
       RE = 4*UORB*AORB1 / NU_AIR           ! Reynolds number
-!!$ACC END KERNELS
-!!$ACC END DATA
 !
 ! Defines the swell dissipation based on the "Reynolds number"
 !
@@ -494,8 +483,6 @@
         PTURB=1.
         PVISC=1.
       END IF
- 
-!
       IF (SSWELLF(2).EQ.0) THEN
         FW=MAX(ABS(SSWELLF(3)),0.)
         FU=0.
@@ -519,6 +506,7 @@
 ! Abdalla & Cavaleri, JGR 2002 for Usigma. For USTARsigma ... I do not see where
 ! I got it from, maybe just made up from drag law ...
 !
+!$ACC KERNELS
       UST=USTAR
       ISTAB=3
       TAUX = UST**2* COS(USDIR)
@@ -535,7 +523,7 @@
 !
 ! Coupling coefficient times density ratio DRAT
 !
-      CONST0=BBETA*DRAT/(kappa**2)
+      CONST0=BBETA*DRAT/(KAPPA**2)
 !
 !GPUNotes loops over full spectrum
 !!$ACC DATA COPYIN (NTH, SSINTHP, TTAUWSHELTER, ZZALP) & ! scalars
@@ -546,11 +534,10 @@
 
 ! WHY does adding the above explicit COPY statements change the results
 ! (slightly more values have a small rounding/truncation difference)???
-!$ACC DATA COPYIN(NTH, SSINTHP)                  &  ! scalars
-!$ACC      COPYIN(ECOS, SIG2, A, ESIN, sSWELLF)  &  ! arrays
-!$ACC      COPY  (DSTAB)  &
-!$ACC      COPYOUT(XSTRESS, YSTRESS, TAUWNX, TAUWNY, COSU, SINU )
-!$ACC KERNELS
+!!$ACC DATA COPYIN(NTH, SSINTHP)                  &  ! scalars
+!!$ACC      COPYIN(ECOS, SIG2, A, ESIN, sSWELLF)  &  ! arrays
+!!$ACC      COPY  (DSTAB)  &
+!!$ACC      COPYOUT(XSTRESS, YSTRESS, TAUWNX, TAUWNY, COSU, SINU )
       DO IK=1, NK
         !TAUPX=TAUX-ABS(TTAUWSHELTER)*STRESSSTAB(ISTAB,1)
         !TAUPY=TAUY-ABS(TTAUWSHELTER)*STRESSSTAB(ISTAB,2)
@@ -580,7 +567,6 @@
         SWELLCOEFV=-SSWELLF(5)*DRAT*2*K(IS)*SQRT(2*NU_AIR*SIG2(IS))
         SWELLCOEFT=-DRAT*SSWELLF(1)*16*SIG2(IS)**2/GRAV
 
-!!$ACC KERNELS
 !$ACC LOOP INDEPENDENT &
 !$ACC      REDUCTION(+:STRESSSTAB1, STRESSSTAB2, STRESSSTABN1, STRESSSTABN2)
         DO ITH=1,NTH
@@ -653,9 +639,7 @@
             STRESSSTAB2=STRESSSTAB2+TEMP2*ESIN(IS)
           END IF
         END DO
-!!$ACC END KERNELS
       END DO
-!!$ACC END KERNELS
 
 
       !------------
@@ -669,15 +653,9 @@
       SINU   = SIN(USDIRP) ! CB - value is used later outside the loop
       !------------
 
-!$ACC END KERNELS
-!$ACC END DATA
+!!$ACC END DATA
 !
-      !D(:)=DSTAB(3,:)
       D(:)=DSTAB(:)
-      !XSTRESS=STRESSSTAB (3,1)
-      !YSTRESS=STRESSSTAB (3,2)
-      !TAUWNX =STRESSSTABN(3,1)
-      !TAUWNY =STRESSSTABN(3,2)
       XSTRESS=STRESSSTAB1
       YSTRESS=STRESSSTAB2
       TAUWNX =STRESSSTABN1
@@ -741,7 +719,7 @@
         TAUWX=TAUWX*TAUWB/TAUW
         TAUWY=TAUWY*TAUWB/TAUW
       END IF
-!
+!$ACC END KERNELS
       RETURN
 !
 ! Formats
@@ -1549,7 +1527,7 @@
       REAL XI,DELI1,DELI2,XJ,delj1,delj2
       REAL TAUW_LOCAL
       INTEGER IND,J
-!
+
       TAUW_LOCAL=MAX(MIN(TAUW,TAUWMAX),0.)
       XI      = SQRT(TAUW_LOCAL)/DELTAUW
       IND     = MIN ( ITAUMAX-1, INT(XI)) ! index for stress table
@@ -1570,8 +1548,7 @@
         CHARN = GRAV*Z0/USTAR**2
       ELSE
         CHARN = AALPHA
-        END IF
-!
+      END IF
       RETURN
       END SUBROUTINE CALC_USTAR
 !/ ------------------------------------------------------------------- /

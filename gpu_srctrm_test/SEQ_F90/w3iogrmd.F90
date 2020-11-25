@@ -376,6 +376,7 @@
           NTH    = MTH
           NK2    = NK + 2
           NSPEC  = NK * NTH
+!$ACC ENTER DATA COPYIN(NTH, NK)
 !
           IF ( IDTST .NE. IDSTR ) THEN
               IF ( IAPROC .EQ. NAPERR )                               &
@@ -630,6 +631,7 @@
                MAPWN, MAPTH, DTH, TH, ESIN, ECOS, ES2, ESC, EC2,      &
                XFR, FR1, SIG, SIG2, DSIP, DSII, DDEN, DDEN2, FTE,     &
                FTF, FTWN, FTTR, FTWL, FACTI1, FACTI2, FACHFA, FACHFE
+!$ACC ENTER DATA COPYIN(DDEN, ES2, ESIN, ECOS, DTH, SIG, EC2)
         END IF
  
 !
@@ -684,6 +686,7 @@
           READ (NDSM,END=801,ERR=802,IOSTAT=IERR)                     &
                 FACP, XREL, XFLT, FXFM, FXPM, XFT, XFC, FACSD, FHMAX, &
                 FFACBERG, DELAB, FWTABLE
+!$ACC ENTER DATA COPYIN(FWTABLE)
         END IF
 !
 ! Source term parameters --------------------------------------------- *
@@ -730,6 +733,12 @@
                 DELU, DELALP, TAUT, TAUHFT, TAUHFT2,             &
                 IKTAB, DCKI, QBI, SATINDICES, SATWEIGHTS,        &
                 DIKCUMUL, CUMULW
+!Use enter data to avoid creating a data structure, only use single
+!data transfer. Placed here to copy over to GPU as soon as it is 
+!read on CPU. 
+!$ACC ENTER DATA COPYIN(TAUT, TAUHFT, TAUHFT2, QBI, IKTAB, DCKI) &
+!$ACC            COPYIN(SSDSC, SSDSISO, SSDSBR,SSDSBRFDF, CUMULW)&
+!$ACC            COPYIN(SATINDICES, SATWEIGHTS, SSDSDTH, SSDSP)  
         END IF
 !
 ! ... Nonlinear interactions
