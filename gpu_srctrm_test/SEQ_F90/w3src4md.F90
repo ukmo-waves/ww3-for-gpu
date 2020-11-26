@@ -355,7 +355,7 @@
 ! 10. Source code :
 !/ ------------------------------------------------------------------- /
 !/ ------------------------------------------------------------------- /
-      USE CONSTANTS, ONLY: GRAV,nu_air,KAPPA,TPI,FWTABLE,SIZEFWTABLE, &
+      USE CONSTANTS, ONLY: GRAV,NU_AIR,KAPPA,TPI,FWTABLE,SIZEFWTABLE, &
                            DELAB,ABMIN
       USE W3GDATMD, ONLY: NK, NTH, NSPEC, XFR, DDEN, SIG, SIG2, TH,   &
                           ESIN, ECOS, EC2, ZZWND, AALPHA, BBETA, ZZALP,&
@@ -398,7 +398,7 @@
       REAL X,ZARG,ZLOG,UST
       REAL                    :: COSWIND, XSTRESS, YSTRESS, TAUHF
       REAL                    :: TEMP, TEMP2
-      INTEGER                 :: IND=SIZEFWTABLE-1,J,I,ISTAB
+      INTEGER                 :: IND,J,I,ISTAB
       REAL DSTAB(NSPEC), DVISC, DTURB
       REAL STRESSSTAB1, STRESSSTAB2, STRESSSTABN1,STRESSSTABN2
 !/
@@ -407,6 +407,7 @@
 !
 !      CALL PRINT_MY_TIME("    Calculate input source terms",NDTO)
 ! 1.  Preparations
+!$ACC KERNELS
 !
       !JDM: Initializing values to zero, they shouldn't be used unless
       !set in another place, but seems to solve some bugs with certain
@@ -421,33 +422,33 @@
       STRESSSTAB1 = 0.
       STRESSSTAB2 = 0.
       STRESSSTABN1 = 0.
-      STRESSSTABN1 = 0.
+      STRESSSTABN2 = 0.
 !
 ! 1.a  estimation of surface roughness parameters
 !
-      Z0VISC = 0.1*nu_air/MAX(USTAR,0.0001)
+      Z0VISC = 0.1*NU_AIR/MAX(USTAR,0.0001)
       Z0NOZ = MAX(Z0VISC,ZZ0RAT*Z0)
       FACLN1 = U / LOG(ZZWND/Z0NOZ)
       FACLN2 = LOG(Z0NOZ)
 !
 ! 1.b  estimation of surface orbital velocity and displacement
 !
-!$ACC DATA  COPYIN (DDEN, A, NK, NTH, SIG, CG, SSWELLF)   &
-!$ACC       COPYIN (fwtable) &
-!$ACC       COPYOUT(UORB, AORB, RE)       &
-!$ACC       COPYOUT( pturb, pvisc, fw, fu, fud )
+!!$ACC DATA  COPYIN (DDEN, A, NK, NTH, SIG, CG, SSWELLF)   &
+!!$ACC       COPYIN (fwtable) &
+!!$ACC       COPYOUT(UORB, AORB, RE)       &
+!!$ACC       COPYOUT( pturb, pvisc, fw, fu, fud )
 
 
-!$ACC KERNELS
       UORB=0.
       AORB=0.
  
 !!$ACC LOOP REDUCTION(+:UORB,AORB) !! This causes different results...why?
+!$ACC LOOP INDEPENDENT
       DO IK=1, NK
         EB  = 0.
         EBX = 0.
         EBY = 0.
-!$ACC LOOP INDEPENDENT REDUCTION(+:EB)
+!!$ACC LOOP INDEPENDENT REDUCTION(+:EB)
 ! This loop still ends up being a serial kernel. Why?
         DO ITH=1, NTH
            IS=ITH+(IK-1)*NTH
@@ -459,7 +460,7 @@
         UORB = UORB + EB *SIG(IK)**2 * DDEN(IK) / CG(IK)
         AORB = AORB + EB             * DDEN(IK) / CG(IK)  !deep water only
       END DO
-      UORB  = 2*SQRT(UORB)                  ! significant orbital amplitude
+      UORB  = 2*UORB**0.5                  ! significant orbital amplitude
       AORB1 = 2*AORB**(1-0.5*SSWELLF(6))    ! half the significant wave height ... if SWELLF(6)=1
       RE = 4*UORB*AORB1 / NU_AIR           ! Reynolds number
 !
@@ -490,15 +491,13 @@
       ELSE
         FU=ABS(SSWELLF(3))
         FUD=SSWELLF(2)
-        AORB=2*SQRT(AORB)
+        AORB=2*AORB**0.5
         XI=(ALOG10(MAX(AORB/Z0NOZ,3.))-ABMIN)/DELAB
         IND  = MIN (SIZEFWTABLE-1, INT(XI))
         DELI1= MIN (1. ,XI-FLOAT(IND))
         DELI2= 1. - DELI1
         FW = FWTABLE(IND)*DELI2+FWTABLE(IND+1)*DELI1
       END IF
-!$ACC END KERNELS
-!$ACC END DATA
 !
 ! 2.  Diagonal
 !
@@ -506,7 +505,6 @@
 ! Abdalla & Cavaleri, JGR 2002 for Usigma. For USTARsigma ... I do not see where
 ! I got it from, maybe just made up from drag law ...
 !
-!$ACC KERNELS
       UST=USTAR
       ISTAB=3
       TAUX = UST**2* COS(USDIR)
@@ -653,8 +651,6 @@
       SINU   = SIN(USDIRP) ! CB - value is used later outside the loop
       !------------
 
-!!$ACC END DATA
-!
       D(:)=DSTAB(:)
       XSTRESS=STRESSSTAB1
       YSTRESS=STRESSSTAB2

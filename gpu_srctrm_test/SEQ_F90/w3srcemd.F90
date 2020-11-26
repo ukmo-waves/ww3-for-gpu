@@ -532,16 +532,16 @@
                    TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
         CALL WAV_MY_WTIME(eTime1)
         SPR4T = SPR4T + eTime1 - sTime1
-        !S1 = 'Call to W3SPR4 in W3SRCE -'
-        !WRITE(NDTO,101) S1, T1
+!$ACC DATA COPYIN (SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS, Z0, CD) &
+!$ACC      COPYIN (BRLAMBDA, IX, IY)                                &
+!$ACC      COPYOUT(TAUWX, TAUWY, TAUWAX, TAUWAY, VSIN, VDIN, LLWS)   
         CALL WAV_MY_WTIME(sTime2) 
         CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
                  U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,       &
                  VSIN, VDIN, LLWS, IX, IY, BRLAMBDA )
         CALL WAV_MY_WTIME(eTime2)
+!$ACC END DATA
         SIN4T = SIN4T + eTime2 - sTime2
-        !S2 = 'Call to W3SIN4 in W3SRCE -'
-        !WRITE(NDTO,101) S2, T2
       END IF
  
 !GPUNotes call below will contain source term specific spectral loops
