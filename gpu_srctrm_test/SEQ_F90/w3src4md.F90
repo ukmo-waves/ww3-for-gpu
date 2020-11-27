@@ -195,6 +195,8 @@
       AMAX   = 0.
 !
 ! 1.  Integral over directions and maximum --------------------------- *
+!
+!GPUNotes spectral loop
       EB(:)  = 0.
       EB2(:) = 0.
 !$ACC LOOP INDEPENDENT GANG VECTOR(128)
@@ -359,7 +361,7 @@
 ! 10. Source code :
 !/ ------------------------------------------------------------------- /
 !/ ------------------------------------------------------------------- /
-      USE CONSTANTS, ONLY: GRAV,nu_air,KAPPA,TPI,FWTABLE,SIZEFWTABLE, &
+      USE CONSTANTS, ONLY: GRAV,NU_AIR,KAPPA,TPI,FWTABLE,SIZEFWTABLE, &
                            DELAB,ABMIN
       USE W3GDATMD, ONLY: NK, NTH, NSPEC, XFR, DDEN, SIG, SIG2, TH,   &
                           ESIN, ECOS, EC2, ZZWND, AALPHA, BBETA, ZZALP,&
@@ -383,7 +385,7 @@
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
 !/
-      INTEGER                 :: IS,IK,ITH
+      INTEGER                 :: IS,IK,ITH, IR
       REAL                    :: FACLN1, FACLN2, LAMBDA
       REAL                    :: COSU, SINU, TAUX, TAUY, USDIRP, USTP
       REAL                    :: TAUPX, TAUPY, UST2, TAUW, TAUWB
@@ -401,10 +403,10 @@
       REAL                    :: CONST, CONST0, CONST2, TAU1
       REAL X,ZARG,ZLOG,UST
       REAL                    :: COSWIND, XSTRESS, YSTRESS, TAUHF
-      REAL                    :: TEMP, TEMP2
-      INTEGER                 :: IND=SIZEFWTABLE-1,J,I,ISTAB
-      REAL                    :: DSTAB(3,NSPEC), DVISC, DTURB
-      REAL                    :: STRESSSTAB(3,2),STRESSSTABN(3,2)
+      REAL                    :: TEMP, TEMP2 
+      INTEGER                 :: IND,J,I,ISTAB
+      REAL DSTAB(NSPEC), DVISC, DTURB
+      REAL STRESSSTAB1, STRESSSTAB2, STRESSSTABN1,STRESSSTABN2
 !/
 !/ ------------------------------------------------------------------- /
 !/
@@ -415,26 +417,38 @@
       !JDM: Initializing values to zero, they shouldn't be used unless
       !set in another place, but seems to solve some bugs with certain
       !compilers.
-      DSTAB = 0.
-      STRESSSTAB = 0.
-      STRESSSTABN = 0.
+!$ACC DATA COPYOUT(PTURB, PVISC, STRESSSTAB1, STRESSSTAB2)
+!$ACC KERNELS
+      DSTAB(:) =0.
+
+      ! ChrisB: STRESSSTAB[N] is a 2D array and does not reduce
+      ! properly in an ACC loop. Only element 3 is ever using in
+      ! the first dimension and the second dimension is size 2.
+      ! Splitting into two seperate scalars simplifies the handling
+      ! in ACC reduce operations.
+      STRESSSTAB1 = 0.
+      STRESSSTAB2 = 0.
+      STRESSSTABN1 = 0.
+      STRESSSTABN2 = 0.
 !
 ! 1.a  estimation of surface roughness parameters
 !
-      Z0VISC = 0.1*nu_air/MAX(USTAR,0.0001)
+      Z0VISC = 0.1*NU_AIR/MAX(USTAR,0.0001)
       Z0NOZ = MAX(Z0VISC,ZZ0RAT*Z0)
       FACLN1 = U / LOG(ZZWND/Z0NOZ)
       FACLN2 = LOG(Z0NOZ)
 !
 ! 1.b  estimation of surface orbital velocity and displacement
+!
       UORB=0.
       AORB=0.
  
-!GPUNotes spectral loop
+!$ACC LOOP INDEPENDENT
       DO IK=1, NK
         EB  = 0.
         EBX = 0.
         EBY = 0.
+! This loop still ends up being a serial kernel. Why?
         DO ITH=1, NTH
            IS=ITH+(IK-1)*NTH
            EB  = EB  + A(IS)
@@ -442,13 +456,11 @@
 !
 !  At this point UORB and AORB are the variances of the orbital velocity and surface elevation
 !
-        UORB = UORB + EB *SIG(IK)**2 * DDEN(IK) / CG(IK)
+        UORB = UORB + EB * SIG(IK)**2 * DDEN(IK) / CG(IK)
         AORB = AORB + EB             * DDEN(IK) / CG(IK)  !deep water only
       END DO
-      UORB  = 2*SQRT(UORB)                  ! significant orbital amplitude
+      UORB  = 2*UORB**0.5                  ! significant orbital amplitude
       AORB1 = 2*AORB**(1-0.5*SSWELLF(6))    ! half the significant wave height ... if SWELLF(6)=1
-      !WRITE(740+IAPROC,*) EB, EBX, EBY, UORB, AORB1, NU_AIR, 4*UORB*AORB1/NU_AIR
-      !CALL FLUSH(740+IAPROC)
       RE = 4*UORB*AORB1 / NU_AIR           ! Reynolds number
 !
 ! Defines the swell dissipation based on the "Reynolds number"
@@ -478,13 +490,14 @@
       ELSE
         FU=ABS(SSWELLF(3))
         FUD=SSWELLF(2)
-        AORB=2*SQRT(AORB)
+        AORB=2*AORB**0.5
         XI=(ALOG10(MAX(AORB/Z0NOZ,3.))-ABMIN)/DELAB
         IND  = MIN (SIZEFWTABLE-1, INT(XI))
         DELI1= MIN (1. ,XI-FLOAT(IND))
         DELI2= 1. - DELI1
         FW = FWTABLE(IND)*DELI2+FWTABLE(IND+1)*DELI1
       END IF
+!
 ! 2.  Diagonal
 !
 ! Here AS is the air-sea temperature difference in degrees. Expression given by
@@ -498,44 +511,59 @@
 !
 ! Loop over the resolved part of the spectrum
 !
-      STRESSSTAB(ISTAB,:)=0.
-      STRESSSTABN(ISTAB,:)=0.
+      !STRESSSTAB(ISTAB,:)=0.
+      !STRESSSTABN(ISTAB,:)=0.
+      STRESSSTAB1 = 0. ! Already zeroed at L418, but what the hell...
+      STRESSSTAB2 = 0.
+      STRESSSTABN1 = 0.
+      STRESSSTABN1 = 0.
 !
 ! Coupling coefficient times density ratio DRAT
 !
       CONST0=BBETA*DRAT/(KAPPA**2)
 !
 !GPUNotes loops over full spectrum
+
+! WHY does adding the above explicit COPY statements change the results
+! (slightly more values have a small rounding/truncation difference)???
+
+! Seems to work without issues when set to SEQ. 
+
+!!$ACC LOOP GANG VECTOR(32) INDEPENDENT
       DO IK=1, NK
-        TAUPX=TAUX-ABS(TTAUWSHELTER)*STRESSSTAB(ISTAB,1)
-        TAUPY=TAUY-ABS(TTAUWSHELTER)*STRESSSTAB(ISTAB,2)
+        !TAUPX=TAUX-ABS(TTAUWSHELTER)*STRESSSTAB(ISTAB,1)
+        !TAUPY=TAUY-ABS(TTAUWSHELTER)*STRESSSTAB(ISTAB,2)
+        TAUPX=TAUX-ABS(TTAUWSHELTER)*STRESSSTAB1
+        TAUPY=TAUY-ABS(TTAUWSHELTER)*STRESSSTAB2
 ! With MIN and MAX the bug should disappear.... but where did it come from?
+           ! rho_a, and thus comparable to USTAR**2
+           ! it is the integral of rho_w g Sin/C /rho_a
+           ! (air-> waves momentum flux)
+           ! CM parameter is 1 / C_phi
+           ! Z0 corresponds to Z0+Z1 of the Janssen eq. 14
+!
+! precomputes swell factors
+!
+!$ACC LOOP INDEPENDENT &
+!$ACC      REDUCTION(+:STRESSSTAB1, STRESSSTAB2, STRESSSTABN1, STRESSSTABN2)
+        DO ITH=1,NTH
         USTP=MIN((TAUPX**2+TAUPY**2)**0.25,MAX(UST,0.3))
         USDIRP=ATAN2(TAUPY,TAUPX)
-        COSU   = COS(USDIRP)
-        SINU   = SIN(USDIRP)
+        COSU   = COS(USDIRP) ! CB - these lines are problematic as the LAST 
+        SINU   = SIN(USDIRP) ! CB - value is used later outside the loop
         IS=1+(IK-1)*NTH
         CM=K(IS)/SIG2(IS) !inverse of phase speed
         UCN=USTP*CM+ZZALP  !this is the inverse wave age
            ! the stress is the real stress (N/m^2) divided by
-           ! rho_a, and thus comparable to USTAR**2
-           ! it is the integral of rho_w g Sin/C /rho_a
-           ! (air-> waves momentum flux)
         CONST2=DDEN2(IS)/CG(IK) &        !Jacobian to get energy in band
               *GRAV/(SIG(IK)/K(IS)*DRAT) ! coefficient to get momentum
         CONST=SIG2(IS)*CONST0
-           ! CM parameter is 1 / C_phi
-           ! Z0 corresponds to Z0+Z1 of the Janssen eq. 14
         ZCN=ALOG(K(IS)*Z0)
-!
-! precomputes swell factors
-!
         SWELLCOEFV=-SSWELLF(5)*DRAT*2*K(IS)*SQRT(2*NU_AIR*SIG2(IS))
         SWELLCOEFT=-DRAT*SSWELLF(1)*16*SIG2(IS)**2/GRAV
-!
-        DO ITH=1,NTH
-          IS=ITH+(IK-1)*NTH
-          COSWIND=(ECOS(IS)*COSU+ESIN(IS)*SINU)
+
+          IR=ITH+(IK-1)*NTH
+          COSWIND=(ECOS(IR)*COSU+ESIN(IR)*SINU)
           IF (COSWIND.GT.0.01) THEN
             X=COSWIND*UCN
             ! this ZARG term is the argument of the exponential
@@ -549,57 +577,81 @@
               ! The source term Sp is beta * omega * X**2
               ! as given by Janssen 1991 eq. 19
               ! Note that this is slightly diffent from ECWAM code CY45R2 where ZLOG is replaced by ??
-              DSTAB(ISTAB,IS) = CONST*EXP(ZLOG)*ZLOG**4*UCN*UCN*COSWIND**SSINTHP
+              !DSTAB(ISTAB,IS) = CONST*EXP(ZLOG)*ZLOG**4*UCN*UCN*COSWIND**SSINTHP
+              DSTAB(IR) = CONST*EXP(ZLOG)*ZLOG**4*UCN*UCN*COSWIND**SSINTHP
  
               ! Below is an example with breaking probability feeding back to the input...
               !DSTAB(ISTAB,IS) = CONST*EXP(ZLOG)*ZLOG**4  &
               !                  *UCN*UCN*COSWIND**SSINTHP *(1+BRLAMBDA(IS)*20*SSINBR)
-              LLWS(IS)=.TRUE.
+              LLWS(IR)=.TRUE.
             ELSE
-              DSTAB(ISTAB,IS) = 0.
-              LLWS(IS)=.FALSE.
+              !DSTAB(ISTAB,IS) = 0.
+              DSTAB(IR) = 0.
+              LLWS(IR)=.FALSE.
             END IF
 !
 !  Added for consistency with ECWAM implsch.F
 !
             IF (28.*CM*USTAR*COSWIND.GE.1) THEN
-              LLWS(IS)=.TRUE.
+              LLWS(IR)=.TRUE.
             END IF
           ELSE  ! (COSWIND.LE.0.01)
-            DSTAB(ISTAB,IS) = 0.
-            LLWS(IS)=.FALSE.
+            !DSTAB(ISTAB,IS) = 0.
+            DSTAB(IR) = 0.
+            LLWS(IR)=.FALSE.
           END IF
 !
-          IF ((SSWELLF(1).NE.0.AND.DSTAB(ISTAB,IS).LT.1E-7*SIG2(IS)) &
+          !IF ((SSWELLF(1).NE.0.AND.DSTAB(ISTAB,IS).LT.1E-7*SIG2(IS)) &
+          IF ((SSWELLF(1).NE.0.AND.DSTAB(IR).LT.1E-7*SIG2(IR)) &
               .OR.SSWELLF(3).GT.0) THEN
 !
             DVISC=SWELLCOEFV
             DTURB=SWELLCOEFT*(FW*UORB+(FU+FUD*COSWIND)*USTP)
 !
-            DSTAB(ISTAB,IS) = DSTAB(ISTAB,IS) + PTURB*DTURB +  PVISC*DVISC
+            !DSTAB(ISTAB,IS) = DSTAB(ISTAB,IS) + PTURB*DTURB +  PVISC*DVISC
+            DSTAB(IR) = DSTAB(IR) + PTURB*DTURB +  PVISC*DVISC
           END IF
+
 !
 ! Sums up the wave-supported stress
 !
           ! Wave direction is "direction to"
           ! therefore there is a PLUS sign for the stress
-          TEMP2=CONST2*DSTAB(ISTAB,IS)*A(IS)
-          IF (DSTAB(ISTAB,IS).LT.0) THEN
-            STRESSSTABN(ISTAB,1)=STRESSSTABN(ISTAB,1)+TEMP2*ECOS(IS)
-            STRESSSTABN(ISTAB,2)=STRESSSTABN(ISTAB,2)+TEMP2*ESIN(IS)
+          !TEMP2=CONST2*DSTAB(ISTAB,IS)*A(IS)
+          TEMP2=CONST2*DSTAB(IR)*A(IR)
+          !IF (DSTAB(ISTAB,IS).LT.0) THEN
+          IF (DSTAB(IR).LT.0) THEN
+            !STRESSSTABN(ISTAB,1)=STRESSSTABN(ISTAB,1)+TEMP2*ECOS(IS)
+            !STRESSSTABN(ISTAB,2)=STRESSSTABN(ISTAB,2)+TEMP2*ESIN(IS)
+            STRESSSTABN1=STRESSSTABN1+TEMP2*ECOS(IR)
+            STRESSSTABN2=STRESSSTABN2+TEMP2*ESIN(IR)
           ELSE
-            STRESSSTAB(ISTAB,1)=STRESSSTAB(ISTAB,1)+TEMP2*ECOS(IS)
-            STRESSSTAB(ISTAB,2)=STRESSSTAB(ISTAB,2)+TEMP2*ESIN(IS)
+            !STRESSSTAB(ISTAB,1)=STRESSSTAB(ISTAB,1)+TEMP2*ECOS(IS)
+            !STRESSSTAB(ISTAB,2)=STRESSSTAB(ISTAB,2)+TEMP2*ESIN(IS)
+            STRESSSTAB1=STRESSSTAB1+TEMP2*ECOS(IR)
+            STRESSSTAB2=STRESSSTAB2+TEMP2*ESIN(IR)
           END IF
         END DO
       END DO
-!
-      D(:)=DSTAB(3,:)
-      XSTRESS=STRESSSTAB (3,1)
-      YSTRESS=STRESSSTAB (3,2)
-      TAUWNX =STRESSSTABN(3,1)
-      TAUWNY =STRESSSTABN(3,2)
-      S = D * A
+
+
+      !------------
+      ! ChrisB: Need to repeat code from lines 548 - 554 here
+      ! as COSU and SINU need to be the last calculated 
+      ! values from the IK loop
+      TAUPX=TAUX-ABS(TTAUWSHELTER)*STRESSSTAB1
+      TAUPY=TAUY-ABS(TTAUWSHELTER)*STRESSSTAB2
+      USDIRP=ATAN2(TAUPY,TAUPX)
+      COSU   = COS(USDIRP) ! CB - these lines are problematic as the LAST 
+      SINU   = SIN(USDIRP) ! CB - value is used later outside the loop
+      !------------
+
+      D(:)=DSTAB(:)
+      XSTRESS=STRESSSTAB1
+      YSTRESS=STRESSSTAB2
+      TAUWNX =STRESSSTABN1
+      TAUWNY =STRESSSTABN2
+      S(:) = D(:) * A(:)
 !
 ! ... Test output of arrays
 !
@@ -651,13 +703,15 @@
 ! Reduces tail effect to make sure that wave-supported stress
 ! is less than total stress, this is borrowed from ECWAM Stresso.F
 !
-      TAUW = SQRT(TAUWX**2+TAUWY**2)
+      TAUW = (TAUWX**2+TAUWY**2)**0.5
       UST2   = MAX(USTAR,EPS2)**2
       TAUWB = MIN(TAUW,MAX(UST2-EPS1,EPS2**2))
       IF (TAUWB.LT.TAUW) THEN
         TAUWX=TAUWX*TAUWB/TAUW
         TAUWY=TAUWY*TAUWB/TAUW
       END IF
+!$ACC END KERNELS
+!$ACC END DATA
       RETURN
 !
 ! Formats

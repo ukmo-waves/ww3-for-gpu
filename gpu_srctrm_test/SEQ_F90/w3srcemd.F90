@@ -446,6 +446,9 @@
 !/
       SPR4T = 0.0
       SIN4T = 0.0
+!$ACC DATA COPY  (WN1,LLWS,CG1,SPEC)&
+!$ACC      COPYIN (SPEC, CG1) &
+!$ACC      COPY   (VSIN, VDIN)
 !$ACC KERNELS      
 !
       DEPTH  = MAX ( DMIN , D_INP )
@@ -520,8 +523,6 @@
       TAUWX=0.
       TAUWY=0.
 !$ACC END KERNELS
-!$ACC DATA COPY   (SPEC, CG1, WN1, LLWS, USTDIR, USTAR)                 & 
-!$ACC      COPYIN (U10ABS, U10DIR) 
       IF ( IT .eq. 0 ) THEN
 !$ACC KERNELS
          LLWS(:) = .TRUE.
@@ -537,7 +538,6 @@
                    TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
         CALL WAV_MY_WTIME(eTime1)
         SPR4T = SPR4T + eTime1 - sTime1
-!$ACC UPDATE HOST(USTAR,USTDIR)
         CALL WAV_MY_WTIME(sTime2) 
         CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,         &
                  U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,         &
@@ -547,14 +547,13 @@
       END IF
  
 !GPUNotes call below will contain source term specific spectral loops
-!$ACC UPDATE DEVICE(LLWS)
       CALL WAV_MY_WTIME(sTime1)
       CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN,       &
                  AMAX, U10ABS, U10DIR, USTAR, USTDIR,                  &
                  TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
       CALL WAV_MY_WTIME(eTime1)
       SPR4T = SPR4T + eTime1 - sTime1
-!$ACC END DATA
+!$ACC KERNELS
       TWS = 1./FMEANWS
 !
 ! 1.c2 Stores the initial data
@@ -578,6 +577,8 @@
 !GPUNotes loop for explicit time integration of source terms
 !GPUNotes this might be a pain in the proverbial for tightening
 !GPUNotes the seapoint and spectral loops
+!$ACC END KERNELS
+!$ACC END DATA
       DO
 !
         NSTEPS = NSTEPS + 1
@@ -590,13 +591,17 @@
         CALL W3SLN1 (       WN1, FHIGH, USTAR, U10DIR , VSLN       )
 !
 !GPUNotes subrotuine will contain source term specific spectral loops
+!$ACC DATA COPYIN (SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS, Z0, CD) &
+!$ACC      COPYIN (U10DIR, BRLAMBDA, IX, IY)      &                  
+!$ACC      COPYOUT(TAUWAX, TAUWAY, VSIN, VDIN)
+!Breaks if include TAUWX/Y 
         CALL WAV_MY_WTIME(sTime2) 
         CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
                  U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,       &
                  VSIN, VDIN, LLWS, IX, IY, BRLAMBDA )
         CALL WAV_MY_WTIME(eTime2)
         SIN4T = SIN4T + eTime2 - sTime2
-
+!$ACC END DATA
 !
 ! 2.b Nonlinear interactions.
 !
@@ -840,13 +845,17 @@
 ! 6.e  Update wave-supported stress----------------------------------- *
 !
 ! GPUNotes source term specific loops over spectrum in this call
+!$ACC DATA COPYIN (SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS, Z0, CD) &
+!$ACC      COPYIN (U10DIR, BRLAMBDA, IX, IY)      &                  
+!$ACC      COPYOUT(TAUWAX, TAUWAY, VSIN, VDIN)
+!Breaks if include TAUWX/Y 
         CALL WAV_MY_WTIME(sTime2) 
         CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
                  U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,       &
                  VSIN, VDIN, LLWS, IX, IY, BRLAMBDA )
         CALL WAV_MY_WTIME(eTime2)
         SIN4T = SIN4T + eTime2 - sTime2
- 
+!$ACC END DATA 
 !
 ! 7.  Check if integration complete ---------------------------------- *
 !
