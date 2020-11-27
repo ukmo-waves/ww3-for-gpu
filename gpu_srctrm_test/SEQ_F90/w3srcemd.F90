@@ -533,8 +533,9 @@
         CALL WAV_MY_WTIME(eTime1)
         SPR4T = SPR4T + eTime1 - sTime1
 !$ACC DATA COPYIN (SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS, Z0, CD) &
-!$ACC      COPYIN (BRLAMBDA, IX, IY)                                &
-!$ACC      COPYOUT(TAUWX, TAUWY, TAUWAX, TAUWAY, VSIN, VDIN, LLWS)   
+!$ACC      COPYIN (U10DIR, BRLAMBDA, IX, IY)      &                  
+!$ACC      COPYOUT(TAUWAX, TAUWAY, VSIN, VDIN)
+!Breaks if include TAUWX/Y 
         CALL WAV_MY_WTIME(sTime2) 
         CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
                  U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,       &
@@ -586,13 +587,17 @@
         CALL W3SLN1 (       WN1, FHIGH, USTAR, U10DIR , VSLN       )
 !
 !GPUNotes subrotuine will contain source term specific spectral loops
+!$ACC DATA COPYIN (SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS, Z0, CD) &
+!$ACC      COPYIN (U10DIR, BRLAMBDA, IX, IY)      &                  
+!$ACC      COPYOUT(TAUWAX, TAUWAY, VSIN, VDIN)
+!Breaks if include TAUWX/Y 
         CALL WAV_MY_WTIME(sTime2) 
         CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
                  U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,       &
                  VSIN, VDIN, LLWS, IX, IY, BRLAMBDA )
         CALL WAV_MY_WTIME(eTime2)
         SIN4T = SIN4T + eTime2 - sTime2
-
+!$ACC END DATA
 !
 ! 2.b Nonlinear interactions.
 !
@@ -833,13 +838,17 @@
 ! 6.e  Update wave-supported stress----------------------------------- *
 !
 ! GPUNotes source term specific loops over spectrum in this call
+!$ACC DATA COPYIN (SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS, Z0, CD) &
+!$ACC      COPYIN (U10DIR, BRLAMBDA, IX, IY)      &                  
+!$ACC      COPYOUT(TAUWAX, TAUWAY, VSIN, VDIN)
+!Breaks if include TAUWX/Y 
         CALL WAV_MY_WTIME(sTime2) 
         CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
                  U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,       &
                  VSIN, VDIN, LLWS, IX, IY, BRLAMBDA )
         CALL WAV_MY_WTIME(eTime2)
         SIN4T = SIN4T + eTime2 - sTime2
- 
+!$ACC END DATA 
 !
 ! 7.  Check if integration complete ---------------------------------- *
 !
