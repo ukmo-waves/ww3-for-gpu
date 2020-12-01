@@ -199,7 +199,7 @@
 !GPUNotes spectral loop
       EB(:)  = 0.
       EB2(:) = 0.
-!$ACC LOOP INDEPENDENT GANG VECTOR(128)
+!$ACC LOOP INDEPENDENT GANG VECTOR(128) COLLAPSE(2)
       DO IK=1, NK
         DO ITH=1, NTH
           IS=ITH+(IK-1)*NTH
@@ -405,7 +405,7 @@
       REAL                    :: COSWIND, XSTRESS, YSTRESS, TAUHF
       REAL                    :: TEMP, TEMP2 
       INTEGER                 :: IND,J,I,ISTAB
-      REAL DSTAB(NSPEC), DVISC, DTURB
+      REAL DVISC, DTURB
       REAL STRESSSTAB1, STRESSSTAB2, STRESSSTABN1,STRESSSTABN2
 !/
 !/ ------------------------------------------------------------------- /
@@ -417,9 +417,9 @@
       !JDM: Initializing values to zero, they shouldn't be used unless
       !set in another place, but seems to solve some bugs with certain
       !compilers.
-!$ACC DATA COPYOUT(PTURB, PVISC, STRESSSTAB1, STRESSSTAB2)
+!$ACC DATA COPYOUT(S, D, PTURB, PVISC, STRESSSTAB1, STRESSSTAB2)
 !$ACC KERNELS
-      DSTAB(:) =0.
+      D(:) =0.
 
       ! ChrisB: STRESSSTAB[N] is a 2D array and does not reduce
       ! properly in an ACC loop. Only element 3 is ever using in
@@ -445,19 +445,16 @@
  
 !$ACC LOOP INDEPENDENT
       DO IK=1, NK
-        EB  = 0.
-        EBX = 0.
-        EBY = 0.
+!        EB  = 0.
+!        EBX = 0.
+!        EBY = 0.
 ! This loop still ends up being a serial kernel. Why?
         DO ITH=1, NTH
            IS=ITH+(IK-1)*NTH
-           EB  = EB  + A(IS)
+           UORB = UORB + A(IS) *SIG(IK)**2 * DDEN(IK) / CG(IK)
+           AORB = AORB + A(IS)             * DDEN(IK) / CG(IK) 
         END DO
-!
-!  At this point UORB and AORB are the variances of the orbital velocity and surface elevation
-!
-        UORB = UORB + EB * SIG(IK)**2 * DDEN(IK) / CG(IK)
-        AORB = AORB + EB             * DDEN(IK) / CG(IK)  !deep water only
+!REFACTORED
       END DO
       UORB  = 2*UORB**0.5                  ! significant orbital amplitude
       AORB1 = 2*AORB**(1-0.5*SSWELLF(6))    ! half the significant wave height ... if SWELLF(6)=1
@@ -576,17 +573,11 @@
             IF (ZLOG.LT.0.) THEN
               ! The source term Sp is beta * omega * X**2
               ! as given by Janssen 1991 eq. 19
-              ! Note that this is slightly diffent from ECWAM code CY45R2 where ZLOG is replaced by ??
-              !DSTAB(ISTAB,IS) = CONST*EXP(ZLOG)*ZLOG**4*UCN*UCN*COSWIND**SSINTHP
-              DSTAB(IR) = CONST*EXP(ZLOG)*ZLOG**4*UCN*UCN*COSWIND**SSINTHP
+              D(IR) = CONST*EXP(ZLOG)*ZLOG**4*UCN*UCN*COSWIND**SSINTHP
  
-              ! Below is an example with breaking probability feeding back to the input...
-              !DSTAB(ISTAB,IS) = CONST*EXP(ZLOG)*ZLOG**4  &
-              !                  *UCN*UCN*COSWIND**SSINTHP *(1+BRLAMBDA(IS)*20*SSINBR)
               LLWS(IR)=.TRUE.
             ELSE
-              !DSTAB(ISTAB,IS) = 0.
-              DSTAB(IR) = 0.
+              D(IR) = 0.
               LLWS(IR)=.FALSE.
             END IF
 !
@@ -596,20 +587,18 @@
               LLWS(IR)=.TRUE.
             END IF
           ELSE  ! (COSWIND.LE.0.01)
-            !DSTAB(ISTAB,IS) = 0.
-            DSTAB(IR) = 0.
+            D(IR) = 0.
             LLWS(IR)=.FALSE.
           END IF
 !
-          !IF ((SSWELLF(1).NE.0.AND.DSTAB(ISTAB,IS).LT.1E-7*SIG2(IS)) &
-          IF ((SSWELLF(1).NE.0.AND.DSTAB(IR).LT.1E-7*SIG2(IR)) &
+          IF ((SSWELLF(1).NE.0.AND.D(IR).LT.1E-7*SIG2(IR)) &
               .OR.SSWELLF(3).GT.0) THEN
 !
             DVISC=SWELLCOEFV
             DTURB=SWELLCOEFT*(FW*UORB+(FU+FUD*COSWIND)*USTP)
 !
             !DSTAB(ISTAB,IS) = DSTAB(ISTAB,IS) + PTURB*DTURB +  PVISC*DVISC
-            DSTAB(IR) = DSTAB(IR) + PTURB*DTURB +  PVISC*DVISC
+            D(IR) = D(IR) + PTURB*DTURB +  PVISC*DVISC
           END IF
 
 !
@@ -618,9 +607,9 @@
           ! Wave direction is "direction to"
           ! therefore there is a PLUS sign for the stress
           !TEMP2=CONST2*DSTAB(ISTAB,IS)*A(IS)
-          TEMP2=CONST2*DSTAB(IR)*A(IR)
+          TEMP2=CONST2*D(IR)*A(IR)
           !IF (DSTAB(ISTAB,IS).LT.0) THEN
-          IF (DSTAB(IR).LT.0) THEN
+          IF (D(IR).LT.0) THEN
             !STRESSSTABN(ISTAB,1)=STRESSSTABN(ISTAB,1)+TEMP2*ECOS(IS)
             !STRESSSTABN(ISTAB,2)=STRESSSTABN(ISTAB,2)+TEMP2*ESIN(IS)
             STRESSSTABN1=STRESSSTABN1+TEMP2*ECOS(IR)
@@ -646,7 +635,7 @@
       SINU   = SIN(USDIRP) ! CB - value is used later outside the loop
       !------------
 
-      D(:)=DSTAB(:)
+! Replaced DSTAB with D, 
       XSTRESS=STRESSSTAB1
       YSTRESS=STRESSSTAB2
       TAUWNX =STRESSSTABN1
