@@ -175,7 +175,7 @@
       FFILT  = MIN ( MAX(FF1,FF2) , 2.*SIG(NK) )
 !
 !GPUNotes loop over directions
-!$ACC LOOP GANG, VECTOR(128)
+!$ACC LOOP GANG VECTOR(128)
       DO ITH=1, NTH
         DIRF(ITH) = MAX ( 0. , (ECOS(ITH)*COSU+ESIN(ITH)*SINU) )**4
       END DO
@@ -188,7 +188,7 @@
 !      FFILT  = MIN ( MAX(FF1,FF2) , 2.*SIG(NK) )
 !
 !GPUNotes loop over frequencies no dependence on above
-!$ACC LOOP GANG, VECTOR(128)
+!$ACC LOOP GANG VECTOR(128)
       DO IK=1, NK
         RFR    = SIG(IK) / FFILT
         IF ( RFR .LT. 0.5 ) THEN
