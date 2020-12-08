@@ -1630,16 +1630,12 @@
 ! 0.  Pre-Initialization to zero out arrays. All arrays should be reset
 !     within the computation, but these are helping with some bugs
 !     found in certain compilers
-!$ACC DATA COPYOUT(BRLAMBDA, DDIAG, WHITECAP, SRHS)
-!$ACC KERNELS
-      NSMOOTH=0
-      S1=0.; E1=0.
-      NTIMES=0;IKSUP=0;IMSSMAX=0
-      DK=0.; HS=0.; KBAR=0.; DCK=0.; EFDF=0.
-      BTH0=0.; BTH=0.; BTH0S=0.; DDIAG=0.; SRHS=0.; PB=0.
-      BTHS=0.; SBK=0.; SBKT=0.; MSSSUM(:,:)=0.
-      QB=0.; S2=0.;PB=0.; PB2=0.
- 
+!!$ACC DATA COPYOUT(BRLAMBDA, DDIAG, WHITECAP, SRHS)
+!!$ACC KERNELS
+
+!CODENotes: Removed pre-initialization, this creates additional 
+!data transfers and are not needed for the mini-app to run.
+       
 ! 1.  Initialization and numerical factors
 !
       FACTURB=SSDSC(5)*USTAR**2/GRAV*DAIR/DWAT
@@ -1655,7 +1651,7 @@
       ELSE
         WTHSUM(1)=2*SSDSC(10)
       END IF
-!$ACC END KERNELS
+!!$ACC END KERNELS
 !
 ! 2.   Estimation of spontaneous breaking
 !$ACC KERNELS
@@ -1671,13 +1667,13 @@
         SDSNTH = MIN(NINT(SSDSDTH/(DTH*RADE)),NTH/2-1)
         MSSLONG(:,:) = 0.
         MSSSUM2(:,:) = 0.
+        MSSSUM(:,:) = 0. 
 !       SSDSDIK is the integer difference in frequency bands
 !       between the "large breakers" and short "wiped-out waves"
-!
         BTH(:) = 0.
- 
-!GPUNotes Loops over full spectrum
-!$ACC LOOP SEQ PRIVATE(BTH)
+
+!GPUNotes: Loops over full spectrum
+!$ACC LOOP INDEPENDENT PRIVATE(BTH)
         DO  IK=IK1, NK
  
           FACSAT=SIG(IK)*K(IK)**3*DTH
@@ -1703,13 +1699,13 @@
 !
 ! Sums the contributions to the directional MSS for all ITH
 !
-!GPUNotes loops over directions and sum iteration within IK loop above
-!$ACC LOOP INDEPENDENT
+!GPUNotes: loops over directions and sum iteration within IK loop above
+!CODENotes: Internalise as much code as possible for collapsable loops
+!$ACC LOOP INDEPENDENT COLLAPSE(2)
               DO ITH=1,NTH
+                DO JTH=-NTHSUM,NTHSUM
                 IS=ITH+(IK-1)*NTH
                 MSSLONG(IK,ITH) = K(IK)**2 * A(IS) * DDEN(IK) / CG(IK) ! contribution to MSS
-!$ACC LOOP INDEPENDENT
-                DO JTH=-NTHSUM,NTHSUM
                    ITH2 = 1+MOD(ITH-1+JTH+NTH,NTH)
                    MSSSUM2(IK:NK,ITH2) = MSSSUM2(IK:NK,ITH2)+MSSLONG(IK,ITH)*WTHSUM(ABS(JTH)+1)
                 END DO
@@ -1739,10 +1735,9 @@
  
             END IF ! SSDSC(8).GT.0) THEN
  
-!GPUNotes loop over directions
-!$ACC LOOP PRIVATE(BTH)
+!GPUNotes: loop over directions
+!$ACC LOOP INDEPENDENT PRIVATE(BTH)
             DO ITH=1,NTH            ! partial integration
- 
               IS=ITH+(IK-1)*NTH
 !
 ! Testing straining effect of long waves on short waves
@@ -1759,7 +1754,6 @@
                         +MSSSUM(IKC,2)*ES2(1+ABS(ITH-IMSSMAX (IKC)))
 !
                 FACSTRAIN=1+SSDSC(8)*SQRT(MSSTH)+SSDSC(11)*SQRT(MSSSUM2(IKC,ITH))
-!$ACC ATOMIC WRITE
                 FACSAT=SIG(IK)*K(IK)**3*DTH*FACSTRAIN
               END IF
  
@@ -1784,53 +1778,50 @@
           BTH0S(:)=BTH0(:)
           BTHS(:)=BTH(:)
           NSMOOTH(:)=1
-!GPUNotes loops over full spectrum - assume need to be sequential
-!$ACC LOOP INDEPENDENT
+!GPUNotes: loops over full spectrum - assume need to be sequential
+!CODENotes: Internalise as much code as possible for collapsable loops
+!original indentation has been left for code taken from outer loops
+!$ACC LOOP INDEPENDENT COLLAPSE(2)
           DO IK=1, SSDSBRFDF
+            DO ITH=1,NTH
             BTH0S(1+SSDSBRFDF)=BTH0S(1+SSDSBRFDF)+BTH0(IK)
             NSMOOTH(1+SSDSBRFDF)=NSMOOTH(1+SSDSBRFDF)+1
-!$ACC LOOP INDEPENDENT
-            DO ITH=1,NTH
               IS=ITH+(IK-1)*NTH
               BTHS(ITH+SSDSBRFDF*NTH)=BTHS(ITH+SSDSBRFDF*NTH)+BTH(IS)
             END DO
           END DO
-!$ACC LOOP INDEPENDENT
+!$ACC LOOP INDEPENDENT COLLAPSE(2)
           DO IK=IK1+1+SSDSBRFDF,1+2*SSDSBRFDF
+            DO ITH=1,NTH
             BTH0S(1+SSDSBRFDF)=BTH0S(1+SSDSBRFDF)+BTH0(IK)
             NSMOOTH(1+SSDSBRFDF)=NSMOOTH(1+SSDSBRFDF)+1
-!$ACC LOOP INDEPENDENT
-            DO ITH=1,NTH
               IS=ITH+(IK-1)*NTH
               BTHS(ITH+SSDSBRFDF*NTH)=BTHS(ITH+SSDSBRFDF*NTH)+BTH(IS)
             END DO
           END DO
-!$ACC LOOP INDEPENDENT
+!$ACC LOOP INDEPENDENT COLLAPSE(2)
           DO IK=SSDSBRFDF,IK1,-1
+            DO ITH=1,NTH
             BTH0S(IK)=BTH0S(IK+1)-BTH0(IK+SSDSBRFDF+1)
             NSMOOTH(IK)=NSMOOTH(IK+1)-1
-!$ACC LOOP INDEPENDENT
-            DO ITH=1,NTH
               IS=ITH+(IK-1)*NTH
               BTHS(IS)=BTHS(IS+NTH)-BTH(IS+(SSDSBRFDF+1)*NTH)
             END DO
           END DO
-!$ACC LOOP INDEPENDENT
+!$ACC LOOP INDEPENDENT COLLAPSE(2)  
           DO IK=IK1+1+SSDSBRFDF,NK-SSDSBRFDF
+            DO ITH=1,NTH
             BTH0S(IK)=BTH0S(IK-1)-BTH0(IK-SSDSBRFDF-1)+BTH0(IK+SSDSBRFDF)
             NSMOOTH(IK)=NSMOOTH(IK-1)
-!$ACC LOOP INDEPENDENT
-            DO ITH=1,NTH
               IS=ITH+(IK-1)*NTH
               BTHS(IS)=BTHS(IS-NTH)-BTH(IS-(SSDSBRFDF+1)*NTH)+BTH(IS+(SSDSBRFDF)*NTH)
             END DO
           END DO
-!$ACC LOOP INDEPENDENT
+!$ACC LOOP INDEPENDENT COLLAPSE(2)
           DO IK=NK-SSDSBRFDF+1,NK
+            DO ITH=1,NTH
             BTH0S(IK)=BTH0S(IK-1)-BTH0(IK-SSDSBRFDF)
             NSMOOTH(IK)=NSMOOTH(IK-1)-1
-!$ACC LOOP INDEPENDENT
-            DO ITH=1,NTH
               IS=ITH+(IK-1)*NTH
               BTHS(IS)=BTHS(IS-NTH)-BTH(IS-(SSDSBRFDF+1)*NTH)
             END DO
@@ -1839,6 +1830,7 @@
 !    final division by NSMOOTH
 !
           BTH0(:)=MAX(0.,BTH0S(:)/NSMOOTH(:))
+!$ACC LOOP INDEPENDENT
           DO IK=IK1,NK
             IS0=(IK-1)*NTH
             BTH(IS0+1:IS0+NTH)=MAX(0.,BTHS(IS0+1:IS0+NTH)/NSMOOTH(IK))
@@ -1875,7 +1867,7 @@
 !              WRITE(*,'(A10,I10,10F15.6)') 'ST4 D3',IK,BTH0(IK),SUM(BTH((IK-1)*NTH+1:IK*NTH)),COEF1,COEF2,COEF3,SSDSP,SDIAGISO
 !            ENDIF
         END DO
- 
+
           !IF(IX == DEBUG_NODE) WRITE(*,'(A20,4F15.6)') 'ST4 DISSIP 1', SUM(SRHS), SUM(DDIAG), SUM(BTH)
  
 !
@@ -1929,7 +1921,6 @@
 !
 !GPUNotes loop over frequencies
         HS=0.
-        EFDF=0.
         KBAR=0.
         EFDF=0.
         NKL=0. !number of windows
@@ -2025,7 +2016,7 @@
 !
         ASUM = 0.
 !GPUNotes loop over frequencies
-!$ACC LOOP PRIVATE(PB2,DDIAG)
+!$ACC LOOP INDEPENDENT PRIVATE(PB2,DDIAG)
         DO IK = 1, NK
           ASUM = (SUM(A(((IK-1)*NTH+1):(IK*NTH)))*DTH)
           IF (ASUM.GT.1.E-8) THEN
@@ -2062,7 +2053,8 @@
 !
 !GPUNotes Loops over the full spectrum
       SBKT(:)=0.
-!$ACC LOOP SEQ COLLAPSE(2)
+      SBK(:)=0.
+!$ACC LOOP INDEPENDENT COLLAPSE(2)
       DO  IK=IK1, NK
         DO ITH=1,NTH
           IS=ITH+(IK-1)*NTH
@@ -2072,14 +2064,11 @@
           RENEWALFREQ = 0.
           IF (SSDSC(3).NE.0 .AND. IK.GT.DIKCUMUL) THEN
 !GPUNotes loop over frequencies
+!$ACC LOOP INDEPENDENT
             DO IK2=IK1,IK-DIKCUMUL
               IF (BTH0(IK2).GT.SSDSBR) THEN
                 IS2=(IK2-1)*NTH
                 RENEWALFREQ=RENEWALFREQ+DOT_PRODUCT(CUMULW(IS2+1:IS2+NTH,IS),BRLAMBDA(IS2+1:IS2+NTH))
-                !DO ITH2=1,NTH
-                !  IS2=ITH2+(IK2-1)*NTH
-                !  RENEWALFREQ=RENEWALFREQ+CUMULW(IS2,IS)*BRLAMBDA(IS2)
-                !  END DO
               END IF
             END DO
           END IF
@@ -2124,6 +2113,7 @@
           IKM= MIN(NK,IK2+2*DIKCUMUL)
           NKM=IKM-(IK2+DIKCUMUL)+1
           FACHF=SSDSC(9)/FLOAT(NKM*NTH)
+!$ACC LOOP INDEPENDENT
           DO IK = IK2+DIKCUMUL, IKM
             SRHS((IK-1)*NTH+1:IK*NTH) = SRHS((IK-1)*NTH+1:IK*NTH) + ABS(SBKT(IK2))*FACHF
           END DO
@@ -2143,6 +2133,8 @@
 ! precomputes integration of Lambda over direction
 ! times wavelength times a (a=5 in Reul&Chapron JGR 2003) times dk
 !
+!CODENotes: It for all cases in the miniapp the following is not used
+!this means that GPU optimisation has no affect for speed or validation.
 !GPUNotes loops over frequencies
       DO IK=1,NK
         COEF4(IK) = SUM(BRLAMBDA((IK-1)*NTH+1:IK*NTH) * DTH) *(2*PI/K(IK)) *  &
@@ -2172,7 +2164,6 @@
           TMAX = 5.  * 2*PI/SIG(IK)
           DT   = TMAX / 50
           MFT  = 0.
-!$ACC LOOP SEQ
           DO IT = 1, 50
 ! integration over time of foam persistance
             T = FLOAT(IT) * DT
@@ -2194,7 +2185,7 @@
 ! End of output computing
 1000  CONTINUE
 !$ACC END KERNELS
-!$ACC END DATA
+!!$ACC END DATA
       RETURN
 !
 ! Formats
