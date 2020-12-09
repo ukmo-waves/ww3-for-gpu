@@ -59,7 +59,7 @@
                           TAUWY, TAUOX, TAUOY, TAUWIX, TAUWIY, TAUWNX,&
                           TAUWNY, PHIAW, CHARN, TWS, PHIOC, WHITECAP, &
                           D50, PSIC, BEDFORM , PHIBBL, TAUBBL, TAUICE,&
-                          PHICE, COEF, SIN4T, SPR4T)
+                          PHICE, COEF, SIN4T, SPR4T, SDS4T)
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -368,7 +368,6 @@
       USE W3SRC4MD, ONLY : W3SPR4, W3SIN4, W3SDS4
       USE W3GDATMD, ONLY : ZZWND, FFXFM, FFXPM, FFXFA, FFXFI, FFXFD
       USE W3SNL1MD
-      USE W3PARALL, ONLY : WAV_MY_WTIME
 !/
       IMPLICIT NONE
 !/
@@ -438,17 +437,18 @@
  
 !/
 !!LS  Newly added time varibles
-      REAL(8)                 :: sTime1, eTime1, sTime2, eTime2
-      CHARACTER(LEN=30)       :: S1, S2
-      REAL(8), INTENT(OUT)    :: SIN4T, SPR4T
+      REAL(8)                 :: sTime1, eTime1, sTime2, eTime2,     &
+                                 sTime3, eTime3
+      REAL(8), INTENT(OUT)    :: SIN4T, SPR4T, SDS4T
 !/
 !/ ------------------------------------------------------------------- /
 !/
       SPR4T = 0.0
       SIN4T = 0.0
-!$ACC DATA COPY  (WN1,LLWS,CG1,SPEC)&
-!$ACC      COPYIN (SPEC, CG1) &
-!$ACC      COPY   (VSIN, VDIN)
+      SDS4T = 0.0
+!$ACC DATA COPY   (WN1, WN2, CG1, SPEC, DAM)&
+!$ACC      COPYOUT(VSIN, VDIN, VDBT, VSBT)&
+!$ACC      COPYOUT(BRLAMBDA)
 !$ACC KERNELS      
 !
       DEPTH  = MAX ( DMIN , D_INP )
@@ -511,8 +511,8 @@
       TAUWAY = 0.
       TAUSCX = 0.
       TAUSCY = 0.
-      TAUBBL = 0.
-      TAUICE = 0.
+!      TAUBBL = 0.
+!      TAUICE = 0.
       PHICE  = 0.
  
  
@@ -532,26 +532,26 @@
       ELSE
 !GPUNotes calls to W3PSR4 and W3SIN4 below will contain source term specific spectral loops
 !GPUNotes the sequencing is important (although maybe excessive?)
-        CALL WAV_MY_WTIME(sTime1)
-        CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN,     &
-                   AMAX, U10ABS, U10DIR, USTAR, USTDIR,                &
+        CALL CPU_TIME(sTime1)
+        CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN, &
+                   AMAX, U10ABS, U10DIR, USTAR, USTDIR,            &
                    TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
-        CALL WAV_MY_WTIME(eTime1)
+        CALL CPU_TIME(eTime1)
         SPR4T = SPR4T + eTime1 - sTime1
-        CALL WAV_MY_WTIME(sTime2) 
-        CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,         &
-                 U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,         &
+        CALL CPU_TIME(sTime2) 
+        CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
+                 U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,       &
                  VSIN, VDIN, LLWS, IX, IY, BRLAMBDA )
-        CALL WAV_MY_WTIME(eTime2)
+        CALL CPU_TIME(eTime2)
         SIN4T = SIN4T + eTime2 - sTime2
       END IF
  
 !GPUNotes call below will contain source term specific spectral loops
-      CALL WAV_MY_WTIME(sTime1)
-      CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN,       &
-                 AMAX, U10ABS, U10DIR, USTAR, USTDIR,                  &
+      CALL CPU_TIME(sTime1)
+      CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN, &
+                 AMAX, U10ABS, U10DIR, USTAR, USTDIR,            &
                  TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
-      CALL WAV_MY_WTIME(eTime1)
+      CALL CPU_TIME(eTime1)
       SPR4T = SPR4T + eTime1 - sTime1
 !$ACC KERNELS
       TWS = 1./FMEANWS
@@ -592,14 +592,14 @@
 !
 !GPUNotes subrotuine will contain source term specific spectral loops
 !$ACC DATA COPYIN (SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS, Z0, CD) &
-!$ACC      COPYIN (U10DIR, BRLAMBDA, IX, IY)      &                  
+!$ACC      COPYIN (U10DIR)      &                  
 !$ACC      COPYOUT(TAUWAX, TAUWAY, VSIN, VDIN)
 !Breaks if include TAUWX/Y 
-        CALL WAV_MY_WTIME(sTime2) 
+        CALL CPU_TIME(sTime2) 
         CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
                  U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,       &
                  VSIN, VDIN, LLWS, IX, IY, BRLAMBDA )
-        CALL WAV_MY_WTIME(eTime2)
+        CALL CPU_TIME(eTime2)
         SIN4T = SIN4T + eTime2 - sTime2
 !$ACC END DATA
 !
@@ -612,9 +612,14 @@
 ! 2.c1   as in source term package
 !
 !GPUNotes subroutine will contain source term specific spectral loops
+!$ACC DATA COPYIN (SPEC, WN1, CG1, USTAR, USTDIR, DEPTH, IX, IY)      &
+!$ACC      COPYOUT(VSDS, VDDS, BRLAMBDA, WHITECAP)
+        CALL CPU_TIME(sTime3)
         CALL W3SDS4 ( SPEC, WN1, CG1, USTAR, USTDIR, DEPTH, VSDS,    &
                       VDDS, IX, IY, BRLAMBDA, WHITECAP )
- 
+        CALL CPU_TIME(eTime3)
+        SDS4T = SDS4T + eTime3 - sTime3
+!$ACC END DATA
  
 !
 ! 2.c2   optional dissipation parameterisations
@@ -808,13 +813,13 @@
 !GPUNotes source term specific loops over spectrum in this call
 !$ACC DATA COPY   (SPEC, CG1, WN1, LLWS, USTDIR, USTAR)                &
 !$ACC      COPYIN (U10ABS, U10DIR)                                     
-        CALL WAV_MY_WTIME(sTime1)
+        CALL CPU_TIME(sTime1)
         CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN, &
                    AMAX, U10ABS, U10DIR, USTAR, USTDIR,            &
                    TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
-        CALL WAV_MY_WTIME(eTime1)
-!$ACC END DATA
+        CALL CPU_TIME(eTime1)
         SPR4T = SPR4T + eTime1 - sTime1
+!$ACC END DATA
 !
 ! Introduces a Long & Resio (JGR2007) type dependance on wave age
         FAGE   = FFXFA*TANH(0.3*U10ABS*FMEANWS*TPI/GRAV)
@@ -849,11 +854,11 @@
 !$ACC      COPYIN (U10DIR, BRLAMBDA, IX, IY)      &                  
 !$ACC      COPYOUT(TAUWAX, TAUWAY, VSIN, VDIN)
 !Breaks if include TAUWX/Y 
-        CALL WAV_MY_WTIME(sTime2) 
+        CALL CPU_TIME(sTime2) 
         CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
                  U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,       &
                  VSIN, VDIN, LLWS, IX, IY, BRLAMBDA )
-        CALL WAV_MY_WTIME(eTime2)
+        CALL CPU_TIME(eTime2)
         SIN4T = SIN4T + eTime2 - sTime2
 !$ACC END DATA 
 !
@@ -886,6 +891,11 @@
 !     and final energy, plus wind input plus the SNL flux to high freq.,
 !     minus the energy lost to the bottom boundary layer (BBL)
 !
+!CODENotes: Brought initialisations here to avoid them being pulled and
+!push to gpu.
+      TAUBBL = 0.
+      TAUICE = 0.
+
 !GPUNotes loop over spectrum requires spectrum to be properly updated
       EFINISH  = 0.
       MWXFINISH  = 0.

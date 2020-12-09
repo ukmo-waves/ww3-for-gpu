@@ -609,6 +609,7 @@
                IICEDDISP, IICEHDISP, IICEFDISP, BTBETA
  
               READ(NDSM,END=801,ERR=802,IOSTAT=IERR)GRIDSHIFT
+!$ACC ENTER DATA COPYIN(ICESCALES, DMIN)
 !
         END IF
  
@@ -686,7 +687,7 @@
           READ (NDSM,END=801,ERR=802,IOSTAT=IERR)                     &
                 FACP, XREL, XFLT, FXFM, FXPM, XFT, XFC, FACSD, FHMAX, &
                 FFACBERG, DELAB, FWTABLE
-!$ACC ENTER DATA COPYIN(FWTABLE)
+!$ACC ENTER DATA COPYIN(FACP, FWTABLE)
         END IF
 !
 ! Source term parameters --------------------------------------------- *
@@ -733,7 +734,6 @@
                 DELU, DELALP, TAUT, TAUHFT, TAUHFT2,             &
                 IKTAB, DCKI, QBI, SATINDICES, SATWEIGHTS,        &
                 DIKCUMUL, CUMULW
-
 !Use enter data to avoid creating a data structure, only use single
 !data transfer. Placed here to copy over to GPU as soon as it is 
 !read on CPU. 
@@ -742,7 +742,8 @@
 !$ACC            COPYIN(SSDSC, SSDSISO, SSDSBR,SSDSBRFDF, CUMULW)&
 !$ACC            COPYIN(SATINDICES, SATWEIGHTS, SSDSDTH, SSDSP)  &
 !$ACC            COPYIN(ZZ0RAT, ZZALP, SSINTHP, BBETA, SSWELLF)  &
-!$ACC            COPYIN(ZZWND, AALPHA, TTAUWSHELTER)
+!$ACC            COPYIN(ZZWND, AALPHA, TTAUWSHELTER)             &
+!$ACC            COPYIN(QBI, IKTAB, DCKI, SSDSBM)
         END IF
 !
 ! ... Nonlinear interactions

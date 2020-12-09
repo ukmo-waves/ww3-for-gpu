@@ -119,7 +119,7 @@
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
 !/
-       IMPLICIT NONE
+      IMPLICIT NONE
       INTEGER mpimode
       REAL(8), intent(out) :: eTime
       mpimode=0
