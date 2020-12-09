@@ -376,7 +376,7 @@
           NTH    = MTH
           NK2    = NK + 2
           NSPEC  = NK * NTH
-!$ACC ENTER DATA COPYIN(NK, NTH)
+!$ACC ENTER DATA COPYIN(NK, NSPEC, NTH)
 !
           IF ( IDTST .NE. IDSTR ) THEN
               IF ( IAPROC .EQ. NAPERR )                               &
@@ -632,7 +632,8 @@
                MAPWN, MAPTH, DTH, TH, ESIN, ECOS, ES2, ESC, EC2,      &
                XFR, FR1, SIG, SIG2, DSIP, DSII, DDEN, DDEN2, FTE,     &
                FTF, FTWN, FTTR, FTWL, FACTI1, FACTI2, FACHFA, FACHFE
-!$ACC ENTER DATA COPYIN(DDEN, DDEN2, ES2, ESIN, ECOS, DTH, SIG, SIG2, EC2)
+!$ACC ENTER DATA COPYIN(DDEN, DDEN2, ES2, ESIN, ECOS, DTH, SIG, SIG2) &
+!$ACC            COPYIN(EC2, FACHFE)
         END IF
  
 !
@@ -754,6 +755,7 @@
       ELSE
           READ (NDSM,END=801,ERR=802,IOSTAT=IERR)                &
                 SNLC1, LAM, KDCON, KDMN, SNLS1, SNLS2, SNLS3
+!$ACC ENTER DATA COPYIN(KDCON, KDMN, SNLS1, SNLS2, SNLS3, SNLC1)
       END IF
 !
       IF ( FLTEST ) WRITE (NDST,9051) SNLC1, LAM,                &

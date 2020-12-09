@@ -256,29 +256,48 @@
 !/
 ! initialisations
 !
+!GPUNotes To make whole routine run effectively on kernels I so have
+!GPUNotes to run the serial section below in a separate kernel to
+!GPUNotes the other parallel parts. This prevents last two loop sections
+!GPUNotes becoming serial... Not sure why. 
+!$ACC KERNELS
 ! 1.  Calculate prop. constant --------------------------------------- *
 !
       X      = MAX ( KDCON*KDMEAN , KDMN )
       X2     = MAX ( -1.E15, SNLS3*X)
       CONS   = SNLC1 * ( 1. + SNLS1/X * (1.-SNLS2*X) * EXP(X2) )
-!
+!$ACC END KERNELS
 ! 2.  Prepare auxiliary spectrum and arrays -------------------------- *
 !
 !GPUNotes loop over full spectrum
+!$ACC KERNELS
+!$ACC LOOP INDEPENDENT COLLAPSE(2)
       DO IFR=1, NFR
-        CONX = TPIINV / SIG(IFR) * CG(IFR)
         DO ITH=1, NTH
+          CONX = TPIINV / SIG(IFR) * CG(IFR)
           ISP       = ITH + (IFR-1)*NTH
           UE (ISP) = A(ISP) / CONX
           CON(ISP) = CONX
         END DO
       END DO
 !
+!!GPUNotes loop over subset of frequencies and all directions
+!!GPUNotes the commented code below uses the original code
+!!GPUNotes which could only parallelise over the inner loop
+!      DO IFR=NFR+1, NFRHGH
+!!$ACC LOOP INDEPENDENT
+!        DO ITH=1, NTH
+!          ISP      = ITH + (IFR-1)*NTH
+!          UE(ISP) = UE(ISP-NTH) * FACHFE
+!        END DO
+!      END DO
 !GPUNotes loop over subset of frequencies and all directions
+!GPUNotes refactored code
+!$ACC LOOP INDEPENDENT COLLAPSE(2)
       DO IFR=NFR+1, NFRHGH
         DO ITH=1, NTH
           ISP      = ITH + (IFR-1)*NTH
-          UE(ISP) = UE(ISP-NTH) * FACHFE
+          UE(ISP) = UE((NFR-1)*NTH+ITH) * (FACHFE)**(IFR-NFR)
         END DO
       END DO
 !
@@ -298,6 +317,7 @@
 ! 3.  Calculate interactions for extended spectrum ------------------- *
 !
 !GPUNotes loop over extended spectrum for nonlinear calcs
+!$ACC LOOP INDEPENDENT
       DO ISP=1, NSPECX
 !
 ! 3.a Energy at interacting bins
@@ -340,6 +360,7 @@
 !!/DEBUGSRC     WRITE(740+IAPROC,*)  'W3SNL1 : sum(SA2)=', sum(SA2)
 !!/DEBUGSRC     FLUSH(740+IAPROC)
 !GPUNotes loops over full spectrum
+!$ACC LOOP INDEPENDENT
       DO ISP=1, NSPEC
 !
         S(ISP) = CON(ISP) * ( - 2. * ( SA1(ISP) + SA2(ISP) )       &
@@ -363,6 +384,7 @@
                 + SWG8 * ( DA1M(IC81(ISP)) + DA2M(IC82(ISP)) )
 !
       END DO
+!$ACC END KERNELS
 !!/DEBUGSRC     WRITE(740+IAPROC,*)  'W3SNL1 : sum(S)=', sum(S)
 !!/DEBUGSRC     WRITE(740+IAPROC,*)  'W3SNL1 : sum(D)=', sum(D)
 !!/DEBUGSRC     FLUSH(740+IAPROC)
@@ -665,7 +687,15 @@
       SWG7   = AWG7**2
       SWG8   = AWG8**2
 !
-      RETURN
+!$ACC ENTER DATA COPYIN(NFR,NFRHGH, NFRCHG, NSPECX, NSPECY)            &
+!$ACC            COPYIN(IP11, IP12, IP13, IP14, IM11, IM12, IM13, IM14)&
+!$ACC            COPYIN(IP21, IP22, IP23, IP24, IM21, IM22, IM23, IM24)&
+!$ACC            COPYIN(IC11, IC12, IC21, IC22, IC31, IC32, IC41, IC42)&
+!$ACC            COPYIN(IC51, IC52, IC61, IC62, IC71, IC72, IC81, IC82)&
+!$ACC            COPYIN(DAL1, DAL2, DAL3, AF11)                        &
+!$ACC            COPYIN(AWG1, AWG2, AWG3, AWG4, AWG5, AWG6, AWG7, AWG8)&
+!$ACC            COPYIN(SWG1, SWG2, SWG3, SWG4, SWG5, SWG6, SWG7, SWG8)
+!RETURN
 !
 ! Formats
 !
