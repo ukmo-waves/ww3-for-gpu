@@ -588,7 +588,13 @@
 ! 2.a Input.
 !
 !GPUNotes subroutine will contain source term specific spectral loops
+!GPUNotes using COPY rather than CREATE for now as VSLN used in a
+!GPUNotes later loop
+!!$ACC DATA CREATE (VSLN) &
+!$ACC DATA COPY (VSLN) &
+!$ACC      COPYIN (WN1)
         CALL W3SLN1 (       WN1, FHIGH, USTAR, U10DIR , VSLN       )
+!$ACC END DATA
 !
 !GPUNotes subrotuine will contain source term specific spectral loops
 !$ACC DATA COPYIN (SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS, Z0, CD) &

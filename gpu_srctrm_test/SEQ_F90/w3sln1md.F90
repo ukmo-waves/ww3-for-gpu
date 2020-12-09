@@ -158,37 +158,60 @@
 !/ ------------------------------------------------------------------- /
 !/
 !
+!GPUNotes now running entire subroutine on GPU
+!$ACC DATA COPYIN (ECOS,ESIN,K,SIG)        &
+!$ACC      COPYIN (FSPM,FSHF,SLNC1,NTH,NK) &
+!$ACC      CREATE (DIRF,WNF)               & 
+!$ACC      COPY   (S)
+!$ACC KERNELS
 ! 1.  Set up factors ------------------------------------------------- *
 !
       COSU   = COS(USDIR)
       SINU   = SIN(USDIR)
-!
-!GPUNotes loop over directions
-      DO ITH=1, NTH
-        DIRF(ITH) = MAX ( 0. , (ECOS(ITH)*COSU+ESIN(ITH)*SINU) )**4
-      END DO
 !
       FAC    = SLNC1 * USTAR**4
       FF1    = FSPM * GRAV/(28.*USTAR)
       FF2    = FSHF * MIN(SIG(NK),FHIGH)
       FFILT  = MIN ( MAX(FF1,FF2) , 2.*SIG(NK) )
 !
+!GPUNotes loop over directions
+!$ACC LOOP GANG VECTOR(128)
+      DO ITH=1, NTH
+        DIRF(ITH) = MAX ( 0. , (ECOS(ITH)*COSU+ESIN(ITH)*SINU) )**4
+      END DO
+!
+!GPUNotes Moved below from original location below to top of code 
+!GPUNotes This avoids jumping in/out of kernels with serial code
+!      FAC    = SLNC1 * USTAR**4
+!      FF1    = FSPM * GRAV/(28.*USTAR)
+!      FF2    = FSHF * MIN(SIG(NK),FHIGH)
+!      FFILT  = MIN ( MAX(FF1,FF2) , 2.*SIG(NK) )
+!
 !GPUNotes loop over frequencies no dependence on above
+!$ACC LOOP GANG VECTOR(128)
       DO IK=1, NK
         RFR    = SIG(IK) / FFILT
         IF ( RFR .LT. 0.5 ) THEN
-            WNF(IK) = 0.
-          ELSE
-            WNF(IK) = FAC / K(IK) * EXP(-RFR**(-4))
+          WNF(IK) = 0.
+        ELSE
+          WNF(IK) = FAC / K(IK) * EXP(-RFR**(-4))
         END IF
       END DO
 !
 ! 2.  Compose source term -------------------------------------------- *
 !
 !GPUNotes loop over frequencies fills array using arrays from prior 2 loops
+!$ACC LOOP GANG VECTOR(128) COLLAPSE(2)
       DO IK=1, NK
-        S(:,IK) = WNF(IK) * DIRF(:)
+!GPUNotes replaced array format below with loop in order to use ACC LOOP
+!statement
+!        S(:,IK) = WNF(IK) * DIRF(:)
+        DO ITH=1, NTH
+          S(ITH,IK) = WNF(IK) * DIRF(ITH)
+        END DO
       END DO
+!$ACC END KERNELS
+!$ACC END DATA
 !
       RETURN
 !
