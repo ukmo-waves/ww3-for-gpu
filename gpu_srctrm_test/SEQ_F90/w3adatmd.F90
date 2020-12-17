@@ -341,28 +341,28 @@
 !
 ! The grid
 !
-        REAL, POINTER         :: CG(:,:), WN(:,:)
+        REAL, ALLOCATABLE         :: CG(:,:), WN(:,:)
 !
 ! Arrays for processing model input
 !
-        REAL, POINTER         :: CA0(:), CAI(:), CD0(:), CDI(:),      &
+        REAL, ALLOCATABLE     :: CA0(:), CAI(:), CD0(:), CDI(:),      &
                                  UA0(:), UAI(:), UD0(:), UDI(:),      &
                                  AS0(:), ASI(:), ATRNX(:,:), ATRNY(:,:)
 !
 ! Output fields group 1)
 !
-        REAL, POINTER         :: DW(:), UA(:), UD(:), U10(:), U10D(:),&
+        REAL, ALLOCATABLE     :: DW(:), UA(:), UD(:), U10(:), U10D(:),&
                                  AS(:), CX(:), CY(:)
 !
 ! Output fields group 2)
 !
-        REAL, POINTER         :: HS(:),  WLM(:),  T02(:), T0M1(:),   &
+        REAL, ALLOCATABLE     :: HS(:),  WLM(:),  T02(:), T0M1(:),   &
                                  T01 (:),  FP0(:),  THM(:),          &
                                  THS(:),  THP0(:),  FP1(:), THP1(:), &
                                  HSIG(:), STMAXE(:), STMAXD(:),      &
                                  HMAXE(:), HCMAXE(:), HMAXD(:),      &
                                  HCMAXD(:), QP(:), WBT(:)
-        REAL, POINTER         :: XHS(:), XWLM(:), XT02(:), XT0M1(:),  &
+        REAL, ALLOCATABLE     :: XHS(:), XWLM(:), XT02(:), XT0M1(:),  &
                                  XT01 (:), XFP0(:), XTHM(:),          &
                                  XTHS(:), XTHP0(:), XFP1(:), XTHP1(:),&
                                  XHSIG(:), XSTMAXE(:), XSTMAXD(:),    &
@@ -371,20 +371,20 @@
 !
 ! Output fields group 3)
 !
-        REAL, POINTER         ::  EF(:,:),  TH1M(:,:),  STH1M(:,:),   &
+        REAL, ALLOCATABLE     ::  EF(:,:),  TH1M(:,:),  STH1M(:,:),   &
                                   TH2M(:,:),  STH2M(:,:) !, WN(:,:)
-        REAL, POINTER         ::  XEF(:,:),  XTH1M(:,:),  XSTH1M(:,:),&
+        REAL, ALLOCATABLE     ::  XEF(:,:),  XTH1M(:,:),  XSTH1M(:,:),&
                                   XTH2M(:,:),  XSTH2M(:,:) !, XWN(:,:)
 !
 ! Output fields group 4)
 !
-        REAL, POINTER         :: PHS(:,:),  PTP(:,:),  PLP(:,:),      &
+        REAL, ALLOCATABLE     :: PHS(:,:),  PTP(:,:),  PLP(:,:),      &
                                  PDIR(:,:),  PSI(:,:),  PWS(:,:),     &
                                  PWST(:),  PNR(:), PGW(:,:),          &
                                  PTHP0(:,:), PQP(:,:), PPE(:,:),      &
                                  PSW(:,:), PTM1(:,:), PT1(:,:),       &
                                  PT2(:,:), PEP(:,:)
-        REAL, POINTER         :: XPHS(:,:), XPTP(:,:), XPLP(:,:),     &
+        REAL, ALLOCATABLE     :: XPHS(:,:), XPTP(:,:), XPLP(:,:),     &
                                  XPDIR(:,:), XPSI(:,:), XPWS(:,:),    &
                                  XPWST(:), XPNR(:), XPGW(:,:),        &
                                  XPTHP0(:,:), XPQP(:,:), XPPE(:,:),   &
@@ -393,67 +393,67 @@
 !
 ! Output fields group 5)
 !
-        REAL, POINTER         ::  CHARN(:),  CGE(:),  PHIAW(:),       &
+        REAL, ALLOCATABLE     ::  CHARN(:),  CGE(:),  PHIAW(:),       &
                                   TAUWIX(:),  TAUWIY(:),  TAUWNX(:),  &
                                   TAUWNY(:),  WHITECAP(:,:), TWS(:)
-        REAL, POINTER         :: XCHARN(:), XCGE(:), XPHIAW(:),       &
+        REAL, ALLOCATABLE     :: XCHARN(:), XCGE(:), XPHIAW(:),       &
                                  XTAUWIX(:), XTAUWIY(:), XTAUWNX(:),  &
                                  XTAUWNY(:), XWHITECAP(:,:), XTWS(:)
 !
 ! Output fields group 6)
 !
-        REAL, POINTER         ::  SXX(:),  SYY(:),  SXY(:),  TAUOX(:),&
+        REAL, ALLOCATABLE     ::  SXX(:),  SYY(:),  SXY(:),  TAUOX(:),&
                                   TAUOY(:),  BHD(:),  PHIOC(:),       &
                                   TUSX(:),  TUSY(:),  USSX(:),        &
                                   USSY(:),  PRMS(:),  TPMS(:),        &
                                   PHICE(:), TAUICE(:,:)
-        REAL, POINTER         ::  P2SMS(:,:),  US3D(:,:), USSP(:,:)
-        REAL, POINTER         :: XSXX(:), XSYY(:), XSXY(:), XTAUOX(:),&
+        REAL, ALLOCATABLE     ::  P2SMS(:,:),  US3D(:,:), USSP(:,:)
+        REAL, ALLOCATABLE     :: XSXX(:), XSYY(:), XSXY(:), XTAUOX(:),&
                                  XTAUOY(:), XBHD(:), XPHIOC(:),       &
                                  XTUSX(:), XTUSY(:), XUSSX(:),        &
                                  XUSSY(:), XPRMS(:), XTPMS(:),        &
                                  XPHICE(:), XTAUICE(:,:)
-        REAL, POINTER         :: XP2SMS(:,:), XUS3D(:,:), XUSSP(:,:)
+        REAL, ALLOCATABLE     :: XP2SMS(:,:), XUS3D(:,:), XUSSP(:,:)
 !
 ! Output fields group 7)
 !
-        REAL, POINTER         ::  ABA(:),  ABD(:),  UBA(:),  UBD(:),  &
+        REAL, ALLOCATABLE     ::  ABA(:),  ABD(:),  UBA(:),  UBD(:),  &
                                   BEDFORMS(:,:),  PHIBBL(:),          &
                                   TAUBBL(:,:)
-        REAL, POINTER         :: XABA(:), XABD(:), XUBA(:), XUBD(:),  &
+        REAL, ALLOCATABLE     :: XABA(:), XABD(:), XUBA(:), XUBD(:),  &
                                  XBEDFORMS(:,:), XPHIBBL(:),          &
                                  XTAUBBL(:,:)
 !
 ! Output fields group 8)
 !
-        REAL, POINTER         ::  MSSX(:),  MSSY(:),  MSSD(:),        &
+        REAL, ALLOCATABLE     ::  MSSX(:),  MSSY(:),  MSSD(:),        &
                                   MSCX(:),  MSCY(:),  MSCD(:)
-        REAL, POINTER         ::  XMSSX(:), XMSSY(:), XMSSD(:),       &
+        REAL, ALLOCATABLE     ::  XMSSX(:), XMSSY(:), XMSSD(:),       &
                                   XMSCX(:), XMSCY(:), XMSCD(:)
 !
 ! Output fields group 9)
 !
-        REAL, POINTER         ::  DTDYN(:),  FCUT(:),  CFLXYMAX(:),   &
+        REAL, ALLOCATABLE     ::  DTDYN(:),  FCUT(:),  CFLXYMAX(:),   &
                                   CFLTHMAX(:),  CFLKMAX(:)
-        REAL, POINTER         :: XDTDYN(:), XFCUT(:), XCFLXYMAX(:),   &
+        REAL, ALLOCATABLE     :: XDTDYN(:), XFCUT(:), XCFLXYMAX(:),   &
                                  XCFLTHMAX(:), XCFLKMAX(:)
 !
 ! Output fields group 10)
 !
-        REAL, POINTER         ::  USERO(:,:)
-        REAL, POINTER         :: XUSERO(:,:)
+        REAL, ALLOCATABLE     ::  USERO(:,:)
+        REAL, ALLOCATABLE     :: XUSERO(:,:)
 !
 ! Spatial derivatives
 !
-        REAL, POINTER         :: DDDX(:,:), DDDY(:,:), DCXDX(:,:),    &
+        REAL, ALLOCATABLE     :: DDDX(:,:), DDDY(:,:), DCXDX(:,:),    &
                                  DCYDX(:,:), DCXDY(:,:), DCYDY(:,:)
-        REAL, POINTER         :: DCDX(:,:,:), DCDY(:,:,:)
+        REAL, ALLOCATABLE     :: DCDX(:,:,:), DCDY(:,:,:)
 !
 ! Warning Defined but not set if UGTYPE .EQ. .T.
-            INTEGER, POINTER      :: ITER(:,:)
+        INTEGER, ALLOCATABLE  :: ITER(:,:)
 !
         INTEGER               :: NFR, NFRHGH, NFRCHG, NSPECX, NSPECY
-        INTEGER, POINTER      :: IP11(:), IP12(:), IP13(:), IP14(:),  &
+        INTEGER, ALLOCATABLE  :: IP11(:), IP12(:), IP13(:), IP14(:),  &
                                  IM11(:), IM12(:), IM13(:), IM14(:),  &
                                  IP21(:), IP22(:), IP23(:), IP24(:),  &
                                  IM21(:), IM22(:), IM23(:), IM24(:),  &
@@ -465,14 +465,14 @@
                                  AWG1, AWG2, AWG3, AWG4, AWG5, AWG6,  &
                                  AWG7, AWG8, SWG1, SWG2, SWG3, SWG4,  &
                                  SWG5, SWG6, SWG7, SWG8
-        REAL, POINTER         :: AF11(:)
+        REAL, ALLOCATABLE     :: AF11(:)
         LOGICAL               :: NLINIT
 !
-        INTEGER, POINTER      :: IAPPRO(:)
-        REAL, POINTER         :: SPPNT(:,:,:)
+        INTEGER, ALLOCATABLE     :: IAPPRO(:)
+        REAL, ALLOCATABLE     :: SPPNT(:,:,:)
 !
         INTEGER               :: ITIME, IPASS, IDLAST, NSEALM
-        REAL, POINTER         :: ALPHA(:,:)
+        REAL, ALLOCATABLE     :: ALPHA(:,:)
         LOGICAL               :: AINIT, AINIT2, FL_ALL, FLCOLD, FLIWND
 !
       END TYPE WADAT

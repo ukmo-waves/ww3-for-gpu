@@ -502,8 +502,9 @@
         FACX   =  1.
       END IF
 !
-      TAUWX  = 0.
-      TAUWY  = 0.
+!CODENotes: Added array syntax.
+      TAUWX(:)  = 0.
+      TAUWY(:)  = 0.
 !
 ! 0.d Test output
 !

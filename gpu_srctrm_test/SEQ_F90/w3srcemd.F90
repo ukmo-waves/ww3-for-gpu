@@ -416,14 +416,14 @@
                                  FACTOR, FACTOR2, DRAT, TAUWAX, TAUWAY,    &
                                  MWXFINISH, MWYFINISH, A1BAND, B1BAND,     &
                                  COSI(2)
-      REAL                    :: SPECINIT(NSPEC), SPEC2(NSPEC)
-      REAL                    :: DAM (NSPEC), WN2 (NSPEC),            &
-                                 VSLN(NSPEC),                         &
-                                 VSIN(NSPEC), VDIN(NSPEC),            &
-                                 VSNL(NSPEC), VDNL(NSPEC),            &
-                                 VSDS(NSPEC), VDDS(NSPEC),            &
-                                 VSBT(NSPEC), VDBT(NSPEC),            &
-                                 VS  (NSPEC), VD  (NSPEC), EB(NK)
+      REAL,ALLOCATABLE        :: SPECINIT(:), SPEC2(:)
+      REAL,ALLOCATABLE        :: DAM (:), WN2 (:),            &
+                                 VSLN(:),                         &
+                                 VSIN(:), VDIN(:),            &
+                                 VSNL(:), VDNL(:),            &
+                                 VSDS(:), VDDS(:),            &
+                                 VSBT(:), VDBT(:),            &
+                                 VS  (:), VD  (:), EB(:)
       LOGICAL                 :: LLWS(NSPEC)
       REAL                    :: BRLAMBDA(NSPEC)
       REAL                    :: FOUT(NK,NTH), SOUT(NK,NTH), DOUT(NK,NTH)
@@ -443,12 +443,17 @@
 !/
 !/ ------------------------------------------------------------------- /
 !/
+  
+      ALLOCATE( DAM (NSPEC), WN2 (NSPEC), VSLN(NSPEC),SPECINIT(NSPEC), &
+      SPEC2(NSPEC), VSIN(NSPEC), VDIN(NSPEC), VSNL(NSPEC), VDNL(NSPEC),&
+      VSDS(NSPEC), VDDS(NSPEC), VSBT(NSPEC), VDBT(NSPEC), VS(NSPEC),   &
+      VD(NSPEC), EB(NK) )
       SPR4T = 0.0
       SIN4T = 0.0
       SDS4T = 0.0
-!$ACC DATA COPY   (WN1, WN2, CG1, SPEC, DAM)&
-!$ACC      COPYOUT(VSIN, VDIN, VDBT, VSBT)&
-!$ACC      COPYOUT(BRLAMBDA)
+!$ACC DATA COPY   (WN1, WN2, CG1, SPEC, DAM, NSTEPS)&
+!$ACC      COPYOUT(VSIN, VDIN, VDBT, VSBT, BRLAMBDA)&
+!$ACC      CREATE (LLWS)
 !$ACC KERNELS      
 !
       DEPTH  = MAX ( DMIN , D_INP )
@@ -511,11 +516,10 @@
       TAUWAY = 0.
       TAUSCX = 0.
       TAUSCY = 0.
+!CODENotes: Doesn't need to be initialised here.
 !      TAUBBL = 0.
 !      TAUICE = 0.
       PHICE  = 0.
- 
- 
       BRLAMBDA(:)=0.
 !
 ! 1.c Set mean parameters
@@ -573,16 +577,12 @@
 ! 1.f Prepare output file for !/NNT option
 !
 ! ... Branch point dynamic integration - - - - - - - - - - - - - - - -
-!
 !GPUNotes loop for explicit time integration of source terms
 !GPUNotes this might be a pain in the proverbial for tightening
 !GPUNotes the seapoint and spectral loops
 !$ACC END KERNELS
-!$ACC END DATA
       DO
-!
         NSTEPS = NSTEPS + 1
-!
 ! 2.  Calculate source terms ----------------------------------------- *
 !
 ! 2.a Input.
@@ -590,8 +590,7 @@
 !GPUNotes subroutine will contain source term specific spectral loops
 !GPUNotes using COPY rather than CREATE for now as VSLN used in a
 !GPUNotes later loop
-!!$ACC DATA CREATE (VSLN) &
-!$ACC DATA COPY (VSLN) &
+!$ACC DATA COPY   (VSLN) &
 !$ACC      COPYIN (WN1)
         CALL W3SLN1 (       WN1, FHIGH, USTAR, U10DIR , VSLN       )
 !$ACC END DATA
@@ -612,9 +611,8 @@
 ! 2.b Nonlinear interactions.
 !
 !GPUnotes subruoutine will contain source term specific spectral loops
-!$ACC DATA COPY(VSNL,VDNL) &
-!$ACC      COPYIN(SPEC,CG1,WNMEAN,DEPTH)
-        CALL W3SNL1 ( SPEC, CG1, WNMEAN*DEPTH,        VSNL, VDNL )
+!$ACC DATA COPY(VSNL,VDNL) 
+        CALL W3SNL1 ( SPEC, CG1, WNMEAN*DEPTH, VSNL, VDNL )
 !$ACC END DATA
 !
 ! 2.c Dissipation... except for ST4
@@ -643,14 +641,20 @@
 !
 ! 3.  Set frequency cut-off ------------------------------------------ *
 !
+!!$ACC DATA COPY(DT, DTTOT, DTMAX, DTG, NK, FACTI2, FACTI1, FHIGH, NTH)&
+!!$ACC      COPY(FFXFI, NKH1, VS,VD, NSPEC, XFLT, AMAX, DAM, VSNL,VDNL)&
+!!$ACC      COPY(VSLN, VSIN, VDIN, VSDS, VDDS, NSPECH, XREL, SPECINIT )&
+!!$ACC      COPY(AFILT, AFAC)
+!!$ACC DATA COPY(DTDYN)
+!$ACC KERNELS 
         NKH    = MIN ( NK , INT(FACTI2+FACTI1*LOG(MAX(1.E-7,FHIGH))) )
         NKH1   = MIN ( NK , NKH+1 )
         NSPECH = NKH1*NTH
-!
 ! 4.  Summation of source terms and diagonal term and time step ------ *
 !
         DT     = MIN ( DTG-DTTOT , DTMAX )
         AFILT  = MAX ( DAM(NSPEC) , XFLT*AMAX )
+!$ACC END KERNELS
 !
 !     For input and dissipation calculate the fraction of the ice-free
 !     surface. In the presence of ice, the effective water surface
@@ -659,6 +663,7 @@
 !             SIN = (1-ICE)**ISCALEIN*SIN and SDS=(1-ICE)**ISCALEDS*SDS ------------------ *
 !     INFLAGS2(4) is true if ice concentration was ever read during
 !             this simulation
+!$ACC KERNELS 
         IF ( INFLAGS2(4) ) THEN
           VSNL(1:NSPECH) = ICESCALENL * VSNL(1:NSPECH)
           VDNL(1:NSPECH) = ICESCALENL * VDNL(1:NSPECH)
@@ -668,13 +673,12 @@
           VSDS(1:NSPECH) = ICESCALEDS * VSDS(1:NSPECH)
           VDDS(1:NSPECH) = ICESCALEDS * VDDS(1:NSPECH)
         END IF
-!
         NKI    = MAX ( 2 , MIN ( NKH1 ,                           &
                  INT ( FACTI2 + FACTI1*LOG(MAX(1.E-7,FFXFI* FMEAN1)) ) ) )
  
-        VS = 0
-        VD = 0
 !GPUNotes spectral loop up to frequency cut off
+        VS(:) = 0.
+        VD(:) = 0.
         DO IS=IS1, NSPECH
           VS(IS) = VSLN(IS) + VSIN(IS) + VSNL(IS)  &
                  + VSDS(IS) + VSBT(IS)
@@ -684,9 +688,6 @@
           AFAC   = 1. / MAX( 1.E-10 , ABS(VS(IS)/DAMAX) )
           DT     = MIN ( DT , AFAC / ( MAX ( 1.E-10,                  &
                          1. + OFFSET*AFAC*MIN(0.,VD(IS)) ) ) )
-!          IF (IX == DEBUG_NODE) THEN
-!            WRITE(*,'(A20,I10,10F30.10)') 'TIME STEP COMP', IS, DAMAX, DAM(IS), XREL*SPECINIT(IS), AFILT, AFAC, DT
-!          END IF
         END DO  ! end of loop on IS
 !
 !        WRITE(*,*) 'NODE_NUMBER', IX
@@ -699,57 +700,18 @@
         SHAVE  = DT.LT.DTMIN .AND. DT.LT.DTG-DTTOT   ! limiter check ...
         SHAVEIO = SHAVE
         DT     = MAX ( DT , MIN (DTMIN,DTG-DTTOT) ) ! override dt with input time step or last time step if it is bigger ... anyway
-        IF (srce_call .eq. srce_imp_post) DT = DTG  ! for implicit part
+!CODENotes: This call is to a variable that is not defined, this causes
+!issues on GPU but is just ignored on CPU. 
+!        IF (srce_call .eq. srce_imp_post) DT = DTG  ! for implicit part
         HDT    = OFFSET * DT
         DTTOT  = DTTOT + DT
- 
- 
 !GPUNotes calls below may be for implicit source term update
 !GPUNotes would this remove the need for the NSTEPS loop?
 !GPUNotes discussed in section 3.6 of manual, although maybe
 !GPUNotes not it looks like Aron R code?
 !GPUNotes Not used in source term test, which sets srce_direct
 !GPUNotes loops below are over spectrum
-        IF (srce_call .eq. srce_imp_pre) THEN
-          PrintDeltaSmDA=.FALSE.
-          IF (PrintDeltaSmDA .eqv. .TRUE.) THEN
-            DO IS=1,NSPEC
-              DeltaSRC(IS) = VSIN(IS) - SPEC(IS)*VDIN(IS)
-            END DO
-            WRITE(740+IAPROC,*) 'min/max/sum(VSIN)=', minval(VSIN), maxval(VSIN), sum(VSIN)
-            WRITE(740+IAPROC,*) 'min/max/sum(DeltaIN)=', minval(DeltaSRC), maxval(DeltaSRC), sum(DeltaSRC)
-            !
-            DO IS=1,NSPEC
-              DeltaSRC(IS) = VSNL(IS) - SPEC(IS)*VDNL(IS)
-            END DO
-            WRITE(740+IAPROC,*) 'min/max/sum(VSNL)=', minval(VSNL), maxval(VSNL), sum(VSNL)
-            WRITE(740+IAPROC,*) 'min/max/sum(DeltaNL)=', minval(DeltaSRC), maxval(DeltaSRC), sum(DeltaSRC)
-            !
-            DO IS=1,NSPEC
-              DeltaSRC(IS) = VSDS(IS) - SPEC(IS)*VDDS(IS)
-            END DO
-            WRITE(740+IAPROC,*) 'min/max/sum(VSDS)=', minval(VSDS), maxval(VSDS), sum(VSDS)
-            WRITE(740+IAPROC,*) 'min/max/sum(DeltaDS)=', minval(DeltaSRC), maxval(DeltaSRC), sum(DeltaSRC)
-            !
-!            DO IS=1,NSPEC
-!              DeltaSRC(IS) = VSIC(IS) - SPEC(IS)*VDIC(IS)
-!            END DO
-            WRITE(740+IAPROC,*) 'min/max/sum(DeltaDS)=', minval(DeltaSRC), maxval(DeltaSRC), sum(DeltaSRC)
-          END IF
- 
-          IF (optionCall .eq. 1) THEN
-            CALL SIGN_VSD_PATANKAR_WW3(SPEC,VS,VD)
-          ELSE IF (optionCall .eq. 2) THEN
-            CALL SIGN_VSD_SEMI_IMPLICIT_WW3(SPEC,VS,VD)
-          ELSE IF (optionCall .eq. 3) THEN
-            CALL SIGN_VSD_SEMI_IMPLICIT_WW3(SPEC,VS,VD)
-          END IF
-          VSIO=VS
-          VDIO=VD
-!!/DEBUGSRC          IF (IX == DEBUG_NODE) WRITE(44,'(10EN15.4)') SUM(VS), SUM(VD), SUM(VSIN), SUM(VDIN), SUM(VSDS), SUM(VDDS), SUM(
-          RETURN ! return everything is done for the implicit ...
-        END IF ! srce_imp_pre
-!
+
 ! 5.  Increment spectrum --------------------------------------------- *
 !
 !GPUNotes Integrations over spectrum below active in source term test
@@ -771,13 +733,7 @@
               SPEC(IS) = MAX ( 0. , SPEC(IS)+eInc1 )
             END DO
           END IF
-!          IF (IX == DEBUG_NODE) THEN
-!            WRITE(*,'(A20,I20,F20.10,L20,4F20.10)') 'AFTER', IX, DEPTH, SHAVE, SUM(VS), SUM(VD), SUM(SPEC)
-!          ENDIF
-!!/DEBUGSRC          IF (IX == DEBUG_NODE) WRITE(44,'(10EN15.4)') SUM(VS), SUM(VD), SUM(VSIN), SUM(VDIN), SUM(VSDS), SUM(VDDS), SUM(
         END IF
- 
- 
 !
 ! 5.b  Computes
 !              atmos->wave flux PHIAW-------------------------------- *
@@ -814,8 +770,9 @@
         TAUWIY= TAUWIY+ TAUWY * DRAT *DT
         TAUWNX= TAUWNX+ TAUWAX * DRAT *DT
         TAUWNY= TAUWNY+ TAUWAY * DRAT *DT
+!$ACC END KERNELS
+!!$ACC END DATA
         ! MISSING: TAIL TO BE ADDED ?
-!
 ! 6.  Add tail ------------------------------------------------------- *
 !   a Mean parameters
 !
@@ -829,6 +786,7 @@
         CALL CPU_TIME(eTime1)
         SPR4T = SPR4T + eTime1 - sTime1
 !$ACC END DATA
+!$ACC KERNELS
 !
 ! Introduces a Long & Resio (JGR2007) type dependance on wave age
         FAGE   = FFXFA*TANH(0.3*U10ABS*FMEANWS*TPI/GRAV)
@@ -851,11 +809,11 @@
 !GPUNotes Smaller spectral loop to add energy to tail
         DO IK=NKH+1, NK
           DO ITH=1, NTH
-            SPEC(ITH+(IK-1)*NTH) = SPEC(ITH+(IK-2)*NTH) * FACHFA         &
-                       + 0.
+            SPEC(ITH+(IK-1)*NTH) = SPEC(ITH+(IK-2)*NTH) * FACHFA         
           END DO
         END DO
 !
+!$ACC END KERNELS
 ! 6.e  Update wave-supported stress----------------------------------- *
 !
 ! GPUNotes source term specific loops over spectrum in this call
@@ -870,7 +828,6 @@
         CALL CPU_TIME(eTime2)
         SIN4T = SIN4T + eTime2 - sTime2
 !$ACC END DATA 
-!
 ! 7.  Check if integration complete ---------------------------------- *
 !
         IF (srce_call .eq. srce_imp_post) THEN
@@ -880,20 +837,18 @@
 !          IF (IX == DEBUG_NODE) WRITE(*,*) 'DTTOT, DTG', DTTOT, DTG
           EXIT
         ENDIF
-      END DO ! INTEGRATIN LOOP
+      END DO ! INTEGRATION LOOP
 !
 ! ... End point dynamic integration - - - - - - - - - - - - - - - - - -
 !
 ! 8.  Save integration data ------------------------------------------ *
-!
+!$ACC KERNELS
       DTDYN  = DTDYN / REAL(MAX(1,NSTEPS))
       FCUT   = FHIGH * TPIINV
 !
-      GOTO 888
 !
 ! Error escape locations
 !
-  888 CONTINUE
 !
 ! 9.a  Computes PHIOC------------------------------------------ *
 !     The wave to ocean flux is the difference between initial energy
@@ -902,8 +857,6 @@
 !
 !CODENotes: Brought initialisations here to avoid them being pulled and
 !push to gpu.
-      TAUBBL = 0.
-      TAUICE = 0.
 
 !GPUNotes loop over spectrum requires spectrum to be properly updated
       EFINISH  = 0.
@@ -928,13 +881,16 @@
 !
 ! Transformation in momentum flux in m^2 / s^2
 !
+      TAUBBL(:)=0
       TAUOX=(GRAV*MWXFINISH+TAUWIX-TAUBBL(1))/DTG
       TAUOY=(GRAV*MWYFINISH+TAUWIY-TAUBBL(2))/DTG
       TAUWIX=TAUWIX/DTG
       TAUWIY=TAUWIY/DTG
       TAUWNX=TAUWNX/DTG
       TAUWNY=TAUWNY/DTG
-      TAUBBL(:)=TAUBBL(:)/DTG
+!CODENotes: TAUBBL is initialised and 0 and doesn't change so this line
+!isnt needed.
+!      TAUBBL(:)=TAUBBL(:)/DTG
 !
 ! Transformation in wave energy flux in W/m^2=kg / s^3
 !
@@ -947,13 +903,14 @@
 !     INFLAGS2(4) is true if ice concentration was ever read during
 !             this simulation
 !
+!!$ACC END KERNELS
  
       IF ( INFLAGS2(4).AND.ICE.GT.0 ) THEN
- 
+        STOP 
         IF (IICEDISP) THEN
           ICECOEF2 = 1E-6
-          CALL LIU_FORWARD_DISPERSION (ICEH,ICECOEF2,DEPTH, &
-                                       SIG,WN_R,CG_ICE,ALPHA_LIU)
+!          CALL LIU_FORWARD_DISPERSION (ICEH,ICECOEF2,DEPTH, &
+!                                       SIG,WN_R,CG_ICE,ALPHA_LIU)
 !
           IF (IICESMOOTH) THEN
           END IF
@@ -970,25 +927,30 @@
 !
         TAUICE(:) = 0.
         PHICE = 0.
+
+!CODENotes: Previously was stored inside following IK loop, but due to
+!specific values of ATT, is a null operation.
+
+! First part of ice term integration: dissipation part
+!
+          ATT=1.
+          SPEC(1+(IK-1)*NTH:NTH+(IK-1)*NTH) = ATT*SPEC2(1+(IK-1)*NTH:NTH+(IK-1)*NTH)
+!
+
 !GPUNotes These spectral loops are for ice effects?
 !GPUnotes slightly surprised they aren't enclosed in a conditional?
 !GPUNotes actually maybe they are, think this is an indentation thing
 !GPUNotes which I have tried to address
-        DO IK=1,NK
-          IS = 1+(IK-1)*NTH
-!
-! First part of ice term integration: dissipation part
-!
-          ATT=1.
-            SPEC(1+(IK-1)*NTH:NTH+(IK-1)*NTH) = ATT*SPEC2(1+(IK-1)*NTH:NTH+(IK-1)*NTH)
-!
 ! Second part of ice term integration: scattering including re-distribution in directions
 !
 ! 10.2  Fluxes of energy and momentum due to ice effects
 !
+!CODENotes: Moved FACTOR and FACTOR2 inside lopp for collapse.
+!$ACC LOOP GANG INDEPENDENT COLLAPSE(2)
+        DO IK=1,NK
+          DO ITH = 1,NTH
           FACTOR = DDEN(IK)/CG1(IK)                    !Jacobian to get energy in band
           FACTOR2= FACTOR*GRAV*WN1(IK)/SIG(IK)         ! coefficient to get momentum
-          DO ITH = 1,NTH
             IS = ITH+(IK-1)*NTH
             PHICE = PHICE + (SPEC(IS)-SPEC2(IS)) * FACTOR
             COSI(1)=ECOS(IS)
@@ -1000,7 +962,10 @@
         TAUICE(:)=TAUICE(:)/DTG
       ELSE
       END IF
-!
+!GPUNotes: Forcing a SYNC, this is required for correct output, stops
+!the code from running too far without correct values. This may be
+!requied in other areas of the code instead of multiple kernels.
+!$ACC WAIT
 ! - - - - - - - - - - - - - - - - - - - - - -
 ! 11. Sea state dependent stress routine calls
 ! - - - - - - - - - - - - - - - - - - - - - -
@@ -1018,12 +983,13 @@
  
       FIRST  = .FALSE.
  
-      IF (IT.EQ.0) SPEC = SPECINIT
+      IF (IT.EQ.0) SPEC = SPECINIT(:)
  
       SPEC = MAX(0., SPEC)
-!
+!$ACC END KERNELS
+!$ACC END DATA
       RETURN
-!
+
 ! Formats
 !
   101 FORMAT ('TIMESTAMP : ', A, F8.6)
