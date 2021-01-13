@@ -236,26 +236,30 @@
 !/ ------------------------------------------------------------------- /
 !/ Parameter list
 !/
-      REAL, INTENT(IN)        :: A(NSPEC), CG(NK), KDMEAN
-      REAL, INTENT(OUT)       :: S(NSPEC), D(NSPEC)
+      REAL, INTENT(IN)    :: A(NSPEC), CG(NK), KDMEAN
+      REAL, INTENT(OUT)   :: S(NSPEC), D(NSPEC)
 !/
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
 !/
-      INTEGER                 :: ITH, IFR, ISP
-      REAL                    :: X, X2, CONS, CONX, FACTOR,           &
-                                 E00, EP1, EM1, EP2, EM2,             &
-                                 SA1A, SA1B, SA2A, SA2B
-      REAL               ::  UE  (1-NTH:NSPECY), SA1 (1-NTH:NSPECX),  &
-                             SA2 (1-NTH:NSPECX), DA1C(1-NTH:NSPECX),  &
-                             DA1P(1-NTH:NSPECX), DA1M(1-NTH:NSPECX),  &
-                             DA2C(1-NTH:NSPECX), DA2P(1-NTH:NSPECX),  &
-                             DA2M(1-NTH:NSPECX), CON (      NSPEC )
+      INTEGER             :: ITH, IFR, ISP
+      REAL                :: X, X2, CONS, CONX, FACTOR, E00, EP1, EM1,&
+                             EP2, EM2, SA1A, SA1B, SA2A, SA2B
+      REAL,ALLOCATABLE    ::  UE(:), SA1(:), SA2(:), DA1C(:), DA1P(:),&
+                             DA1M(:), DA2C(:), DA2P(:), DA2M(:), CON(:)
 !/
 !/ ------------------------------------------------------------------- /
 !/
 ! initialisations
+
+     ALLOCATE(UE(1-NTH:NSPECY), SA1(1-NTH:NSPECX), SA2(1-NTH:NSPECX), &
+              DA1C(1-NTH:NSPECX), DA1P(1-NTH:NSPECX),                 &
+              DA1M(1-NTH:NSPECX), DA2C(1-NTH:NSPECX),                 &
+              DA2P(1-NTH:NSPECX), DA2M(1-NTH:NSPECX), CON(NSPEC))
 !
+!$ACC DATA CREATE(UE(:),SA1(:),SA2(:),DA1C(:),DA1P(:),DA1M(:),DA2C(:))&
+!$ACC      CREATE(DA2P(:),DA2M(:),CON(:))
+
 !GPUNotes To make whole routine run effectively on kernels I so have
 !GPUNotes to run the serial section below in a separate kernel to
 !GPUNotes the other parallel parts. This prevents last two loop sections
@@ -266,11 +270,10 @@
       X      = MAX ( KDCON*KDMEAN , KDMN )
       X2     = MAX ( -1.E15, SNLS3*X)
       CONS   = SNLC1 * ( 1. + SNLS1/X * (1.-SNLS2*X) * EXP(X2) )
-!$ACC END KERNELS
+!$ACC WAIT
 ! 2.  Prepare auxiliary spectrum and arrays -------------------------- *
 !
 !GPUNotes loop over full spectrum
-!$ACC KERNELS
 !$ACC LOOP INDEPENDENT COLLAPSE(2)
       DO IFR=1, NFR
         DO ITH=1, NTH
@@ -385,6 +388,7 @@
 !
       END DO
 !$ACC END KERNELS
+!$ACC END DATA
 !!/DEBUGSRC     WRITE(740+IAPROC,*)  'W3SNL1 : sum(S)=', sum(S)
 !!/DEBUGSRC     WRITE(740+IAPROC,*)  'W3SNL1 : sum(D)=', sum(D)
 !!/DEBUGSRC     FLUSH(740+IAPROC)

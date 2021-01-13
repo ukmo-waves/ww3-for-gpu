@@ -1141,6 +1141,18 @@
             SDS4TOT=0.
 !GPUNotes Outer seapoint loop for source term calculations
             CALL WAV_MY_WTIME(sTime1)
+!$ACC DATA COPYIN (IT,IMOD,VAoldDummy,DW(:),U10(:),REFLEC,REFLED )&
+!$ACC      COPYIN (U10D(:),AS(:),CX(:),CY(:),ICE(:),ICEH(:),ICEDMAX(:))&
+!$ACC      COPYIN (TRNX(:,:),TRNY(:,:),BERG(:),ASF(:),DTG,D50,PSIC)&
+!$ACC      COPYIN (INFLAGS1,INFLAGS2)&
+!$ACC      COPY   (ALPHA(:,:),WN(:,:),CG(:,:),VA(:,:),UST(:),USTDIR(:))&
+!$ACC      COPY   (FPIS(:),TAUOX(:),TAUOY(:),TAUWX(:),TAUWY(:),PHIAW(:))&
+!$ACC      COPY   (PHIOC(:),PHICE(:),CHARN(:),TWS(:),BEDFORMS(:,:)     )&
+!$ACC      COPY   (TAUBBL(:,:),TAUICE(:,:),WHITECAP(:,:),TAUWIX(:)     )&
+!$ACC      COPY   (TAUWIY(:),TAUWNX(:),TAUWNY(:),ICEF(:),PHIBBL(:)     )&
+!$ACC      COPYOUT(VSioDummy(:),VDioDummy(:),SHAVETOTioDummy,FCUT(:))&
+!$ACC      COPYOUT(DTDYN(:))&
+!$ACC      CREATE (IX,IY,DELA,DELX,DELY,TMP1(:),TMP2(:),TMP3(:),TMP4(:))
             DO JSEA=1, NSEAL
               CALL INIT_GET_ISEA(ISEA, JSEA)
               IX     = MAPSF(ISEA,1)
@@ -1188,6 +1200,7 @@
 !               VA(:,JSEA)  = 0.
               END IF
             END DO
+!$ACC END DATA
 !GPUNotes end of seapoint loop for source terms  
 !
             CALL WAV_MY_WTIME(eTime1)

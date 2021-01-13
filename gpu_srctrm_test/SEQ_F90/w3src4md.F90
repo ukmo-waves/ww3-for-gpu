@@ -178,10 +178,12 @@
 !/
       INTEGER                 :: IS, IK, ITH
 !/
-      REAL                    :: TAUW, EBAND, EMEANWS, UNZ,           &
-                                 EB(NK), EB2(NK), ALFA(NK)
+      REAL                    :: TAUW, EBAND, EMEANWS, UNZ
+      REAL,ALLOCATABLE        :: EB(:), EB2(:), ALFA(:)
 !/ ------------------------------------------------------------------- /
 !/
+      ALLOCATE(EB(NK), EB2(NK), ALFA(NK))
+!$ACC DATA CREATE(EB(:),EB2(:),ALFA(:))
 !$ACC KERNELS 
       UNZ    = MAX ( 0.01 , U )
       USTAR  = MAX ( 0.0001 , USTAR )
@@ -199,7 +201,7 @@
 !GPUNotes spectral loop
       EB(:)  = 0.
       EB2(:) = 0.
-!$ACC LOOP INDEPENDENT 
+!$ACC LOOP INDEPENDENT
       DO IK=1, NK
         DO ITH=1, NTH
           IS=ITH+(IK-1)*NTH
@@ -264,11 +266,13 @@
 !             the work being done on the GPU. No need to declare as a
 !             routine because it is not within a loop.
       CALL CALC_USTAR(U,TAUW,USTAR,Z0,CHARN)
+!$ACC UPDATE HOST(USTAR)
 !$ACC KERNELS
       UNZ    = MAX ( 0.01 , U )
       CD     = (USTAR/UNZ)**2
       USDIR = UDIR
 !$ACC END KERNELS
+!$ACC END DATA
 ! 6.  Final test output ---------------------------------------------- *
 !
       RETURN
@@ -280,8 +284,8 @@
 !/
       END SUBROUTINE W3SPR4
 !/ ------------------------------------------------------------------- /
-      SUBROUTINE W3SIN4 (A, CG, K, U, USTAR, DRAT, AS, USDIR, Z0, CD,    &
-                         TAUWX, TAUWY, TAUWNX, TAUWNY, S, D, LLWS,       &
+      SUBROUTINE W3SIN4 (A, CG, K, U, USTAR, DRAT, AS, USDIR, Z0, CD,  &
+                         TAUWX, TAUWY, TAUWNX, TAUWNY, S, D, LLWS,     &
                          IX, IY, BRLAMBDA)
 !/
 !/                  +-----------------------------------+
@@ -1634,37 +1638,48 @@
 !/ Local parameters
 !/
       INTEGER                 :: IS, IS2, IS0, IKL, IKC, ID, NKL
-      INTEGER                 :: IK, IK1, ITH, IK2, JTH, ITH2,             &
+      INTEGER                 :: IK, IK1, ITH, IK2, JTH, ITH2,         &
                                  IKHS, IKD, SDSNTH, IT, IKM, NKM
-      INTEGER                 :: NSMOOTH(NK)
+      INTEGER,ALLOCATABLE     :: NSMOOTH(:),IKSUP(:),IMSSMAX(:)
       REAL                    :: COSWIND, ASUM, SDIAGISO
-      REAL                    :: COEF1, COEF2, COEF3, COEF4(NK)
+      REAL                    :: COEF1, COEF2, COEF3
       REAL                    :: FACTURB, DTURB, BREAKFRACTION
       REAL                    :: RENEWALFREQ, EPSR
-      REAL                    :: S1(NK), E1(NK)
-      INTEGER                 :: NTIMES(NK)
+      REAL,ALLOCATABLE        :: S1(:), E1(:), COEF4(:)
+      INTEGER,ALLOCATABLE     :: NTIMES(:)
       REAL                    :: GAM, XT
-      REAL                    :: DK(NK), HS(NK), KBAR(NK), DCK(NK)
-      REAL                    :: EFDF(NK)     ! Energy integrated over a spectral band
-      INTEGER                 :: IKSUP(NK)
+      REAL,ALLOCATABLE        :: DK(:), HS(:), KBAR(:), DCK(:)
+      REAL,ALLOCATABLE        :: EFDF(:)     ! Energy integrated over a spectral band
       REAL                    :: FACSAT, DKHS, FACSTRAIN
-      REAL                    :: BTH0(NK)     !saturation spectrum
-      REAL                    :: BTH(NSPEC)   !saturation spectrum
-      REAL                    :: BTH0S(NK)    !smoothed saturation spectrum
-      REAL                    :: BTHS(NSPEC)  !smoothed saturation spectrum
-      REAL                    :: SBK(NSPEC)
-      INTEGER                 :: IMSSMAX(NK), NTHSUM
-      REAL                    :: SBKT(NK), MSSSUM(NK,5), WTHSUM(NTH), FACHF
-      REAL                    :: MSSSUM2(NK,NTH)
-      REAL                    :: MSSLONG(NK,NTH)
-      REAL                    :: MSSPCS, MSSPC2, MSSPS2, MSSP, MSSD, MSSTH
-      REAL                    :: MICHE, X
-      REAL                    :: QB(NK), S2(NK)
+      REAL,ALLOCATABLE        :: BTH0(:)     !saturation spectrum
+      REAL,ALLOCATABLE        :: BTH(:)   !saturation spectrum
+      REAL,ALLOCATABLE        :: BTH0S(:)    !smoothed saturation spectrum
+      REAL,ALLOCATABLE        :: BTHS(:)  !smoothed saturation spectrum
+      REAL,ALLOCATABLE        :: SBK(:)
+      INTEGER                 :: NTHSUM
+      REAL,ALLOCATABLE        :: SBKT(:), MSSSUM(:,:), WTHSUM(:)
+      REAL,ALLOCATABLE        :: MSSSUM2(:,:)
+      REAL,ALLOCATABLE        :: MSSLONG(:,:)
+      REAL                    :: MSSPCS,MSSPC2,MSSPS2,MSSP,MSSD,MSSTH
+      REAL                    :: MICHE, X, FACHF
+      REAL,ALLOCATABLE        :: QB(:), S2(:)
       REAL                    :: TSTR, TMAX, DT, T, MFT
-      REAL                    :: PB(NSPEC), PB2(NSPEC)
+      REAL ,ALLOCATABLE       :: PB(:),PB2(:)
 !/
 !/ ------------------------------------------------------------------- /
 !/
+      ALLOCATE(NSMOOTH(NK),IKSUP(NK),S1(NK),E1(NK),COEF4(NK),NTIMES(NK)&
+               ,DK(NK),HS(NK),KBAR(NK),DCK(NK),EFDF(NK),BTH0(NK),QB(NK)&
+               ,S2(NK),BTH(NSPEC),BTH0S(NK),BTHS(NSPEC),SBK(NSPEC),    &
+               IMSSMAX(NK),SBKT(NK),MSSSUM(NK,5),WTHSUM(NTH),PB(NSPEC),&
+               MSSSUM2(NK,NTH),MSSLONG(NK,NTH),PB2(NSPEC))
+!$ACC DATA CREATE(NSMOOTH(:),IKSUP(:),S1(:),E1(:),COEF4(:),NTIMES(:)  )&
+!$ACC      CREATE(DK(:),HS(:),KBAR(:),DCK(:),EFDF(:),BTH0(:),QB(:)    )&
+!$ACC      CREATE(S2(:),BTH0S(:),BTHS(:),SBK(:),IMSSMAX(:),WTHSUM(:)  )&
+!$ACC      CREATE(SBKT(:),MSSSUM(:,:),PB(:),PB2(:),MSSLONG(:,:)       )&
+!$ACC      CREATE(MSSSUM2(:,:))
+!!GPUNotes: Cannot CREATE BTH as it is used as private late, two
+!disagree with eachother
 !
 !----------------------------------------------------------------------
 !
@@ -1672,7 +1687,7 @@
 !     within the computation, but these are helping with some bugs
 !     found in certain compilers
 !!$ACC DATA COPYOUT(BRLAMBDA, DDIAG, WHITECAP, SRHS)
-!!$ACC KERNELS
+!$ACC KERNELS
 
 !CODENotes: Removed pre-initialization, this creates additional 
 !data transfers and are not needed for the mini-app to run.
@@ -1692,7 +1707,7 @@
       ELSE
         WTHSUM(1)=2*SSDSC(10)
       END IF
-!!$ACC END KERNELS
+!$ACC END KERNELS
 !
 ! 2.   Estimation of spontaneous breaking
 !$ACC KERNELS
@@ -2226,7 +2241,7 @@
 ! End of output computing
 1000  CONTINUE
 !$ACC END KERNELS
-!!$ACC END DATA
+!$ACC END DATA
       RETURN
 !
 ! Formats

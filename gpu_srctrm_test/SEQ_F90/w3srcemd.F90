@@ -398,35 +398,34 @@
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
 !/
-      INTEGER                 :: IK, ITH, IS, IS0, NSTEPS,  NKH, NKH1,&
+!CODENotes: Changes to local variables to allow managed memory to work
+!properly, requires POINTERS to be defined as ALLOCATABLES and then
+!allocated. 
+      INTEGER                 :: IK, ITH, IS, IS0, NSTEPS,  NKH, NKH1, &
                                  IKS1, IS1, NSPECH, IDT, IERR, NKI, NKD
-      REAL                    :: DTTOT, FHIGH, DT, AFILT, DAMAX, AFAC,&
-                                 HDT, ZWND, FP, DEPTH, TAUSCX, TAUSCY, FHIGI
+      REAL                    :: DTTOT, FHIGH, DT, AFILT, DAMAX, AFAC, &
+                                 HDT, ZWND, FP, DEPTH, TAUSCX, TAUSCY, &
+                                 FHIGI
 ! Scaling factor for SIN, SDS, SNL
-      REAL                    :: ICESCALELN, ICESCALEIN, ICESCALENL, ICESCALEDS
-      REAL                    :: EMEAN, FMEAN, WNMEAN, AMAX, CD, Z0, SCAT,    &
-                                 SMOOTH_ICEDISP
-      REAL                    :: WN_R(NK), CG_ICE(NK),ALPHA_LIU(NK), ICECOEF2,&
-                                 R(NK)
+      REAL                    :: ICESCALELN, ICESCALEIN, ICESCALENL,   &
+                                 ICESCALEDS
+      REAL                    :: EMEAN, FMEAN, WNMEAN, AMAX, CD, Z0,   &
+                                 SCAT, SMOOTH_ICEDISP, ICECOEF2
+      REAL,ALLOCATABLE        :: WN_R(:),CG_ICE(:),ALPHA_LIU(:),R(:)
       DOUBLE PRECISION        :: ATT, ISO
       REAL                    :: FMEANS, FH1, FH2, FAGE
       REAL                    :: QCERR  = 0.     !/XNL2 and !/NNT
-      REAL                    :: EBAND, DIFF, EFINISH, HSTOT, PHINL,       &
-                                 FMEAN1, FMEANWS, MWXINIT, MWYINIT,        &
-                                 FACTOR, FACTOR2, DRAT, TAUWAX, TAUWAY,    &
-                                 MWXFINISH, MWYFINISH, A1BAND, B1BAND,     &
-                                 COSI(2)
+      REAL                    :: EBAND, DIFF, EFINISH, HSTOT, PHINL,   &
+                                 FMEAN1, FMEANWS, MWXINIT, MWYINIT,    &
+                                 FACTOR, FACTOR2, DRAT, TAUWAX, TAUWAY,&
+                                 MWXFINISH, MWYFINISH, A1BAND, B1BAND
       REAL,ALLOCATABLE        :: SPECINIT(:), SPEC2(:)
-      REAL,ALLOCATABLE        :: DAM (:), WN2 (:),            &
-                                 VSLN(:),                         &
-                                 VSIN(:), VDIN(:),            &
-                                 VSNL(:), VDNL(:),            &
-                                 VSDS(:), VDDS(:),            &
-                                 VSBT(:), VDBT(:),            &
-                                 VS  (:), VD  (:), EB(:)
-      LOGICAL                 :: LLWS(NSPEC)
-      REAL                    :: BRLAMBDA(NSPEC)
-      REAL                    :: FOUT(NK,NTH), SOUT(NK,NTH), DOUT(NK,NTH)
+      REAL,ALLOCATABLE        :: DAM (:), WN2 (:), BRLAMBDA(:),        &
+                                 VSLN(:), VSIN(:), VDIN(:), VSNL(:),   &
+                                 VDNL(:), VSDS(:), VDDS(:), VSBT(:),   &
+                                 VDBT(:), VS(:), VD(:), EB(:), COSI(:)
+      LOGICAL,ALLOCATABLE     :: LLWS(:)
+      REAL,ALLOCATABLE        :: FOUT(:,:), SOUT(:,:), DOUT(:,:)
       LOGICAL, SAVE           :: FLTEST = .FALSE., FLAGNN = .TRUE.
       LOGICAL                 :: SHAVE
       LOGICAL                 :: LBREAK
@@ -437,23 +436,41 @@
  
 !/
 !!LS  Newly added time varibles
-      REAL(8)                 :: sTime1, eTime1, sTime2, eTime2,     &
+      REAL(8)                 :: sTime1, eTime1, sTime2, eTime2,       &
                                  sTime3, eTime3
       REAL(8), INTENT(OUT)    :: SIN4T, SPR4T, SDS4T
 !/
 !/ ------------------------------------------------------------------- /
 !/
   
-      ALLOCATE( DAM (NSPEC), WN2 (NSPEC), VSLN(NSPEC),SPECINIT(NSPEC), &
+      ALLOCATE(DAM(NSPEC), WN2(NSPEC), VSLN(NSPEC), SPECINIT(NSPEC),   &
       SPEC2(NSPEC), VSIN(NSPEC), VDIN(NSPEC), VSNL(NSPEC), VDNL(NSPEC),&
       VSDS(NSPEC), VDDS(NSPEC), VSBT(NSPEC), VDBT(NSPEC), VS(NSPEC),   &
-      VD(NSPEC), EB(NK) )
+      VD(NSPEC), EB(NK), BRLAMBDA(NSPEC), FOUT(NK,NTH), SOUT(NK,NTH),  &
+      DOUT(NK,NTH), WN_R(NK), CG_ICE(NK), ALPHA_LIU(NK), R(NK),        &
+      COSI(2), LLWS(NSPEC))
+     
       SPR4T = 0.0
       SIN4T = 0.0
       SDS4T = 0.0
-!$ACC DATA COPY   (WN1, WN2, CG1, SPEC, DAM, NSTEPS)&
-!$ACC      COPYOUT(VSIN, VDIN, VDBT, VSBT, BRLAMBDA)&
-!$ACC      CREATE (LLWS)
+!$ACC DATA COPY   (WN1(:),CG1(:),SPEC(:),ALPHA(:),USTAR,USTDIR,FPI  )&
+!$ACC      COPY   (TAUOX,TAUOY,TAUWX,TAUWY,PHIAW,PHIOC,PHICE,CHARN  )&
+!$ACC      COPY   (TWS,BEDFORM(:),PHIBBL,TAUBBL(:),TAUICE(:),ICEF   )&
+!$ACC      COPY   (WHITECAP(:),TAUWIX,TAUWIY,TAUWNX,TAUWNY          )&
+!$ACC      COPYIN (U10ABS,U10DIR,CX,CY,DTG,D50,PSIC,ICE,ICEH,D_INP  )&  
+!$ACC      COPYIN (srce_call,IT,JSEA,IX,IY,IMOD,SPECOLD(:),REFLED(:))&
+!$ACC      COPYIN (REFLEC(:),DELX,DELY,DELA,TRNX,TRNY,BERG,ICEDMAX  )&
+!$ACC      COPYIN (COEF,AS,INFLAGS1,INFLAGS2) & 
+!$ACC      COPYOUT(VSIO(:),VDIO(:),SHAVEIO,DTDYN,FCUT               )&
+!$ACC      CREATE (SPECINIT(:),SPEC2(:),DAM(:),WN2(:),BRLAMBDA(:)   )&
+!$ACC      CREATE (VSLN(:),VSIN(:),VDIN(:),VSNL(:),VDNL(:),VSDS(:)  )&
+!$ACC      CREATE (VDDS(:),VSBT(:),VDBT(:),VS(:),VD(:),COSI(:))&
+!$ACC      CREATE (LLWS(:),FOUT(:,:),SOUT(:,:),DOUT(:,:),WN_R(:)    )&
+!$ACC      CREATE (CG_ICE(:),ALPHA_LIU(:),R(:),EBAND,DIFF,EFINISH   )&
+!$ACC      CREATE (HSTOT,PHINL, MWXINIT, MWYINIT,DEPTH    )          &
+!$ACC      CREATE (FACTOR,FACTOR2,TAUWAX,TAUWAY,MWXFINISH      )     &
+!$ACC      CREATE (MWYFINISH, A1BAND, B1BAND, EMEAN, FMEAN, WNMEAN  )&
+!$ACC      CREATE ( AMAX, CD, Z0, SCAT, SMOOTH_ICEDISP, ICECOEF2)
 !$ACC KERNELS      
 !
       DEPTH  = MAX ( DMIN , D_INP )
@@ -527,6 +544,7 @@
       TAUWX=0.
       TAUWY=0.
 !$ACC END KERNELS
+!$ACC UPDATE HOST(DEPTH)
       IF ( IT .eq. 0 ) THEN
 !$ACC KERNELS
          LLWS(:) = .TRUE.
@@ -590,15 +608,9 @@
 !GPUNotes subroutine will contain source term specific spectral loops
 !GPUNotes using COPY rather than CREATE for now as VSLN used in a
 !GPUNotes later loop
-!$ACC DATA COPY   (VSLN) &
-!$ACC      COPYIN (WN1)
         CALL W3SLN1 (       WN1, FHIGH, USTAR, U10DIR , VSLN       )
-!$ACC END DATA
 !
 !GPUNotes subrotuine will contain source term specific spectral loops
-!$ACC DATA COPYIN (SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS, Z0, CD) &
-!$ACC      COPYIN (U10DIR)      &                  
-!$ACC      COPYOUT(TAUWAX, TAUWAY, VSIN, VDIN)
 !Breaks if include TAUWX/Y 
         CALL CPU_TIME(sTime2) 
         CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
@@ -606,27 +618,20 @@
                  VSIN, VDIN, LLWS, IX, IY, BRLAMBDA )
         CALL CPU_TIME(eTime2)
         SIN4T = SIN4T + eTime2 - sTime2
-!$ACC END DATA
 !
 ! 2.b Nonlinear interactions.
 !
 !GPUnotes subruoutine will contain source term specific spectral loops
-!$ACC DATA COPY(VSNL,VDNL) 
         CALL W3SNL1 ( SPEC, CG1, WNMEAN*DEPTH, VSNL, VDNL )
-!$ACC END DATA
 !
 ! 2.c Dissipation... except for ST4
 ! 2.c1   as in source term package
-!
 !GPUNotes subroutine will contain source term specific spectral loops
-!$ACC DATA COPYIN (SPEC, WN1, CG1, USTAR, USTDIR, DEPTH, IX, IY)      &
-!$ACC      COPYOUT(VSDS, VDDS, BRLAMBDA, WHITECAP)
         CALL CPU_TIME(sTime3)
         CALL W3SDS4 ( SPEC, WN1, CG1, USTAR, USTDIR, DEPTH, VSDS,    &
                       VDDS, IX, IY, BRLAMBDA, WHITECAP )
         CALL CPU_TIME(eTime3)
         SDS4T = SDS4T + eTime3 - sTime3
-!$ACC END DATA
  
 !
 ! 2.c2   optional dissipation parameterisations
@@ -641,11 +646,6 @@
 !
 ! 3.  Set frequency cut-off ------------------------------------------ *
 !
-!!$ACC DATA COPY(DT, DTTOT, DTMAX, DTG, NK, FACTI2, FACTI1, FHIGH, NTH)&
-!!$ACC      COPY(FFXFI, NKH1, VS,VD, NSPEC, XFLT, AMAX, DAM, VSNL,VDNL)&
-!!$ACC      COPY(VSLN, VSIN, VDIN, VSDS, VDDS, NSPECH, XREL, SPECINIT )&
-!!$ACC      COPY(AFILT, AFAC)
-!!$ACC DATA COPY(DTDYN)
 !$ACC KERNELS 
         NKH    = MIN ( NK , INT(FACTI2+FACTI1*LOG(MAX(1.E-7,FHIGH))) )
         NKH1   = MIN ( NK , NKH+1 )
@@ -654,7 +654,6 @@
 !
         DT     = MIN ( DTG-DTTOT , DTMAX )
         AFILT  = MAX ( DAM(NSPEC) , XFLT*AMAX )
-!$ACC END KERNELS
 !
 !     For input and dissipation calculate the fraction of the ice-free
 !     surface. In the presence of ice, the effective water surface
@@ -663,7 +662,7 @@
 !             SIN = (1-ICE)**ISCALEIN*SIN and SDS=(1-ICE)**ISCALEDS*SDS ------------------ *
 !     INFLAGS2(4) is true if ice concentration was ever read during
 !             this simulation
-!$ACC KERNELS 
+!$ACC WAIT
         IF ( INFLAGS2(4) ) THEN
           VSNL(1:NSPECH) = ICESCALENL * VSNL(1:NSPECH)
           VDNL(1:NSPECH) = ICESCALENL * VDNL(1:NSPECH)
@@ -771,21 +770,17 @@
         TAUWNX= TAUWNX+ TAUWAX * DRAT *DT
         TAUWNY= TAUWNY+ TAUWAY * DRAT *DT
 !$ACC END KERNELS
-!!$ACC END DATA
         ! MISSING: TAIL TO BE ADDED ?
 ! 6.  Add tail ------------------------------------------------------- *
 !   a Mean parameters
 !
 !GPUNotes source term specific loops over spectrum in this call
-!$ACC DATA COPY   (SPEC, CG1, WN1, LLWS, USTDIR, USTAR)                &
-!$ACC      COPYIN (U10ABS, U10DIR)                                     
         CALL CPU_TIME(sTime1)
         CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN, &
                    AMAX, U10ABS, U10DIR, USTAR, USTDIR,            &
                    TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
         CALL CPU_TIME(eTime1)
         SPR4T = SPR4T + eTime1 - sTime1
-!$ACC END DATA
 !$ACC KERNELS
 !
 ! Introduces a Long & Resio (JGR2007) type dependance on wave age
@@ -817,9 +812,6 @@
 ! 6.e  Update wave-supported stress----------------------------------- *
 !
 ! GPUNotes source term specific loops over spectrum in this call
-!$ACC DATA COPYIN (SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS, Z0, CD) &
-!$ACC      COPYIN (U10DIR, BRLAMBDA, IX, IY)      &                  
-!$ACC      COPYOUT(TAUWAX, TAUWAY, VSIN, VDIN)
 !Breaks if include TAUWX/Y 
         CALL CPU_TIME(sTime2) 
         CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
@@ -827,7 +819,6 @@
                  VSIN, VDIN, LLWS, IX, IY, BRLAMBDA )
         CALL CPU_TIME(eTime2)
         SIN4T = SIN4T + eTime2 - sTime2
-!$ACC END DATA 
 ! 7.  Check if integration complete ---------------------------------- *
 !
         IF (srce_call .eq. srce_imp_post) THEN
@@ -903,7 +894,6 @@
 !     INFLAGS2(4) is true if ice concentration was ever read during
 !             this simulation
 !
-!!$ACC END KERNELS
  
       IF ( INFLAGS2(4).AND.ICE.GT.0 ) THEN
         STOP 
