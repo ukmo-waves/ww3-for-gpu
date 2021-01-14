@@ -1141,17 +1141,17 @@
             SDS4TOT=0.
 !GPUNotes Outer seapoint loop for source term calculations
             CALL WAV_MY_WTIME(sTime1)
-!$ACC DATA COPYIN (IT,IMOD,VAoldDummy,DW(:),U10(:),REFLEC,REFLED )&
-!$ACC      COPYIN (U10D(:),AS(:),CX(:),CY(:),ICE(:),ICEH(:),ICEDMAX(:))&
-!$ACC      COPYIN (TRNX(:,:),TRNY(:,:),BERG(:),ASF(:),DTG,D50,PSIC)&
-!$ACC      COPYIN (INFLAGS1,INFLAGS2)&
-!$ACC      COPY   (ALPHA(:,:),WN(:,:),CG(:,:),VA(:,:),UST(:),USTDIR(:))&
+!$ACC DATA COPYIN (IT,IMOD,VAoldDummy,DW(:),U10(:),REFLEC,REFLED       )&
+!$ACC      COPYIN (U10D(:),AS(:),CX(:),CY(:),ICE(:),ICEH(:),ICEDMAX(:) )&
+!$ACC      COPYIN (TRNX(:,:),TRNY(:,:),BERG(:),ASF(:),DTG,D50,PSIC     )&
+!$ACC      COPYIN (INFLAGS1,INFLAGS2                                   )&
+!$ACC      COPY   (ALPHA(:,:),WN(:,:),CG(:,:),VA(:,:),UST(:),USTDIR(:) )&
 !$ACC      COPY   (FPIS(:),TAUOX(:),TAUOY(:),TAUWX(:),TAUWY(:),PHIAW(:))&
 !$ACC      COPY   (PHIOC(:),PHICE(:),CHARN(:),TWS(:),BEDFORMS(:,:)     )&
 !$ACC      COPY   (TAUBBL(:,:),TAUICE(:,:),WHITECAP(:,:),TAUWIX(:)     )&
 !$ACC      COPY   (TAUWIY(:),TAUWNX(:),TAUWNY(:),ICEF(:),PHIBBL(:)     )&
-!$ACC      COPYOUT(VSioDummy(:),VDioDummy(:),SHAVETOTioDummy,FCUT(:))&
-!$ACC      COPYOUT(DTDYN(:))&
+!$ACC      COPYOUT(VSioDummy(:),VDioDummy(:),SHAVETOTioDummy,FCUT(:)   )&
+!$ACC      COPYOUT(DTDYN(:)                                            )&
 !$ACC      CREATE (IX,IY,DELA,DELX,DELY,TMP1(:),TMP2(:),TMP3(:),TMP4(:))
             DO JSEA=1, NSEAL
               CALL INIT_GET_ISEA(ISEA, JSEA)
@@ -1160,7 +1160,6 @@
               DELA=1.
               DELX=1.
               DELY=1.
-!
               IF ( MAPSTA(IY,IX) .EQ. 1 .AND. FLAGST(ISEA)) THEN
                 TMP1   = WHITECAP(JSEA,1:4)
                 TMP2   = BEDFORMS(JSEA,1:3)

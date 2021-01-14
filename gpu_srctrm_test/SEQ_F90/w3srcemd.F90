@@ -453,24 +453,23 @@
       SPR4T = 0.0
       SIN4T = 0.0
       SDS4T = 0.0
-!$ACC DATA COPY   (WN1(:),CG1(:),SPEC(:),ALPHA(:),USTAR,USTDIR,FPI  )&
-!$ACC      COPY   (TAUOX,TAUOY,TAUWX,TAUWY,PHIAW,PHIOC,PHICE,CHARN  )&
-!$ACC      COPY   (TWS,BEDFORM(:),PHIBBL,TAUBBL(:),TAUICE(:),ICEF   )&
-!$ACC      COPY   (WHITECAP(:),TAUWIX,TAUWIY,TAUWNX,TAUWNY          )&
-!$ACC      COPYIN (U10ABS,U10DIR,CX,CY,DTG,D50,PSIC,ICE,ICEH,D_INP  )&  
-!$ACC      COPYIN (srce_call,IT,JSEA,IX,IY,IMOD,SPECOLD(:),REFLED(:))&
-!$ACC      COPYIN (REFLEC(:),DELX,DELY,DELA,TRNX,TRNY,BERG,ICEDMAX  )&
-!$ACC      COPYIN (COEF,AS,INFLAGS1,INFLAGS2) & 
-!$ACC      COPYOUT(VSIO(:),VDIO(:),SHAVEIO,DTDYN,FCUT               )&
-!$ACC      CREATE (SPECINIT(:),SPEC2(:),DAM(:),WN2(:),BRLAMBDA(:)   )&
-!$ACC      CREATE (VSLN(:),VSIN(:),VDIN(:),VSNL(:),VDNL(:),VSDS(:)  )&
-!$ACC      CREATE (VDDS(:),VSBT(:),VDBT(:),VS(:),VD(:),COSI(:))&
-!$ACC      CREATE (LLWS(:),FOUT(:,:),SOUT(:,:),DOUT(:,:),WN_R(:)    )&
-!$ACC      CREATE (CG_ICE(:),ALPHA_LIU(:),R(:),EBAND,DIFF,EFINISH   )&
-!$ACC      CREATE (HSTOT,PHINL, MWXINIT, MWYINIT,DEPTH    )          &
-!$ACC      CREATE (FACTOR,FACTOR2,TAUWAX,TAUWAY,MWXFINISH      )     &
-!$ACC      CREATE (MWYFINISH, A1BAND, B1BAND, EMEAN, FMEAN, WNMEAN  )&
-!$ACC      CREATE ( AMAX, CD, Z0, SCAT, SMOOTH_ICEDISP, ICECOEF2)
+!$ACC DATA COPY   (WN1(:),CG1(:),SPEC(:),ALPHA(:),USTAR,USTDIR,FPI,TWS  )&
+!$ACC      COPY   (TAUOX,TAUOY,TAUWX,TAUWY,PHIAW,PHIOC,PHICE,CHARN,ICEF )&
+!$ACC      COPY   (BEDFORM(:),PHIBBL,TAUBBL(:),TAUICE(:),WHITECAP(:)    )&
+!$ACC      COPY   (TAUWIX,TAUWIY,TAUWNX,TAUWNY                          )&
+!$ACC      COPYIN (U10ABS,U10DIR,CX,CY,DTG,D50,PSIC,ICE,ICEH,D_INP,IT,IX)&  
+!$ACC      COPYIN (srce_call,JSEA,IY,IMOD,SPECOLD(:),REFLED(:),BERG,COEF)&
+!$ACC      COPYIN (REFLEC(:),DELX,DELY,DELA,TRNX,TRNY,ICEDMAX,AS        )&
+!$ACC      COPYIN (INFLAGS1,INFLAGS2                                    )& 
+!$ACC      COPYOUT(VSIO(:),VDIO(:),SHAVEIO,DTDYN,FCUT                   )&
+!$ACC      CREATE (SPECINIT(:),SPEC2(:),DAM(:),WN2(:),BRLAMBDA(:),VS(:) )&
+!$ACC      CREATE (VSLN(:),VSIN(:),VDIN(:),VSNL(:),VDNL(:),VSDS(:),VD(:))&
+!$ACC      CREATE (VDDS(:),VSBT(:),VDBT(:),COSI(:),LLWS(:),FOUT,ICECOEF2)&
+!$ACC      CREATE (SOUT(:,:),DOUT(:,:),WN_R(:),CG_ICE(:),ALPHA_LIU(:)   )&
+!$ACC      CREATE (R(:),EBAND,DIFF,EFINISH,HSTOT,PHINL,MWXINIT,MWYINIT  )&
+!$ACC      CREATE (DEPTH,FACTOR,FACTOR2,TAUWAX,TAUWAY,MWXFINISH,A1BAND  )&
+!$ACC      CREATE (MWYFINISH,B1BAND,EMEAN,FMEAN,WNMEAN,AMAX,CD,Z0,SCAT  )&
+!$ACC      CREATE (SMOOTH_ICEDISP,ICECOEF2)
 !$ACC KERNELS      
 !
       DEPTH  = MAX ( DMIN , D_INP )
@@ -720,6 +719,8 @@
 !            WRITE(*,'(A20,I20,F20.10,L20,4F20.10)') 'BEFORE', IX, DEPTH, SHAVE, SUM(VS), SUM(VD), SUM(SPEC)
 !          ENDIF
           IF ( SHAVE ) THEN
+!GPUNotes Running sequentially due to the recursive use of eIncX, adding
+!loop independent does not force the loop to be parallel as it should.
             DO IS=IS1, NSPECH
               eInc1 = VS(IS) * DT / MAX ( 1. , (1.-HDT*VD(IS)))
               eInc2 = SIGN ( MIN (DAM(IS),ABS(eInc1)) , eInc1 )
@@ -727,6 +728,8 @@
             END DO
           ELSE
 !
+!GPUNotes Running sequentially due to the recursive use of eIncX, adding
+!loop independent does not force the loop to be parallel as it should.
             DO IS=IS1, NSPECH
               eInc1 = VS(IS) * DT / MAX ( 1. , (1.-HDT*VD(IS)))
               SPEC(IS) = MAX ( 0. , SPEC(IS)+eInc1 )
@@ -741,15 +744,19 @@
 !
         WHITECAP(3)=0.
         HSTOT=0.
-!GPUNotes Loops over spectrum - the spectrum must be properly updated
-!GPUNotes first
+!GPUNotes Loops over spectrum - the spectrum must be properly updated first
+
+!GPUNotes Loop has been refactored for ACC applications to allow the
+!loops to be closely nested and collapsable.
+
+!$ACC LOOP INDEPENDENT COLLAPSE(2)
         DO IK=IKS1, NK
+          DO ITH=1, NTH
           FACTOR = DDEN(IK)/CG1(IK)                    !Jacobian to get energy in band
           FACTOR2= FACTOR*GRAV*WN1(IK)/SIG(IK)         ! coefficient to get momentum
  
           ! Wave direction is "direction to"
           ! therefore there is a PLUS sign for the stress
-          DO ITH=1, NTH
             IS   = (IK-1)*NTH + ITH
             COSI(1)=ECOS(IS)
             COSI(2)=ESIN(IS)
@@ -802,7 +809,10 @@
 ! 6.d Add tail
 !
 !GPUNotes Smaller spectral loop to add energy to tail
+!GPUNotes Independence is acceptable for inner loop, outer loop
+!dependence on IK within SPEC limits any collapsable option.
         DO IK=NKH+1, NK
+!$ACC LOOP INDEPENDENT
           DO ITH=1, NTH
             SPEC(ITH+(IK-1)*NTH) = SPEC(ITH+(IK-2)*NTH) * FACHFA         
           END DO
@@ -935,7 +945,7 @@
 !
 ! 10.2  Fluxes of energy and momentum due to ice effects
 !
-!CODENotes: Moved FACTOR and FACTOR2 inside lopp for collapse.
+!GPUNotes Moved FACTOR and FACTOR2 inside lopp for collapse.
 !$ACC LOOP GANG INDEPENDENT COLLAPSE(2)
         DO IK=1,NK
           DO ITH = 1,NTH
@@ -952,10 +962,11 @@
         TAUICE(:)=TAUICE(:)/DTG
       ELSE
       END IF
-!GPUNotes: Forcing a SYNC, this is required for correct output, stops
-!the code from running too far without correct values. This may be
-!requied in other areas of the code instead of multiple kernels.
+
+!GPUNotes Forcing a SYNC, this is required for correct output, stops
+!the code from running too far without correct values.
 !$ACC WAIT
+
 ! - - - - - - - - - - - - - - - - - - - - - -
 ! 11. Sea state dependent stress routine calls
 ! - - - - - - - - - - - - - - - - - - - - - -
