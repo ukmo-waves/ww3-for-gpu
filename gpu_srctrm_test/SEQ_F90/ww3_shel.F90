@@ -260,6 +260,9 @@
  
 !
       USE W3NMLSHELMD
+!
+      ! TODO: Do this indrectly via w3srce? or w3wavemd?
+      USE W3SRC4MD, ONLY: W3SRC4_INIT
  
  
       IMPLICIT NONE
@@ -634,6 +637,7 @@
         ELSE
           FACTOR = 1.E-3
         END IF
+
  
 ! 2.4 Output dates
  
@@ -1281,8 +1285,6 @@
  
  
  
- 
- 
 !
 ! ----------------
 !
@@ -1473,6 +1475,12 @@
 !
  
       IF ( IAPROC .EQ. NAPOUT ) WRITE (NDSO,951) 'Wave model ...'
+
+!     Initialise source terms SCRATCH variables
+!     TODO: probably want to do this indirectly via w3srcemd
+      WRITE(0,*) "W3SRC4_INIT (WW3_SHEL): NK/NTH/NSPEC: ", NK, NTH, NSPEC
+      CALL W3SRC4_INIT()
+ 
 !
      CALL W3INIT ( 1, .FALSE., 'ww3', NDS, NTRACE, ODAT, FLGRD, FLGR2, FLGD,    &
                    FLG2, NPTS, X, Y, PNAMES, IPRT, PRTFRM, MPI_COMM,   &

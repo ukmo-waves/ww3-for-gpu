@@ -79,7 +79,45 @@
       REAL,    PARAMETER      :: FAC_KD1=1.01, FAC_KD2=1000., KHSMAX=2., KHMAX=2.
       REAL,    PARAMETER      ::KDMAX=200000.
 !/
+      ! Scratch variables for GPU
+      INTEGER,ALLOCATABLE     :: NSMOOTH(:),IKSUP(:),IMSSMAX(:)
+      REAL,ALLOCATABLE        :: S1(:), E1(:), COEF4(:)
+      INTEGER,ALLOCATABLE     :: NTIMES(:)
+      REAL,ALLOCATABLE        :: DK(:), HS(:), KBAR(:), DCK(:)
+      REAL,ALLOCATABLE        :: EFDF(:)     ! Energy integrated over a spectral band
+      REAL,ALLOCATABLE        :: BTH0(:)     !saturation spectrum
+      REAL,ALLOCATABLE        :: BTH(:)   !saturation spectrum
+      REAL,ALLOCATABLE        :: BTH0S(:)    !smoothed saturation spectrum
+      REAL,ALLOCATABLE        :: BTHS(:)  !smoothed saturation spectrum
+      REAL,ALLOCATABLE        :: SBK(:)
+      REAL,ALLOCATABLE        :: SBKT(:), MSSSUM(:,:), WTHSUM(:)
+      REAL,ALLOCATABLE        :: MSSSUM2(:,:)
+      REAL,ALLOCATABLE        :: MSSLONG(:,:)
+      REAL,ALLOCATABLE        :: QB(:), S2(:)
+      REAL,ALLOCATABLE        :: PB(:),PB2(:)
+!/
       CONTAINS
+
+!/ ------------------------------------------------------------------- /
+      SUBROUTINE W3SRC4_INIT()
+
+      USE W3GDATMD, ONLY: NK, NTH, NSPEC
+
+      IMPLICIT NONE
+
+      WRITE(0,*) "W3SRC4_INIT: NK/NTH/NSPEC: ", NK, NTH, NSPEC
+      ! allocate scratch variables for GPU (to avoid Syncing)
+      ALLOCATE(NSMOOTH(NK),IKSUP(NK),S1(NK),E1(NK),COEF4(NK),NTIMES(NK)&
+               ,DK(NK),HS(NK),KBAR(NK),DCK(NK),EFDF(NK),BTH0(NK),QB(NK)&
+               ,S2(NK),BTH(NSPEC),BTH0S(NK),BTHS(NSPEC),SBK(NSPEC),    &
+               IMSSMAX(NK),SBKT(NK),MSSSUM(NK,5),WTHSUM(NTH),PB(NSPEC),&
+               MSSSUM2(NK,NTH),MSSLONG(NK,NTH),PB2(NSPEC))
+
+!$ACC KERNELS
+      WTHSUM(:) = 0.
+!$ACC END KERNELS
+
+      END SUBROUTINE W3SRC4_INIT
 !/ ------------------------------------------------------------------- /
       SUBROUTINE W3SPR4 (A, CG, WN, EMEAN, FMEAN, FMEAN1, WNMEAN,     &
                     AMAX, U, UDIR, USTAR, USDIR, TAUWX, TAUWY, CD, Z0,&
@@ -1600,7 +1638,7 @@
 ! 10. Source code :
 !
 !/ ------------------------------------------------------------------- /
-      USE CONSTANTS,ONLY: GRAV, DAIR, DWAT, PI, TPI, RADE, DEBUG_NODE
+      USE CONSTANTS,ONLY: GRAV, DAIR, DWAT, PI, TPI, RADE, DEBUG_NODE, ONE
       USE W3GDATMD, ONLY: NSPEC, NTH, NK, SSDSBR, DDEN,              &
                           SSDSC, EC2, ES2, ESC,                      &
                           SIG, SSDSP, ECOS, ESIN, DTH, DSIP,         &
@@ -1616,8 +1654,8 @@
 !/ Parameter list
 !/
       INTEGER, OPTIONAL, INTENT(IN) :: IX, IY
-      REAL, INTENT(IN)        :: A(NSPEC), K(NK), CG(NK),            &
-                                 DEPTH, USTAR, USDIR
+      REAL, INTENT(INOUT)     :: A(NSPEC), K(NK), CG(NK)
+      REAL, INTENT(IN)        :: DEPTH, USTAR, USDIR
       REAL, INTENT(OUT)       :: SRHS(NSPEC), DDIAG(NSPEC), BRLAMBDA(NSPEC)
       REAL, INTENT(OUT)       :: WHITECAP(1:4)
 !/
@@ -1627,51 +1665,98 @@
       INTEGER                 :: IS, IS2, IS0, IKL, IKC, ID, NKL, ISPEC
       INTEGER                 :: IK, IK1, ITH, IK2, JTH, ITH2,         &
                                  IKHS, IKD, SDSNTH, IT, IKM, NKM
-      INTEGER,ALLOCATABLE     :: NSMOOTH(:),IKSUP(:),IMSSMAX(:)
       REAL                    :: COSWIND, ASUM, SDIAGISO
       REAL                    :: COEF1, COEF2, COEF3
       REAL                    :: FACTURB, DTURB, BREAKFRACTION
       REAL                    :: RENEWALFREQ, EPSR
-      REAL,ALLOCATABLE        :: S1(:), E1(:), COEF4(:)
-      INTEGER,ALLOCATABLE     :: NTIMES(:)
       REAL                    :: GAM, XT
-      REAL,ALLOCATABLE        :: DK(:), HS(:), KBAR(:), DCK(:)
-      REAL,ALLOCATABLE        :: EFDF(:)     ! Energy integrated over a spectral band
       REAL                    :: FACSAT, DKHS, FACSTRAIN
-      REAL,ALLOCATABLE        :: BTH0(:)     !saturation spectrum
-      REAL,ALLOCATABLE        :: BTH(:)   !saturation spectrum
-      REAL,ALLOCATABLE        :: BTH0S(:)    !smoothed saturation spectrum
-      REAL,ALLOCATABLE        :: BTHS(:)  !smoothed saturation spectrum
-      REAL,ALLOCATABLE        :: SBK(:)
       INTEGER                 :: NTHSUM
-      REAL,ALLOCATABLE        :: SBKT(:), MSSSUM(:,:), WTHSUM(:)
-      REAL,ALLOCATABLE        :: MSSSUM2(:,:)
-      REAL,ALLOCATABLE        :: MSSLONG(:,:)
       REAL                    :: MSSPCS,MSSPC2,MSSPS2,MSSP,MSSD,MSSTH
       REAL                    :: MICHE, X, FACHF
-      REAL,ALLOCATABLE        :: QB(:), S2(:)
       REAL                    :: TSTR, TMAX, DT, T, MFT
-      REAL,ALLOCATABLE        :: PB(:),PB2(:)
+
+!      ! Now declared in W3SRC4_INIT
+!      INTEGER,ALLOCATABLE     :: NSMOOTH(:),IKSUP(:),IMSSMAX(:)
+!      REAL,ALLOCATABLE        :: S1(:), E1(:), COEF4(:)
+!      INTEGER,ALLOCATABLE     :: NTIMES(:)
+!      REAL,ALLOCATABLE        :: DK(:), HS(:), KBAR(:), DCK(:)
+!      REAL,ALLOCATABLE        :: EFDF(:)     ! Energy integrated over a spectral band
+!      REAL,ALLOCATABLE        :: BTH0(:)     !saturation spectrum
+!      REAL,ALLOCATABLE        :: BTH(:)   !saturation spectrum
+!      REAL,ALLOCATABLE        :: BTH0S(:)    !smoothed saturation spectrum
+!      REAL,ALLOCATABLE        :: BTHS(:)  !smoothed saturation spectrum
+!      REAL,ALLOCATABLE        :: SBK(:)
+!      REAL,ALLOCATABLE        :: SBKT(:), MSSSUM(:,:), WTHSUM(:)
+!      REAL,ALLOCATABLE        :: MSSSUM2(:,:)
+!      REAL,ALLOCATABLE        :: MSSLONG(:,:)
+!      REAL,ALLOCATABLE        :: QB(:), S2(:)
+!      REAL,ALLOCATABLE        :: PB(:),PB2(:)
 !/
 !/ ------------------------------------------------------------------- /
 !/
-      ALLOCATE(NSMOOTH(NK),IKSUP(NK),S1(NK),E1(NK),COEF4(NK),NTIMES(NK)&
-               ,DK(NK),HS(NK),KBAR(NK),DCK(NK),EFDF(NK),BTH0(NK),QB(NK)&
-               ,S2(NK),BTH(NSPEC),BTH0S(NK),BTHS(NSPEC),SBK(NSPEC),    &
-               IMSSMAX(NK),SBKT(NK),MSSSUM(NK,5),WTHSUM(NTH),PB(NSPEC),&
-               MSSSUM2(NK,NTH),MSSLONG(NK,NTH),PB2(NSPEC))
-!$ACC DATA CREATE(NSMOOTH(:),IKSUP(:),S1(:),E1(:),COEF4(:),NTIMES(:)  )&
-!$ACC      CREATE(DK(:),HS(:),KBAR(:),DCK(:),EFDF(:),BTH0(:),QB(:)    )&
-!$ACC      CREATE(S2(:),BTH0S(:),BTHS(:),SBK(:),IMSSMAX(:),WTHSUM(:)  )&
-!$ACC      CREATE(SBKT(:),MSSSUM(:,:),PB(:),PB2(:),MSSLONG(:,:)       )&
-!$ACC      CREATE(MSSSUM2(:,:), BTH(:))
+!      ! Now allocated in W3SRC4_INIT
+!      ALLOCATE(NSMOOTH(NK),IKSUP(NK),S1(NK),E1(NK),COEF4(NK),NTIMES(NK)&
+!               ,DK(NK),HS(NK),KBAR(NK),DCK(NK),EFDF(NK),BTH0(NK),QB(NK)&
+!               ,S2(NK),BTH(NSPEC),BTH0S(NK),BTHS(NSPEC),SBK(NSPEC),    &
+!               !IMSSMAX(NK),SBKT(NK),MSSSUM(NK,5),WTHSUM(NTH),PB(NSPEC),&
+!               IMSSMAX(NK),SBKT(NK),MSSSUM(NK,5),PB(NSPEC),&
+!               MSSSUM2(NK,NTH),MSSLONG(NK,NTH),PB2(NSPEC))
+
+!!$ACC DATA CREATE(NSMOOTH(:),IKSUP(:),S1(:),E1(:),COEF4(:),NTIMES(:)  )&
+!!$ACC      CREATE(DK(:),HS(:),KBAR(:),DCK(:),EFDF(:),BTH0(:),QB(:)    )&
+!!$ACC      CREATE(S2(:),BTH0S(:),BTHS(:),SBK(:),IMSSMAX(:),WTHSUM(:)  )&
+!!$ACC      CREATE(S2(:),BTH0S(:),BTHS(:),SBK(:),IMSSMAX(:) )&
+!!$ACC      CREATE(SBKT(:),MSSSUM(:,:),PB(:),PB2(:),MSSLONG(:,:)       )&
+!!$ACC      CREATE(MSSSUM2(:,:), BTH(:))
 !
 !----------------------------------------------------------------------
 !
 ! 0.  Pre-Initialization to zero out arrays. All arrays should be reset
 !     within the computation, but these are helping with some bugs
 !     found in certain compilers
+
 !$ACC KERNELS
+                 
+! Touch all the SCRATCH variables
+      NSMOOTH(:) = 0
+      IKSUP(:) = 0
+      S1(:) = 0.0
+      E1(:) = 0.0
+      COEF4(:) = 0.0
+      NTIMES(:) = 0
+      DK(:) = 0.0
+      HS(:) = 0.0
+      KBAR(:) = 0.0
+      DCK(:) = 0.0
+      EFDF(:) = 0.0
+      BTH0(:) = 0.0
+      QB(:) = 0.0
+      S2(:) = 0.0
+      BTH(:) = 0.0
+      BTH0S(:) = 0.0
+      BTHS(:) = 0.0
+      SBK(:) = 0.0
+      IMSSMAX(:) = 0
+      SBKT(:) = 0.0
+      MSSSUM(:,:) = 0.0
+      WTHSUM(:) = 0.0
+      PB(:) = 0.0
+      MSSSUM2(:,:) = 0.0
+      MSSLONG(:,:) = 0.0
+      PB2(:) = 0.0
+
+      ! Touch global variables
+      SSDSC(:) = ONE * SSDSC(:)
+      CUMULW(:,:) = ONE * CUMULW(:,:)
+
+      ECOS(:) = ONE * ECOS(:)
+      ESIN(:) = ONE * ESIN(:)
+      SIG(:) = ONE * SIG(:)
+      K(:) = ONE * K(:)
+      A(:) = ONE * A(:)
+      CG(:) = ONE * CG(:)
+!
 
 !CODENotes: Removed pre-initialization, this creates additional 
 !data transfers and are not needed for the mini-app to run.
@@ -2282,7 +2367,13 @@
 ! End of output computing
 1000  CONTINUE
 !$ACC END KERNELS
-!$ACC END DATA
+!!$ACC END DATA
+
+
+      !STOP       ! TODO - DONT LEAVE ME HERE! :)
+
+
+
       RETURN
 !
 ! Formats
