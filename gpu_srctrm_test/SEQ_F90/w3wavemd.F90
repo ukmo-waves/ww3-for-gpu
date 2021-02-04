@@ -388,12 +388,11 @@
 !/ Local parameters :
 !/
       INTEGER                 :: IP
-      INTEGER                 :: TCALC(2), IT, IT0, NT, ITEST,        &
+      INTEGER                 :: IT, IT0, NT, ITEST,        &
                                  ITLOC, ITLOCH, NTLOC, ISEA, JSEA,    &
-                                 IX, IY, ISPEC, J, TOUT(2), TLST(2),  &
-                                 REFLED(6), IK, ITH, IS, NKCFL
+                                 IX, IY, ISPEC, J, IK, ITH, IS, NKCFL
       INTEGER                 :: ISP, IP_glob
-      INTEGER                 :: TTEST(2),DTTEST
+      INTEGER                 :: DTTEST
       REAL                    :: ICEDAVE
 !
       INTEGER                 :: IXrel
@@ -401,13 +400,15 @@
                                  DTL0, DTI0, DTI10, DTI50,            &
                                  DTGA, DTG, DTGpre, DTRES,            &
                                  FAC, VGX, VGY, FACK, FACTH,          &
-                                 FACX, XXX, REFLEC(4),                &
+                                 FACX, XXX,                &
                                  DELX, DELY, DELA, DEPTH, D50, PSIC
-     REAL                     :: VSioDummy(NSPEC), VDioDummy(NSPEC), VAoldDummy(NSPEC)
+     REAL,ALLOCATABLE         :: VSioDummy(:), VDioDummy(:), VAoldDummy(:)
      LOGICAL                  :: SHAVETOTioDummy
 !
-      REAL, ALLOCATABLE       :: FIELD(:)
-      REAL                    :: TMP1(4), TMP2(3), TMP3(2), TMP4(2)
+      INTEGER, ALLOCATABLE    :: TCALC(:), REFLED(:), TOUT(:), TLST(:),&
+                                 TTEST(:)
+      REAL, ALLOCATABLE       :: FIELD(:),  TMP1(:), TMP2(:), TMP3(:),&
+                                 TMP4(:), REFLEC(:)
 !
 ! Orphaned arrays from old data structure
 !
@@ -453,7 +454,11 @@
       IF ( IIDATA .NE. IMOD ) CALL W3SETI ( IMOD, NDSE, NDST )
  
 !
-      ALLOCATE(TAUWX(NSEAL), TAUWY(NSEAL))
+      ALLOCATE(TAUWX(NSEAL), TAUWY(NSEAL), TCALC(2), REFLED(6),TOUT(2),&
+               TLST(2), TTEST(2), TMP1(4), TMP2(3), TMP3(2), TMP4(2),  &
+               REFLEC(4), VSioDummy(NSPEC), VDioDummy(NSPEC),          &
+               VAoldDummy(NSPEC))
+!
 !
       IF ( PRESENT(STAMP) ) THEN
         TSTAMP = STAMP
@@ -1152,7 +1157,7 @@
 !$ACC      COPY   (TAUWIY(:),TAUWNX(:),TAUWNY(:),ICEF(:),PHIBBL(:)     )&
 !$ACC      COPYOUT(VSioDummy(:),VDioDummy(:),SHAVETOTioDummy,FCUT(:)   )&
 !$ACC      COPYOUT(DTDYN(:)                                            )&
-!$ACC      CREATE (IX,IY,DELA,DELX,DELY,TMP1(:),TMP2(:),TMP3(:),TMP4(:))
+!$ACC      CREATE (JSEA,IX,IY,DELX,DELY,DELA,TMP1(:),TMP2(:),TMP3(:),TMP4(:))
             DO JSEA=1, NSEAL
               CALL INIT_GET_ISEA(ISEA, JSEA)
               IX     = MAPSF(ISEA,1)

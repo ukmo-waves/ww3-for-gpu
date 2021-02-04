@@ -714,7 +714,7 @@
         INTEGER, ALLOCATABLE  :: IKTAB(:,:), SATINDICES(:,:)
         REAL,    ALLOCATABLE  :: DCKI(:,:), SATWEIGHTS(:,:),          &
                                  CUMULW(:,:), QBI(:,:), SSWELLF(:),   &
-                                 SSDSC(:)
+                                 SSDSC(:), SSDSBM(:)
         REAL                  :: SSDSBR, SSDSP, WWNMEANP, SSTXFTF, SSTXFTWN,  &
                                  FFXPM, FFXFM, FFXFA, FFXFI, FFXFD,   &
                                  SSDSBRF1, SSDSBRF2, SSDSBINT,SSDSBCK,&
@@ -722,7 +722,7 @@
         REAL, ALLOCATABLE     :: ZZWND, AALPHA, BBETA, ZZALP,         &
                                  TTAUWSHELTER, SSINTHP, SSINBR, ZZ0RAT&
                                  ,ZZ0MAX
-        REAL                  :: SSDSCOS, SSDSDTH, SSDSBR2, SSDSBM(0:4)
+        REAL                  :: SSDSCOS, SSDSDTH, SSDSBR2
 !
       END TYPE SRCP
 !
@@ -1462,6 +1462,7 @@
                  MPARS(IMOD)%SRCPS%QBI(NKHS,NKD),   &
                  MPARS(IMOD)%SRCPS%SSWELLF(1:7),    &
                  MPARS(IMOD)%SRCPS%SSDSC(1:11),     &
+                 MPARS(IMOD)%SRCPS%SSDSBM(0:4),     &
                  MPARS(IMOD)%SRCPS%ZZWND,           &
                  MPARS(IMOD)%SRCPS%AALPHA,          &
                  MPARS(IMOD)%SRCPS%BBETA,           &

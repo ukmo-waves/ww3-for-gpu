@@ -64,11 +64,11 @@
       !air kinematic viscosity (used in WAM)
       INTEGER, PARAMETER      :: ITAUMAX=200,JUMAX=200
       INTEGER, PARAMETER      :: IUSTAR=100,IALPHA=200, ILEVTAIL=50
-      REAL                    :: TAUT(0:ITAUMAX,0:JUMAX), DELTAUW, DELU
+      REAL                    :: DELTAUW, DELU
       ! Table for H.F. stress as a function of 2 variables
-      REAL                    :: TAUHFT(0:IUSTAR,0:IALPHA), DELUST, DELALP
+      REAL                    :: DELUST, DELALP
       ! Table for H.F. stress as a function of 3 variables
-      REAL                    :: TAUHFT2(0:IUSTAR,0:IALPHA,0:ILEVTAIL)
+      REAL,ALLOCATABLE        :: TAUT(:,:), TAUHFT(:,:), TAUHFT2(:,:,:)
       ! Table for swell damping
       REAL                    :: DELTAIL
       REAL,    PARAMETER      :: UMAX    = 50.
@@ -199,8 +199,11 @@
 ! 1.  Integral over directions and maximum --------------------------- *
 !
 !GPUNotes spectral loop
-      EB(:)  = 0.
-      EB2(:) = 0.
+!$ACC LOOP INDEPENDENT
+      DO IK=1,NK
+        EB(IK)  = 0.
+        EB2(IK) = 0.
+      END DO
 !$ACC LOOP INDEPENDENT
       DO IK=1, NK
         DO ITH=1, NTH
@@ -213,6 +216,7 @@
 ! 2.  Integrate over directions -------------------------------------- *
 !
 !GPUNotes directions loop only
+!$ACC LOOP INDEPENDENT
       DO IK=1, NK
         ALFA(IK) = 2. * DTH * SIG(IK) * EB(IK) * WN(IK)**3
         EB(IK)   = EB(IK) * DDEN(IK) / CG(IK)
@@ -261,10 +265,6 @@
  
       Z0=0.
 !$ACC END KERNELS
-!HACKA NOTES: CALC_USTAR is a routine that has caused some difficulties
-!             the ACC kernel has been moved inside to closely look at 
-!             the work being done on the GPU. No need to declare as a
-!             routine because it is not within a loop.
       CALL CALC_USTAR(U,TAUW,USTAR,Z0,CHARN)
 !$ACC UPDATE HOST(USTAR)
 !$ACC KERNELS
@@ -396,7 +396,7 @@
       REAL   , PARAMETER      :: EPS1 = 0.00001, EPS2 = 0.000001
       REAL                    :: Usigma           !standard deviation of U due to gustiness
       REAL                    :: USTARsigma       !standard deviation of USTAR due to gustiness
-      REAL                    :: CM,UCN,ZCN, &
+      REAL                    :: CM, UCN, ZCN, DSTAB, &
                                  Z0VISC, Z0NOZ, EB,  &
                                  EBX, EBY, AORB, AORB1, FW, UORB, TH2, &
                                  RE, FU, FUD, SWELLCOEFV, SWELLCOEFT
@@ -421,7 +421,7 @@
       !JDM: Initializing values to zero, they shouldn't be used unless
       !set in another place, but seems to solve some bugs with certain
       !compilers.
-!$ACC DATA COPYOUT(PTURB, PVISC, STRESSSTAB1, STRESSSTAB2)
+!$ACC DATA CREATE(PTURB, PVISC, STRESSSTAB1, STRESSSTAB2)
 !$ACC KERNELS
       D(:) =0.
 
@@ -447,12 +447,8 @@
       UORB=0.
       AORB=0.
  
-!$ACC LOOP INDEPENDENT
+!$ACC LOOP INDEPENDENT COLLAPSE(2)
       DO IK=1, NK
-!        EB  = 0.
-!        EBX = 0.
-!        EBY = 0.
-! This loop still ends up being a serial kernel. Why?
         DO ITH=1, NTH
            IS=ITH+(IK-1)*NTH
            UORB = UORB + A(IS) *SIG(IK)**2 * DDEN(IK) / CG(IK)
@@ -524,44 +520,31 @@
       CONST0=BBETA*DRAT/(KAPPA**2)
 !
 !GPUNotes loops over full spectrum
-
-! WHY does adding the above explicit COPY statements change the results
-! (slightly more values have a small rounding/truncation difference)???
-
-! Seems to work without issues when set to SEQ. 
-
-!!$ACC LOOP GANG VECTOR(32) INDEPENDENT
       DO IK=1, NK
-        !TAUPX=TAUX-ABS(TTAUWSHELTER)*STRESSSTAB(ISTAB,1)
-        !TAUPY=TAUY-ABS(TTAUWSHELTER)*STRESSSTAB(ISTAB,2)
         TAUPX=TAUX-ABS(TTAUWSHELTER)*STRESSSTAB1
         TAUPY=TAUY-ABS(TTAUWSHELTER)*STRESSSTAB2
-! With MIN and MAX the bug should disappear.... but where did it come from?
-           ! rho_a, and thus comparable to USTAR**2
-           ! it is the integral of rho_w g Sin/C /rho_a
-           ! (air-> waves momentum flux)
-           ! CM parameter is 1 / C_phi
-           ! Z0 corresponds to Z0+Z1 of the Janssen eq. 14
-!
-! precomputes swell factors
-!
+
+!GPUNotes Added in DSTAB as a variable for simplifying the use of D
+!within this loop. Aiming to help the compiler implicitly produce
+!optimisations.
+
 !$ACC LOOP INDEPENDENT &
 !$ACC      REDUCTION(+:STRESSSTAB1, STRESSSTAB2, STRESSSTABN1, STRESSSTABN2)
         DO ITH=1,NTH
-        USTP=MIN((TAUPX**2+TAUPY**2)**0.25,MAX(UST,0.3))
-        USDIRP=ATAN2(TAUPY,TAUPX)
-        COSU   = COS(USDIRP) ! CB - these lines are problematic as the LAST 
-        SINU   = SIN(USDIRP) ! CB - value is used later outside the loop
-        IS=1+(IK-1)*NTH
-        CM=K(IS)/SIG2(IS) !inverse of phase speed
-        UCN=USTP*CM+ZZALP  !this is the inverse wave age
-           ! the stress is the real stress (N/m^2) divided by
-        CONST2=DDEN2(IS)/CG(IK) &        !Jacobian to get energy in band
+          USTP=MIN((TAUPX**2+TAUPY**2)**0.25,MAX(UST,0.3))
+          USDIRP=ATAN2(TAUPY,TAUPX)
+          COSU   = COS(USDIRP) ! CB - these lines are problematic as the LAST 
+          SINU   = SIN(USDIRP) ! CB - value is used later outside the loop
+          IS=1+(IK-1)*NTH
+          CM=K(IS)/SIG2(IS) !inverse of phase speed
+          UCN=USTP*CM+ZZALP  !this is the inverse wave age
+          ! the stress is the real stress (N/m^2) divided by
+          CONST2=DDEN2(IS)/CG(IK) &        !Jacobian to get energy in band
               *GRAV/(SIG(IK)/K(IS)*DRAT) ! coefficient to get momentum
-        CONST=SIG2(IS)*CONST0
-        ZCN=ALOG(K(IS)*Z0)
-        SWELLCOEFV=-SSWELLF(5)*DRAT*2*K(IS)*SQRT(2*NU_AIR*SIG2(IS))
-        SWELLCOEFT=-DRAT*SSWELLF(1)*16*SIG2(IS)**2/GRAV
+          CONST=SIG2(IS)*CONST0
+          ZCN=ALOG(K(IS)*Z0)
+          SWELLCOEFV=-SSWELLF(5)*DRAT*2*K(IS)*SQRT(2*NU_AIR*SIG2(IS))
+          SWELLCOEFT=-DRAT*SSWELLF(1)*16*SIG2(IS)**2/GRAV
 
           IR=ITH+(IK-1)*NTH
           COSWIND=(ECOS(IR)*COSU+ESIN(IR)*SINU)
@@ -577,11 +560,11 @@
             IF (ZLOG.LT.0.) THEN
               ! The source term Sp is beta * omega * X**2
               ! as given by Janssen 1991 eq. 19
-              D(IR) = CONST*EXP(ZLOG)*ZLOG**4*UCN*UCN*COSWIND**SSINTHP
+              DSTAB = CONST*EXP(ZLOG)*ZLOG**4*UCN*UCN*COSWIND**SSINTHP
  
               LLWS(IR)=.TRUE.
             ELSE
-              D(IR) = 0.
+              DSTAB = 0.
               LLWS(IR)=.FALSE.
             END IF
 !
@@ -591,18 +574,18 @@
               LLWS(IR)=.TRUE.
             END IF
           ELSE  ! (COSWIND.LE.0.01)
-            D(IR) = 0.
+            DSTAB = 0.
             LLWS(IR)=.FALSE.
           END IF
 !
-          IF ((SSWELLF(1).NE.0.AND.D(IR).LT.1E-7*SIG2(IR)) &
+          IF ((SSWELLF(1).NE.0.AND.DSTAB.LT.1E-7*SIG2(IR)) &
               .OR.SSWELLF(3).GT.0) THEN
 !
             DVISC=SWELLCOEFV
             DTURB=SWELLCOEFT*(FW*UORB+(FU+FUD*COSWIND)*USTP)
 !
             !DSTAB(ISTAB,IS) = DSTAB(ISTAB,IS) + PTURB*DTURB +  PVISC*DVISC
-            D(IR) = D(IR) + PTURB*DTURB +  PVISC*DVISC
+            D(IR) = DSTAB + PTURB*DTURB +  PVISC*DVISC
           END IF
 
 !
@@ -655,6 +638,7 @@
          *TPI*SIG(NK) / CG(NK)  !conversion WAM (E(f,theta) to WW3 A(k,theta)
       TEMP=0.
 !GPUNotes loop over directions
+!$ACC LOOP INDEPENDENT
       DO ITH=1,NTH
         IS=ITH+(NK-1)*NTH
         COSWIND=(ECOS(IS)*COSU+ESIN(IS)*SINU)
@@ -1055,6 +1039,7 @@
       INTEGER I,J,ITER
       REAL ZTAUW,UTOP,CDRAG,WCD,USTOLD,TAUOLD
       REAL X,UST,ZZ0,ZNU,F,DELF,ZZ00
+      ALLOCATE(TAUT(0:ITAUMAX,0:JUMAX))
       DELU    = UMAX/FLOAT(JUMAX)
       DELTAUW = TAUWMAX/FLOAT(ITAUMAX)
 !GPUNotes loops over stress table dimensions and calculation iteration
@@ -1184,6 +1169,7 @@
       INTEGER                 :: J,K,L
       REAL                    :: X0
 !
+      ALLOCATE(TAUHFT(0:IUSTAR,0:IALPHA))
       USTARM = 5.
       ALPHAM = 20.*AALPHA
       DELUST = USTARM/REAL(IUSTAR)
@@ -1331,6 +1317,7 @@
       CHARACTER(LEN=10)       :: VERTST=' '
       CHARACTER(LEN=35)       :: IDTST=' '
 !
+      ALLOCATE(TAUHFT2(0:IUSTAR,0:IALPHA,0:ILEVTAIL))
       FNAMETAB='ST4TABUHF2.bin'
       NOFILE=.TRUE.
       OPEN (993,FILE=FNAMETAB,FORM='UNFORMATTED',IOSTAT=IERR,STATUS='OLD')
@@ -1637,7 +1624,7 @@
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
 !/
-      INTEGER                 :: IS, IS2, IS0, IKL, IKC, ID, NKL
+      INTEGER                 :: IS, IS2, IS0, IKL, IKC, ID, NKL, ISPEC
       INTEGER                 :: IK, IK1, ITH, IK2, JTH, ITH2,         &
                                  IKHS, IKD, SDSNTH, IT, IKM, NKM
       INTEGER,ALLOCATABLE     :: NSMOOTH(:),IKSUP(:),IMSSMAX(:)
@@ -1664,7 +1651,7 @@
       REAL                    :: MICHE, X, FACHF
       REAL,ALLOCATABLE        :: QB(:), S2(:)
       REAL                    :: TSTR, TMAX, DT, T, MFT
-      REAL ,ALLOCATABLE       :: PB(:),PB2(:)
+      REAL,ALLOCATABLE        :: PB(:),PB2(:)
 !/
 !/ ------------------------------------------------------------------- /
 !/
@@ -1677,16 +1664,13 @@
 !$ACC      CREATE(DK(:),HS(:),KBAR(:),DCK(:),EFDF(:),BTH0(:),QB(:)    )&
 !$ACC      CREATE(S2(:),BTH0S(:),BTHS(:),SBK(:),IMSSMAX(:),WTHSUM(:)  )&
 !$ACC      CREATE(SBKT(:),MSSSUM(:,:),PB(:),PB2(:),MSSLONG(:,:)       )&
-!$ACC      CREATE(MSSSUM2(:,:))
-!!GPUNotes: Cannot CREATE BTH as it is used as private late, two
-!disagree with eachother
+!$ACC      CREATE(MSSSUM2(:,:), BTH(:))
 !
 !----------------------------------------------------------------------
 !
 ! 0.  Pre-Initialization to zero out arrays. All arrays should be reset
 !     within the computation, but these are helping with some bugs
 !     found in certain compilers
-!!$ACC DATA COPYOUT(BRLAMBDA, DDIAG, WHITECAP, SRHS)
 !$ACC KERNELS
 
 !CODENotes: Removed pre-initialization, this creates additional 
@@ -1710,6 +1694,9 @@
 !$ACC END KERNELS
 !
 ! 2.   Estimation of spontaneous breaking
+!GPUNotes Attempted to use ACC wait but the code continues to break
+!using this, requires further research as to why. 
+
 !$ACC KERNELS
 !
       IF ( (SSDSBCK-SSDSC(1)).LE.0 ) THEN
@@ -1721,15 +1708,20 @@
 ! 2.a.1 Computes saturation
 !
         SDSNTH = MIN(NINT(SSDSDTH/(DTH*RADE)),NTH/2-1)
-        MSSLONG(:,:) = 0.
-        MSSSUM2(:,:) = 0.
-        MSSSUM(:,:) = 0. 
+!$ACC LOOP INDEPENDENT
+        DO IK=1,NK
+          DO ITH=1,NTH
+            MSSLONG(IK,ITH) = 0.
+            MSSSUM2(IK,ITH) = 0.
+            MSSSUM(IK,ITH) = 0. 
 !       SSDSDIK is the integer difference in frequency bands
 !       between the "large breakers" and short "wiped-out waves"
-        BTH(:) = 0.
+          END DO
+          BTH(IK) = 0.
+        END DO
 
 !GPUNotes: Loops over full spectrum
-!$ACC LOOP INDEPENDENT PRIVATE(BTH)
+!$ACC LOOP INDEPENDENT
         DO  IK=IK1, NK
  
           FACSAT=SIG(IK)*K(IK)**3*DTH
@@ -1831,9 +1823,12 @@
 !   Optional smoothing of B and B0 over frequencies
 !
         IF (SSDSBRFDF.GT.0.AND.SSDSBRFDF.LT.NK/2) THEN
-          BTH0S(:)=BTH0(:)
-          BTHS(:)=BTH(:)
-          NSMOOTH(:)=1
+!$ACC LOOP INDEPENDENT
+          DO IK=1,NK
+            BTH0S(IK)=BTH0(IK)
+            BTHS(IK)=BTH(IK)
+            NSMOOTH(IK)=1
+          END DO
 !GPUNotes: loops over full spectrum - assume need to be sequential
 !CODENotes: Internalise as much code as possible for collapsable loops
 !original indentation has been left for code taken from outer loops
@@ -1885,7 +1880,12 @@
 !
 !    final division by NSMOOTH
 !
-          BTH0(:)=MAX(0.,BTH0S(:)/NSMOOTH(:))
+!GPUNotes created loop instead of array syntax.
+!$ACC LOOP INDEPENDENT
+          DO IK=1,NK
+            BTH0(IK)=MAX(0.,BTH0S(IK)/NSMOOTH(IK))
+          END DO
+
 !$ACC LOOP INDEPENDENT
           DO IK=IK1,NK
             IS0=(IK-1)*NTH
@@ -1929,14 +1929,18 @@
 !
 ! Computes Breaking probability
 !
-        PB = (MAX(SQRT(BTH)-EPSR,0.))**2
+!GPUNotes created loop instead of array syntax.
+!$ACC LOOP INDEPENDENT
+        DO ISPEC=1,NSPEC
+          PB(ISPEC) = (MAX(SQRT(BTH(ISPEC))-EPSR,0.))**2
 !
 ! Multiplies by 28.16 = 22.0 * 1.6² * 1/2 with
 !  22.0 (Banner & al. 2000, figure 6)
 !  1.6  the coefficient that transforms  SQRT(B) to Banner et al. (2000)'s epsilon
 !  1/2  factor to correct overestimation of Banner et al. (2000)'s breaking probability due to zero-crossing analysis
 !
-        PB = PB * 28.16
+          PB(ISPEC) = PB(ISPEC) * 28.16
+        END DO
 !/
       END IF ! End of test for (Ardhuin et al. 2010)'s spontaneous dissipation source term
 !
@@ -1954,9 +1958,9 @@
 ! Computes Wavenumber spectrum E1 integrated over direction and computes dk
 !
 !GPUNotes loops over full spectrum
+        E1(:)=0.
+!$ACC LOOP INDEPENDENT COLLAPSE(2)
         DO IK=IK1, NK
-          E1(IK)=0.
-!$ACC LOOP INDEPENDENT
           DO ITH=1,NTH
             IS=ITH+(IK-1)*NTH
             E1(IK)=E1(IK)+(A(IS)*SIG(IK))*DTH
@@ -1980,6 +1984,7 @@
         KBAR=0.
         EFDF=0.
         NKL=0. !number of windows
+!$ACC LOOP INDEPENDENT
         DO IKL=1,NK
           IKSUP(IKL)=IKTAB(IKL,ID)
           IF (IKSUP(IKL) .LE. NK) THEN
@@ -2002,6 +2007,7 @@
         QB =0.
         DKHS = KHSMAX/NKHS
 !GPUNotes loop over ferquencies
+!$ACC LOOP INDEPENDENT
         DO IKL=1, NKL
           IF (HS(IKL) .NE. 0. .AND. KBAR(IKL) .NE. 0.)  THEN
 !
@@ -2041,9 +2047,12 @@
 !
 ! Distributes scale dissipation over the frequency spectrum
 !
-        S1 = 0.
-        S2 = 0.
-        NTIMES = 0
+!$ACC LOOP INDEPENDENT
+        DO IK=1,NK
+          S1(IK) = 0.
+          S2(IK) = 0.
+          NTIMES(IK) = 0
+        END DO
 !GPUNotes loop over freqeuncies
 !$ACC LOOP INDEPENDENT
         DO IKL=1, NKL
@@ -2058,21 +2067,29 @@
 !
 ! Finish the average
 !
-        WHERE (NTIMES .GT. 0)
-          S1 = S1 / NTIMES
-          S2 = S2 / NTIMES
-        ELSEWHERE
-          S1 = 0.
-          S2 = 0.
-        END WHERE
+!$ACC LOOP INDEPENDENT
+        DO IK=1,NK
+          IF (NTIMES(IK) .GT. 0) THEN
+            S1(IK) = S1(IK) / NTIMES(IK)
+            S2(IK) = S2(IK) / NTIMES(IK)
+          ELSE
+            S1(IK) = 0.
+            S2(IK) = 0.
+          END IF
+        END DO
 ! goes back to action for dissipation source term
-        S1(1:NK) = S1(1:NK) / SIG(1:NK)
+
+!GPUNotes created loop instead of array syntax division.
+!$ACC LOOP INDEPENDENT
+        DO IK=1,NK
+          S1(IK) = S1(IK) / SIG(IK)
+        END DO
 !
 ! Makes Isotropic distribution
 !
         ASUM = 0.
 !GPUNotes loop over frequencies
-!$ACC LOOP INDEPENDENT PRIVATE(PB2,DDIAG)
+!$ACC LOOP INDEPENDENT
         DO IK = 1, NK
           ASUM = (SUM(A(((IK-1)*NTH+1):(IK*NTH)))*DTH)
           IF (ASUM.GT.1.E-8) THEN
@@ -2089,7 +2106,12 @@
           END IF
         END DO
 !
-        PB = (1-SSDSC(1))*PB2*A + SSDSC(1)*PB
+!GPUNotes created loop instead of array syntax.
+!$ACC LOOP INDEPENDENT
+        DO ISPEC=1,NSPEC
+          PB(ISPEC) = (1-SSDSC(1))*PB2(ISPEC)*A(ISPEC) + &
+                      SSDSC(1)*PB(ISPEC)
+        END DO
 !
       END IF   ! END OF TEST ON SSDSBCK
 !
@@ -2098,8 +2120,12 @@
 ! Compute Lambda = PB* l(k,th)
 ! with l(k,th)=1/(2*pi²)= the breaking crest density
 !
-      BRLAMBDA = PB / (2.*PI**2.)
-!
+!GPUNotes created loop instead of array syntax.
+!$ACC LOOP INDEPENDENT
+      DO ISPEC=1,NSPEC
+        BRLAMBDA(ISPEC) = PB(ISPEC) / (2.*PI**2.)
+      END DO
+!     
 !/ ------------------------------------------------------------------- /
 !             WAVE-TURBULENCE INTERACTION AND CUMULATIVE EFFECT
 !/ ------------------------------------------------------------------- /
@@ -2110,7 +2136,7 @@
 !GPUNotes Loops over the full spectrum
       SBKT(:)=0.
       SBK(:)=0.
-!$ACC LOOP INDEPENDENT COLLAPSE(2)
+!$ACC LOOP INDEPENDENT GANG COLLAPSE(2)
       DO  IK=IK1, NK
         DO ITH=1,NTH
           IS=ITH+(IK-1)*NTH
@@ -2120,7 +2146,7 @@
           RENEWALFREQ = 0.
           IF (SSDSC(3).NE.0 .AND. IK.GT.DIKCUMUL) THEN
 !GPUNotes loop over frequencies
-!$ACC LOOP INDEPENDENT
+!$ACC LOOP INDEPENDENT VECTOR
             DO IK2=IK1,IK-DIKCUMUL
               IF (BTH0(IK2).GT.SSDSBR) THEN
                 IS2=(IK2-1)*NTH
@@ -2144,7 +2170,14 @@
 !
 ! COMPUTES SOURCES TERM from diagonal term
 !
-      SRHS = DDIAG * A
+!GPUNotes created loop instead of array syntax.
+!$ACC LOOP INDEPENDENT COLLAPSE(2)
+      DO  IK=IK1, NK
+        DO ITH=1,NTH
+          IS=ITH+(IK-1)*NTH
+          SRHS(IS) = DDIAG(IS) * A(IS)
+        END DO
+      END DO
       !IF(IX == DEBUG_NODE) WRITE(*,'(A10,4F20.10)') 'ST4 DISSIP 2', SUM(SRHS), SUM(DDIAG), SSDSC(3)*RENEWALFREQ, DTURB
 !
 ! Adds non-diagonal part: high and low frequency generation
@@ -2165,6 +2198,7 @@
 !
       IF (SSDSC(9).GT.0) THEN
 !GPUNotes loops over frequencies x2
+!$ACC LOOP INDEPENDENT PRIVATE(SRHS)
         DO IK2 = IK1, NK-DIKCUMUL
           IKM= MIN(NK,IK2+2*DIKCUMUL)
           NKM=IKM-(IK2+DIKCUMUL)+1
@@ -2192,27 +2226,34 @@
 !CODENotes: It for all cases in the miniapp the following is not used
 !this means that GPU optimisation has no affect for speed or validation.
 !GPUNotes loops over frequencies
+!$ACC LOOP INDEPENDENT
       DO IK=1,NK
         COEF4(IK) = SUM(BRLAMBDA((IK-1)*NTH+1:IK*NTH) * DTH) *(2*PI/K(IK)) *  &
                     SSDSC(7) * DDEN(IK)/(DTH*SIG(IK)*CG(IK))
 !                   NB: SSDSC(7) is WHITECAPWIDTH
       END DO
 !/
+!CODENotes: If for all cases in the miniapp the following is not used
+!then any GPU optimisation will have no affect for speed or validation.
       IF ( FLOGRD(5,7) ) THEN
 !
 ! Computes the Total WhiteCap Coverage (a=5. ; Reul and Chapron, 2003)
 !
 !GPUNotes loops over frequencies
+!$ACC LOOP INDEPENDENT
         DO IK=IK1,NK
           WHITECAP(1) = WHITECAP(1) + COEF4(IK) * (1-WHITECAP(1))
         END DO
       END IF
 !/
+!CODENotes: If for all cases in the miniapp the following is not used
+!then any GPU optimisation will have no affect for speed or validation.
       IF ( FLOGRD(5,8) ) THEN
 !
 ! Calculates the Mean Foam Thickness for component K(IK) => Fig.3, Reul and Chapron, 2003
 !
 !GPUNotes loops over frequencies and iterations
+!$ACC LOOP INDEPENDENT
         DO IK=IK1,NK
 !    Duration of active breaking (TAU*)
           TSTR = 0.8 * 2*PI/SIG(IK)

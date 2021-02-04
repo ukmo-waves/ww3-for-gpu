@@ -89,7 +89,7 @@
 ! Parameters for friction factor table
 !
       INTEGER, PARAMETER       :: SIZEFWTABLE=300
-      REAL                     :: FWTABLE(0:SIZEFWTABLE)
+      REAL, ALLOCATABLE        :: FWTABLE(:)
       REAL                     :: DELAB
       REAL,    PARAMETER       :: ABMIN = -1.
       REAL, PRIVATE, PARAMETER :: ABMAX = 8.
@@ -180,6 +180,7 @@
       REAL KER, KEI
       REAL ABR,ABRLOG,L10,FACT,FSUBW,FSUBWMEMO,dzeta0,dzeta0memo
 !
+      ALLOCATE(FWTABLE(0:SIZEFWTABLE))
       DELAB   = (ABMAX-ABMIN)/REAL(SIZEFWTABLE)
       L10=ALOG(10.)
       DO I=0,SIZEFWTABLE

@@ -220,10 +220,9 @@
       USE CONSTANTS
       USE W3GDATMD
       USE W3ODATMD
-      USE W3SRC4MD, ONLY: INSIN4, TAUT, TAUHFT, TAUHFT2, &
-                          DELU, DELTAUW, DELUST, &
-                          DELALP, DELTAIL, &
-                          DIKCUMUL
+      USE W3SRC4MD, ONLY: INSIN4, TAUT, TAUHFT, TAUHFT2, DELU, DELTAUW,&
+                          DELUST, DELALP, DELTAIL, DIKCUMUL, IUSTAR,   &
+                          IALPHA, ILEVTAIL, ITAUMAX, JUMAX
       USE W3SNL1MD, ONLY: INSNL1
       USE W3TIMEMD, ONLY: NOLEAP
       USE W3SERVMD, ONLY: EXTCDE
@@ -685,6 +684,7 @@
                 FACP, XREL, XFLT, FXFM, FXPM, XFT, XFC, FACSD, FHMAX, &
                 FFACBERG, DELAB, FWTABLE
         ELSE
+          ALLOCATE(FWTABLE(0:SIZEFWTABLE))
           READ (NDSM,END=801,ERR=802,IOSTAT=IERR)                     &
                 FACP, XREL, XFLT, FXFM, FXPM, XFT, XFC, FACSD, FHMAX, &
                 FFACBERG, DELAB, FWTABLE
@@ -723,6 +723,9 @@
                 IKTAB, DCKI, QBI, SATINDICES, SATWEIGHTS,        &
                 DIKCUMUL, CUMULW
         ELSE
+          ALLOCATE(TAUHFT2(0:IUSTAR,0:IALPHA,0:ILEVTAIL),        &
+                   TAUHFT (0:IUSTAR,0:IALPHA),                   &
+                   TAUT   (0:ITAUMAX,0:JUMAX))
           READ (NDSM,END=801,ERR=802,IOSTAT=IERR)                &
                 ZZWND, AALPHA, ZZ0MAX, BBETA, SSINTHP, ZZALP,    &
                 TTAUWSHELTER, SSWELLFPAR, SSWELLF, SSINBR,       &
@@ -739,7 +742,6 @@
 !Use enter data to avoid creating a data structure, only use single
 !data transfer. Placed here to copy over to GPU as soon as it is 
 !read on CPU. 
-
 !$ACC ENTER DATA COPYIN(TAUT, TAUHFT, TAUHFT2, QBI, IKTAB, DCKI) &
 !$ACC            COPYIN(SSDSC, SSDSISO, SSDSBR,SSDSBRFDF, CUMULW)&
 !$ACC            COPYIN(SATINDICES, SATWEIGHTS, SSDSDTH, SSDSP)  &

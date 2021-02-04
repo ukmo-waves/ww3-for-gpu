@@ -402,10 +402,11 @@
 !properly, requires POINTERS to be defined as ALLOCATABLES and then
 !allocated. 
       INTEGER                 :: IK, ITH, IS, IS0, NSTEPS,  NKH, NKH1, &
-                                 IKS1, IS1, NSPECH, IDT, IERR, NKI, NKD
+                                 IKS1, IS1, NSPECH, IDT, IERR, NKI, NKD&
+                                 , ISPEC
       REAL                    :: DTTOT, FHIGH, DT, AFILT, DAMAX, AFAC, &
                                  HDT, ZWND, FP, DEPTH, TAUSCX, TAUSCY, &
-                                 FHIGI
+                                 FHIGI, KDMEAN
 ! Scaling factor for SIN, SDS, SNL
       REAL                    :: ICESCALELN, ICESCALEIN, ICESCALENL,   &
                                  ICESCALEDS
@@ -453,26 +454,25 @@
       SPR4T = 0.0
       SIN4T = 0.0
       SDS4T = 0.0
+      DEPTH  = MAX ( DMIN , D_INP )
 !$ACC DATA COPY   (WN1(:),CG1(:),SPEC(:),ALPHA(:),USTAR,USTDIR,FPI,TWS  )&
 !$ACC      COPY   (TAUOX,TAUOY,TAUWX,TAUWY,PHIAW,PHIOC,PHICE,CHARN,ICEF )&
 !$ACC      COPY   (BEDFORM(:),PHIBBL,TAUBBL(:),TAUICE(:),WHITECAP(:)    )&
 !$ACC      COPY   (TAUWIX,TAUWIY,TAUWNX,TAUWNY                          )&
-!$ACC      COPYIN (U10ABS,U10DIR,CX,CY,DTG,D50,PSIC,ICE,ICEH,D_INP,IT,IX)&  
-!$ACC      COPYIN (srce_call,JSEA,IY,IMOD,SPECOLD(:),REFLED(:),BERG,COEF)&
-!$ACC      COPYIN (REFLEC(:),DELX,DELY,DELA,TRNX,TRNY,ICEDMAX,AS        )&
-!$ACC      COPYIN (INFLAGS1,INFLAGS2                                    )& 
+!$ACC      COPYIN (U10ABS,U10DIR,CX,CY,DTG,ICE,ICEH,D_INP,IT,IX         )&  
+!$ACC      COPYIN (IY,IMOD,SPECOLD(:),REFLED(:),BERG,COEF,TRNX,ICEDMAX  )&
+!$ACC      COPYIN (REFLEC(:),AS,TRNY,INFLAGS1,INFLAGS2                  )&
 !$ACC      COPYOUT(VSIO(:),VDIO(:),SHAVEIO,DTDYN,FCUT                   )&
 !$ACC      CREATE (SPECINIT(:),SPEC2(:),DAM(:),WN2(:),BRLAMBDA(:),VS(:) )&
 !$ACC      CREATE (VSLN(:),VSIN(:),VDIN(:),VSNL(:),VDNL(:),VSDS(:),VD(:))&
 !$ACC      CREATE (VDDS(:),VSBT(:),VDBT(:),COSI(:),LLWS(:),FOUT,ICECOEF2)&
 !$ACC      CREATE (SOUT(:,:),DOUT(:,:),WN_R(:),CG_ICE(:),ALPHA_LIU(:)   )&
 !$ACC      CREATE (R(:),EBAND,DIFF,EFINISH,HSTOT,PHINL,MWXINIT,MWYINIT  )&
-!$ACC      CREATE (DEPTH,FACTOR,FACTOR2,TAUWAX,TAUWAY,MWXFINISH,A1BAND  )&
+!$ACC      CREATE (FACTOR,FACTOR2,TAUWAX,TAUWAY,MWXFINISH,A1BAND        )&
 !$ACC      CREATE (MWYFINISH,B1BAND,EMEAN,FMEAN,WNMEAN,AMAX,CD,Z0,SCAT  )&
-!$ACC      CREATE (SMOOTH_ICEDISP,ICECOEF2)
+!$ACC      CREATE (SMOOTH_ICEDISP,ICECOEF2,KDMEAN, ISPEC,IK,ITH,IS0)
 !$ACC KERNELS      
 !
-      DEPTH  = MAX ( DMIN , D_INP )
       IKS1 = 1
       ICESCALELN = MAX(0.,MIN(1.,1.-ICE*ICESCALES(1)))
       ICESCALEIN = MAX(0.,MIN(1.,1.-ICE*ICESCALES(2)))
@@ -480,12 +480,15 @@
       ICESCALEDS = MAX(0.,MIN(1.,1.-ICE*ICESCALES(4)))
       IS1=(IKS1-1)*NTH+1
 !
-      VSIN = 0.
-      VDIN = 0.
+      DO ISPEC=1,NSPEC
+        VSIN(ISPEC) = 0.
+        VDIN(ISPEC) = 0.
     
-      VSBT = 0.
-      VDBT = 0.
+        VSBT(ISPEC) = 0.
+        VDBT(ISPEC) = 0.
+      END DO
 !
+
       ZWND   = ZZWND
 !
       DRAT  = DAIR / DWAT
@@ -543,7 +546,6 @@
       TAUWX=0.
       TAUWY=0.
 !$ACC END KERNELS
-!$ACC UPDATE HOST(DEPTH)
       IF ( IT .eq. 0 ) THEN
 !$ACC KERNELS
          LLWS(:) = .TRUE.
@@ -579,8 +581,9 @@
 !
 ! 1.c2 Stores the initial data
 !
-      SPECINIT = SPEC
-!
+      DO ISPEC=1,NSPEC
+         SPECINIT(ISPEC) = SPEC(ISPEC)
+      END DO
 ! 1.d Stresses
 !
 ! 1.e Prepare cut-off beyond which the tail is imposed with a power law
@@ -590,6 +593,7 @@
       FAGE   = 0.
       FHIGH  = MAX( (FFXFM + FAGE ) * MAX(FMEAN1,FMEANWS), FFXPM / USTAR)
       FHIGI  = FFXFA * FMEAN1
+     
 !
 ! 1.f Prepare output file for !/NNT option
 !
@@ -621,7 +625,7 @@
 ! 2.b Nonlinear interactions.
 !
 !GPUnotes subruoutine will contain source term specific spectral loops
-        CALL W3SNL1 ( SPEC, CG1, WNMEAN*DEPTH, VSNL, VDNL )
+        CALL W3SNL1 ( SPEC, CG1, DEPTH*WNMEAN, VSNL, VDNL )
 !
 ! 2.c Dissipation... except for ST4
 ! 2.c1   as in source term package
@@ -1086,13 +1090,15 @@
 !/ Local parameters
 !/
       INTEGER                 :: IS, IK
-      REAL                    ::  M0, M1, SIN1A(NK)
+      REAL                    :: M0, M1
+      REAL, ALLOCATABLE       :: SIN1A(:)
 !/
 !/ ------------------------------------------------------------------- /
 !/
 !
 !     Calculate FPI: equivalent peak frequncy from wind source term
 !     input
+      ALLOCATE(SIN1A(NK))
 !
       DO IK=1, NK
         SIN1A(IK) = 0.
