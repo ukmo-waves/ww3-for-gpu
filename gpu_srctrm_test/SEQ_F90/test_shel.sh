@@ -13,10 +13,11 @@ done
 
 cd ../RUN/ 
 ../SEQ_F90/ww3_grid
-NV_ACC_NOTIFY=3 nvprof ../SEQ_F90/ww3_shel 2> prof
+#nvprof ../SEQ_F90/ww3_shel 2> prof
+NV_ACC_NOTIFY=2 nvprof ../SEQ_F90/ww3_shel 2> prof
 #nsys profile --force-overwrite true -o profile --stats=true ../SEQ_F90/ww3_shel 2> nsys_prof
 #nvprof --metrics dram_read_throughput,dram_write_throughput ../SEQ_F90/ww3_shel 2> metrics
-#NV_ACC_NOTIFY=3 ../SEQ_F90/ww3_shel 2> NV_NOTIFY
+#NV_ACC_NOTIFY=2 ../SEQ_F90/ww3_shel 2> NV_NOTIFY
 #../SEQ_F90/ww3_shel
 
 ../SEQ_F90/ww3_outp

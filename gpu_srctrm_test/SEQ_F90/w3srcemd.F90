@@ -47,7 +47,64 @@
 !/
       REAL, PARAMETER, PRIVATE:: OFFSET = 1.
 !/
+      ! Scratch variables for GPU
+      REAL,ALLOCATABLE        :: WN_R(:),CG_ICE(:),ALPHA_LIU(:),R(:)
+      REAL,ALLOCATABLE        :: SPECINIT(:), SPEC2(:)
+      REAL,ALLOCATABLE        :: DAM (:), WN2 (:), BRLAMBDA(:),        &
+                                 VSLN(:), VSIN(:), VDIN(:), VSNL(:),   &
+                                 VDNL(:), VSDS(:), VDDS(:), VSBT(:),   &
+                                 VDBT(:), VS(:), VD(:), EB(:), COSI(:)
+      LOGICAL,ALLOCATABLE     :: LLWS(:)
+      REAL,ALLOCATABLE        :: FOUT(:,:), SOUT(:,:), DOUT(:,:)
+      INTEGER :: I,JJ
       CONTAINS
+!/ ------------------------------------------------------------------- /
+      SUBROUTINE W3SRCE_INIT()
+
+      USE W3GDATMD, ONLY: NK, NSPEC, NTH 
+
+      IMPLICIT NONE
+!
+      ! Allocate scratch variables for GPU.
+  
+      WRITE(0,*) "W3SRCE_INIT: NK/NTH/NSPEC: " ,NK,NTH,NSPEC
+      ALLOCATE(DAM(NSPEC), WN2(NSPEC), VSLN(NSPEC), SPECINIT(NSPEC),   &
+      SPEC2(NSPEC), VSIN(NSPEC), VDIN(NSPEC), VSNL(NSPEC), VDNL(NSPEC),&
+      VSDS(NSPEC), VDDS(NSPEC), VSBT(NSPEC), VDBT(NSPEC), VS(NSPEC),   &
+      VD(NSPEC), EB(NK), BRLAMBDA(NSPEC), FOUT(NK,NTH), SOUT(NK,NTH),  &
+      DOUT(NK,NTH), WN_R(NK), CG_ICE(NK), ALPHA_LIU(NK), R(NK),        &
+      COSI(2), LLWS(NSPEC))
+
+!$ACC KERNELS
+      DAM(:) = 0.
+      WN2(:) = 0.
+      VSLN(:) = 0.
+      SPECINIT(:) = 0.
+      SPEC2(:) = 0.
+      VSIN(:) = 0.
+      VDIN(:) = 0.
+      VSNL(:) = 0.
+      VDNL(:) = 0.
+      VSDS(:) = 0.
+      VDDS(:) = 0.
+      VSBT(:) = 0.
+      VDBT(:) = 0.
+      VS(:) = 0.
+      VD(:) = 0.
+      EB(:) = 0.
+      BRLAMBDA(:) = 0.
+      FOUT(:,:) = 0.
+      SOUT(:,:) = 0.
+      DOUT(:,:) = 0.
+      WN_R(:) = 0.
+      CG_ICE(:) = 0.
+      ALPHA_LIU(:) = 0.
+      R(:) = 0.
+      COSI(:) = 0.
+      LLWS(:) = 0.
+!$ACC END KERNELS
+      END SUBROUTINE W3SRCE_INIT
+
 !/ ------------------------------------------------------------------- /
       SUBROUTINE W3SRCE ( srce_call, IT, JSEA, IX, IY, IMOD,          &
                           SPECOLD, SPEC, VSIO, VDIO, SHAVEIO,         &
@@ -384,8 +441,8 @@
       INTEGER, INTENT(IN)     :: REFLED(6)
       REAL, INTENT(IN)        :: REFLEC(4), DELX, DELY, DELA,         &
                                  TRNX, TRNY, BERG, ICEDMAX
-      REAL, INTENT(INOUT)     :: WN1(NK), CG1(NK), &
-                                 SPEC(NSPEC), ALPHA(NK), USTAR,       &
+      REAL, INTENT(INOUT)     :: WN1(:), CG1(:), &
+                                 SPEC(NSPEC), ALPHA(:), USTAR,       &
                                  USTDIR, FPI, TAUOX, TAUOY,           &
                                  TAUWX, TAUWY, PHIAW, PHIOC, PHICE,   &
                                  CHARN, TWS, BEDFORM(3), PHIBBL,      &
@@ -412,7 +469,14 @@
                                  ICESCALEDS
       REAL                    :: EMEAN, FMEAN, WNMEAN, AMAX, CD, Z0,   &
                                  SCAT, SMOOTH_ICEDISP, ICECOEF2
-      REAL,ALLOCATABLE        :: WN_R(:),CG_ICE(:),ALPHA_LIU(:),R(:)
+!      REAL,ALLOCATABLE        :: WN_R(:),CG_ICE(:),ALPHA_LIU(:),R(:)
+!      REAL,ALLOCATABLE        :: SPECINIT(:), SPEC2(:)
+!      REAL,ALLOCATABLE        :: DAM (:), WN2 (:), BRLAMBDA(:),        &
+!                                 VSLN(:), VSIN(:), VDIN(:), VSNL(:),   &
+!                                 VDNL(:), VSDS(:), VDDS(:), VSBT(:),   &
+!                                 VDBT(:), VS(:), VD(:), EB(:), COSI(:)
+!      LOGICAL,ALLOCATABLE     :: LLWS(:)
+!      REAL,ALLOCATABLE        :: FOUT(:,:), SOUT(:,:), DOUT(:,:)
       DOUBLE PRECISION        :: ATT, ISO
       REAL                    :: FMEANS, FH1, FH2, FAGE
       REAL                    :: QCERR  = 0.     !/XNL2 and !/NNT
@@ -420,22 +484,15 @@
                                  FMEAN1, FMEANWS, MWXINIT, MWYINIT,    &
                                  FACTOR, FACTOR2, DRAT, TAUWAX, TAUWAY,&
                                  MWXFINISH, MWYFINISH, A1BAND, B1BAND
-      REAL,ALLOCATABLE        :: SPECINIT(:), SPEC2(:)
-      REAL,ALLOCATABLE        :: DAM (:), WN2 (:), BRLAMBDA(:),        &
-                                 VSLN(:), VSIN(:), VDIN(:), VSNL(:),   &
-                                 VDNL(:), VSDS(:), VDDS(:), VSBT(:),   &
-                                 VDBT(:), VS(:), VD(:), EB(:), COSI(:)
-      LOGICAL,ALLOCATABLE     :: LLWS(:)
-      REAL,ALLOCATABLE        :: FOUT(:,:), SOUT(:,:), DOUT(:,:)
       LOGICAL, SAVE           :: FLTEST = .FALSE., FLAGNN = .TRUE.
       LOGICAL                 :: SHAVE
       LOGICAL                 :: LBREAK
       LOGICAL, SAVE           :: FIRST = .TRUE.
       LOGICAL                 :: PrintDeltaSmDA
       REAL                    :: eInc1, eInc2
-      REAL                    :: DeltaSRC(NSPEC), MAXDAC(NSPEC)
+!      REAL                    :: DeltaSRC(NSPEC), MAXDAC(NSPEC)
  
-!/
+!!
 !!LS  Newly added time varibles
       REAL(8)                 :: sTime1, eTime1, sTime2, eTime2,       &
                                  sTime3, eTime3
@@ -444,17 +501,17 @@
 !/ ------------------------------------------------------------------- /
 !/
   
-      ALLOCATE(DAM(NSPEC), WN2(NSPEC), VSLN(NSPEC), SPECINIT(NSPEC),   &
-      SPEC2(NSPEC), VSIN(NSPEC), VDIN(NSPEC), VSNL(NSPEC), VDNL(NSPEC),&
-      VSDS(NSPEC), VDDS(NSPEC), VSBT(NSPEC), VDBT(NSPEC), VS(NSPEC),   &
-      VD(NSPEC), EB(NK), BRLAMBDA(NSPEC), FOUT(NK,NTH), SOUT(NK,NTH),  &
-      DOUT(NK,NTH), WN_R(NK), CG_ICE(NK), ALPHA_LIU(NK), R(NK),        &
-      COSI(2), LLWS(NSPEC))
+!      ALLOCATE(DAM(NSPEC), WN2(NSPEC), VSLN(NSPEC), SPECINIT(NSPEC),   &
+!      SPEC2(NSPEC), VSIN(NSPEC), VDIN(NSPEC), VSNL(NSPEC), VDNL(NSPEC),&
+!      VSDS(NSPEC), VDDS(NSPEC), VSBT(NSPEC), VDBT(NSPEC), VS(NSPEC),   &
+!      VD(NSPEC), EB(NK), BRLAMBDA(NSPEC), FOUT(NK,NTH), SOUT(NK,NTH),  &
+!      DOUT(NK,NTH), WN_R(NK), CG_ICE(NK), ALPHA_LIU(NK), R(NK),        &
+!      COSI(2), LLWS(NSPEC))
      
+      WRITE(0,*)'TAG: W3SRCE'
       SPR4T = 0.0
       SIN4T = 0.0
       SDS4T = 0.0
-      DEPTH  = MAX ( DMIN , D_INP )
 !$ACC DATA COPY   (WN1(:),CG1(:),SPEC(:),ALPHA(:),USTAR,USTDIR,FPI,TWS  )&
 !$ACC      COPY   (TAUOX,TAUOY,TAUWX,TAUWY,PHIAW,PHIOC,PHICE,CHARN,ICEF )&
 !$ACC      COPY   (BEDFORM(:),PHIBBL,TAUBBL(:),TAUICE(:),WHITECAP(:)    )&
@@ -470,9 +527,11 @@
 !$ACC      CREATE (R(:),EBAND,DIFF,EFINISH,HSTOT,PHINL,MWXINIT,MWYINIT  )&
 !$ACC      CREATE (FACTOR,FACTOR2,TAUWAX,TAUWAY,MWXFINISH,A1BAND        )&
 !$ACC      CREATE (MWYFINISH,B1BAND,EMEAN,FMEAN,WNMEAN,AMAX,CD,Z0,SCAT  )&
-!$ACC      CREATE (SMOOTH_ICEDISP,ICECOEF2,KDMEAN, ISPEC,IK,ITH,IS0)
+!$ACC      CREATE (SMOOTH_ICEDISP,ICECOEF2,KDMEAN)
 !$ACC KERNELS      
 !
+      
+      DEPTH  = MAX ( DMIN , D_INP )
       IKS1 = 1
       ICESCALELN = MAX(0.,MIN(1.,1.-ICE*ICESCALES(1)))
       ICESCALEIN = MAX(0.,MIN(1.,1.-ICE*ICESCALES(2)))
@@ -919,15 +978,18 @@
           IF (IICESMOOTH) THEN
           END IF
         ELSE
-          WN_R=WN1
-          CG_ICE=CG1
+!$ACC LOOP INDEPENDENT
+          DO IK=1,NK
+            WN_R(IK)=WN1(IK)
+            CG_ICE(IK)=CG1(IK)
+          END DO
         END IF
 !
         R(:)=1 ! In case IC2 is defined but not IS2
 !
  
 !
-        SPEC2 = SPEC
+        SPEC2(:) = SPEC(:)
 !
         TAUICE(:) = 0.
         PHICE = 0.

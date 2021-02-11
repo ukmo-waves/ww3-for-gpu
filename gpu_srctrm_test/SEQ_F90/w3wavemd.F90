@@ -429,6 +429,7 @@
       CHARACTER(LEN=17)       :: IDACT
       CHARACTER(LEN=13)       :: OUTID
       CHARACTER(LEN=23)       :: IDTIME
+      
       INTEGER eIOBP
       INTEGER ITH_F
 
@@ -447,6 +448,8 @@
 !
 ! 0.a Set pointers to data structure
 !
+      WRITE(0,*)'TAG: W3WAVE'
+
       IF ( IOUTP  .NE. IMOD ) CALL W3SETO ( IMOD, NDSE, NDST )
       IF ( IGRID  .NE. IMOD ) CALL W3SETG ( IMOD, NDSE, NDST )
       IF ( IWDATA .NE. IMOD ) CALL W3SETW ( IMOD, NDSE, NDST )
@@ -1136,15 +1139,6 @@
 
           IF ( FLSOU ) THEN
 !
-            D50=0.0002
-            REFLEC(:)=0.
-            REFLED(:)=0
-            PSIC=0.
-!
-            SPR4TOT=0.
-            SIN4TOT=0.
-            SDS4TOT=0.
-!GPUNotes Outer seapoint loop for source term calculations
             CALL WAV_MY_WTIME(sTime1)
 !$ACC DATA COPYIN (IT,IMOD,VAoldDummy,DW(:),U10(:),REFLEC,REFLED       )&
 !$ACC      COPYIN (U10D(:),AS(:),CX(:),CY(:),ICE(:),ICEH(:),ICEDMAX(:) )&
@@ -1158,22 +1152,35 @@
 !$ACC      COPYOUT(VSioDummy(:),VDioDummy(:),SHAVETOTioDummy,FCUT(:)   )&
 !$ACC      COPYOUT(DTDYN(:)                                            )&
 !$ACC      CREATE (JSEA,IX,IY,DELX,DELY,DELA,TMP1(:),TMP2(:),TMP3(:),TMP4(:))
+!$ACC KERNELS
+            D50=0.0002
+            REFLEC(:)=0.
+            REFLED(:)=0
+            PSIC=0.
+!
+            SPR4TOT=0.
+            SIN4TOT=0.
+            SDS4TOT=0.
+!$ACC END KERNELS
+!GPUNotes Outer seapoint loop for source term calculations
             DO JSEA=1, NSEAL
               CALL INIT_GET_ISEA(ISEA, JSEA)
               IX     = MAPSF(ISEA,1)
               IY     = MAPSF(ISEA,2)
-              DELA=1.
-              DELX=1.
-              DELY=1.
-              IF ( MAPSTA(IY,IX) .EQ. 1 .AND. FLAGST(ISEA)) THEN
-                TMP1   = WHITECAP(JSEA,1:4)
-                TMP2   = BEDFORMS(JSEA,1:3)
-                TMP3   = TAUBBL(JSEA,1:2)
-                TMP4   = TAUICE(JSEA,1:2)
-                CALL W3SRCE(srce_direct, IT, JSEA, IX, IY, IMOD, &
-                            VAoldDummy, VA(:,JSEA),                     &
+              IF ( MAPSTA(IY,IX) .EQ. 1 .AND. FLAGST(JSEA)) THEN
+!$ACC KERNELS
+                DELA=1.
+                DELX=1.
+                DELY=1.
+                TMP1   = WHITECAP(ISEA,1:4)
+                TMP2   = BEDFORMS(ISEA,1:3)
+                TMP3   = TAUBBL(ISEA,1:2)
+                TMP4   = TAUICE(ISEA,1:2)
+!$ACC END KERNELS
+                CALL W3SRCE(srce_direct, IT, ISEA, IX, IY, IMOD, &
+                            VAoldDummy, VA(:,ISEA),                     &
                             VSioDummy, VDioDummy, SHAVETOTioDummy,      &
-                            ALPHA(1:NK,JSEA), WN(1:NK,ISEA),            &
+                            ALPHA(1:NK,ISEA), WN(1:NK,ISEA),            &
                             CG(1:NK,ISEA), DW(ISEA), U10(ISEA),         &
                             U10D(ISEA), AS(ISEA), UST(ISEA),            &
                             USTDIR(ISEA), CX(ISEA), CY(ISEA),           &
@@ -1181,24 +1188,26 @@
                             ICEDMAX(ISEA),                              &
                             REFLEC, REFLED, DELX, DELY, DELA,           &
                             TRNX(IY,IX), TRNY(IY,IX), BERG(ISEA),       &
-                            FPIS(ISEA), DTDYN(JSEA),                    &
-                            FCUT(JSEA), DTG, TAUWX(JSEA), TAUWY(JSEA),  &
-                            TAUOX(JSEA), TAUOY(JSEA), TAUWIX(JSEA),     &
-                            TAUWIY(JSEA), TAUWNX(JSEA),                 &
-                            TAUWNY(JSEA),  PHIAW(JSEA), CHARN(JSEA),    &
-                            TWS(JSEA), PHIOC(JSEA), TMP1, D50, PSIC,TMP2,&
-                            PHIBBL(JSEA), TMP3, TMP4 , PHICE(JSEA),     &
+                            FPIS(ISEA), DTDYN(ISEA),                    &
+                            FCUT(ISEA), DTG, TAUWX(ISEA), TAUWY(ISEA), &
+                            TAUOX(ISEA), TAUOY(ISEA), TAUWIX(ISEA),     &
+                            TAUWIY(ISEA), TAUWNX(ISEA),                 &
+                            TAUWNY(ISEA),  PHIAW(ISEA), CHARN(ISEA),    &
+                            TWS(ISEA), PHIOC(ISEA), TMP1, D50, PSIC,TMP2,&
+                            PHIBBL(ISEA), TMP3, TMP4 , PHICE(ISEA),     &
                             ASF(ISEA), SIN4T, SPR4T, SDS4T)
                 SIN4TOT = SIN4TOT + SIN4T
                 SPR4TOT = SPR4TOT + SPR4T
                 SDS4TOT = SDS4TOT + SDS4T
-                WHITECAP(JSEA,1:4) = TMP1
-                BEDFORMS(JSEA,1:3) = TMP2
-                TAUBBL(JSEA,1:2) = TMP3
-                TAUICE(JSEA,1:2) = TMP4
+!$ACC KERNELS   
+                WHITECAP(ISEA,1:4) = TMP1
+                BEDFORMS(ISEA,1:3) = TMP2
+                TAUBBL(ISEA,1:2) = TMP3
+                TAUICE(ISEA,1:2) = TMP4
+!$ACC END KERNELS
               ELSE
-                UST   (ISEA) = UNDEF
-                USTDIR(ISEA) = UNDEF
+                UST   (JSEA) = UNDEF
+                USTDIR(JSEA) = UNDEF
                 DTDYN (JSEA) = UNDEF
                 FCUT  (JSEA) = UNDEF
 !               VA(:,JSEA)  = 0.

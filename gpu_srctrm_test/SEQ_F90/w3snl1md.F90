@@ -57,7 +57,35 @@
 !/
       PUBLIC
 !/
+      REAL,ALLOCATABLE    ::  UE(:), SA1(:), SA2(:), DA1C(:), DA1P(:),&
+                             DA1M(:), DA2C(:), DA2P(:), DA2M(:), CON(:)
       CONTAINS
+!/ ------------------------------------------------------------------- /
+      SUBROUTINE W3SNL1_INIT()
+
+      USE W3GDATMD, ONLY: NTH, NSPEC
+      USE W3ADATMD, ONLY: NSPECY, NSPECX
+
+      IMPLICIT NONE
+
+      WRITE(0,*) "W3SRCE_INIT (WW3_SHEL): NSPECY/NSPECX: ",NSPECY,NSPECX
+      ALLOCATE(UE(1-NTH:NSPECY), SA1(1-NTH:NSPECX), SA2(1-NTH:NSPECX), &
+              DA1C(1-NTH:NSPECX), DA1P(1-NTH:NSPECX),                 &
+              DA1M(1-NTH:NSPECX), DA2C(1-NTH:NSPECX),                 &
+              DA2P(1-NTH:NSPECX), DA2M(1-NTH:NSPECX), CON(NSPEC))
+      !$ACC KERNELS
+      UE(:) = 0. 
+      SA1(:) = 0. 
+      SA2(:) = 0. 
+      DA1C(:) = 0. 
+      DA1P(:) = 0. 
+      DA1M(:) = 0. 
+      DA2C(:) = 0. 
+      DA2P(:) = 0. 
+      DA2M(:) = 0. 
+      CON(:) = 0.
+      !$ACC END KERNELS
+      END SUBROUTINE
 !/ ------------------------------------------------------------------- /
       SUBROUTINE W3SNL1 (A, CG, KDMEAN, S, D)
 !/
@@ -245,20 +273,20 @@
       INTEGER             :: ITH, IFR, ISP
       REAL                :: X, X2, CONS, CONX, FACTOR, E00, EP1, EM1,&
                              EP2, EM2, SA1A, SA1B, SA2A, SA2B
-      REAL,ALLOCATABLE    ::  UE(:), SA1(:), SA2(:), DA1C(:), DA1P(:),&
-                             DA1M(:), DA2C(:), DA2P(:), DA2M(:), CON(:)
+!      REAL,ALLOCATABLE    ::  UE(:), SA1(:), SA2(:), DA1C(:), DA1P(:),&
+!                             DA1M(:), DA2C(:), DA2P(:), DA2M(:), CON(:)
 !/
 !/ ------------------------------------------------------------------- /
 !/
 ! initialisations
 
-     ALLOCATE(UE(1-NTH:NSPECY), SA1(1-NTH:NSPECX), SA2(1-NTH:NSPECX), &
-              DA1C(1-NTH:NSPECX), DA1P(1-NTH:NSPECX),                 &
-              DA1M(1-NTH:NSPECX), DA2C(1-NTH:NSPECX),                 &
-              DA2P(1-NTH:NSPECX), DA2M(1-NTH:NSPECX), CON(NSPEC))
+!      ALLOCATE(UE(1-NTH:NSPECY), SA1(1-NTH:NSPECX), SA2(1-NTH:NSPECX), &
+!              DA1C(1-NTH:NSPECX), DA1P(1-NTH:NSPECX),                 &
+!              DA1M(1-NTH:NSPECX), DA2C(1-NTH:NSPECX),                 &
+!              DA2P(1-NTH:NSPECX), DA2M(1-NTH:NSPECX), CON(NSPEC))
 !
-!$ACC DATA CREATE(UE(:),SA1(:),SA2(:),DA1C(:),DA1P(:),DA1M(:),DA2C(:))&
-!$ACC      CREATE(DA2P(:),DA2M(:),CON(:))
+!!$ACC DATA CREATE(UE(:),SA1(:),SA2(:),DA1C(:),DA1P(:),DA1M(:),DA2C(:))&
+!!$ACC      CREATE(DA2P(:),DA2M(:),CON(:))
 
 !GPUNotes To make whole routine run effectively on kernels I so have
 !GPUNotes to run the serial section below in a separate kernel to
@@ -388,7 +416,7 @@
 !
       END DO
 !$ACC END KERNELS
-!$ACC END DATA
+!!$ACC END DATA
 !!/DEBUGSRC     WRITE(740+IAPROC,*)  'W3SNL1 : sum(S)=', sum(S)
 !!/DEBUGSRC     WRITE(740+IAPROC,*)  'W3SNL1 : sum(D)=', sum(D)
 !!/DEBUGSRC     FLUSH(740+IAPROC)

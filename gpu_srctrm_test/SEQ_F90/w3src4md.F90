@@ -95,13 +95,16 @@
       REAL,ALLOCATABLE        :: MSSLONG(:,:)
       REAL,ALLOCATABLE        :: QB(:), S2(:)
       REAL,ALLOCATABLE        :: PB(:),PB2(:)
+      REAL, DIMENSION(:,:)   , ALLOCATABLE :: SIGTAB
+      REAL, DIMENSION(:,:)   , ALLOCATABLE :: K1, K2
+      REAL,ALLOCATABLE        :: EB(:), EB2(:), ALFA(:)
 !/
       CONTAINS
 
 !/ ------------------------------------------------------------------- /
       SUBROUTINE W3SRC4_INIT()
 
-      USE W3GDATMD, ONLY: NK, NTH, NSPEC
+      USE W3GDATMD, ONLY: NK, NTH, NSPEC, NKHS, NKD, NDTAB,QBI,DCKI
 
       IMPLICIT NONE
 
@@ -111,11 +114,45 @@
                ,DK(NK),HS(NK),KBAR(NK),DCK(NK),EFDF(NK),BTH0(NK),QB(NK)&
                ,S2(NK),BTH(NSPEC),BTH0S(NK),BTHS(NSPEC),SBK(NSPEC),    &
                IMSSMAX(NK),SBKT(NK),MSSSUM(NK,5),WTHSUM(NTH),PB(NSPEC),&
-               MSSSUM2(NK,NTH),MSSLONG(NK,NTH),PB2(NSPEC))
-
+               MSSSUM2(NK,NTH),MSSLONG(NK,NTH),PB2(NSPEC),EB(NK),      &
+               EB2(NK), ALFA(NK),K1(NK,NDTAB),K2(NK,NDTAB),            &
+               SIGTAB(NK,NDTAB),DCKI(NKHS,NKD),QBI(NKHS,NKD))
 !$ACC KERNELS
-      WTHSUM(:) = 0.
-!$ACC END KERNELS
+      NSMOOTH(:) = 0. 
+      IKSUP(:) = 0. 
+      S1(:) = 0. 
+      E1(:) = 0. 
+      COEF4(:) = 0. 
+      NTIMES(:) = 0. 
+      DK(:) = 0. 
+      HS(:) = 0. 
+      KBAR(:) = 0. 
+      DCK(:) = 0. 
+      EFDF(:) = 0. 
+      BTH0(:) = 0. 
+      QB(:) = 0. 
+      S2(:) = 0. 
+      BTH(:) = 0. 
+      BTH0S(:) = 0. 
+      BTHS(:) = 0. 
+      SBK(:) = 0. 
+      IMSSMAX(:) = 0. 
+      SBKT(:) = 0. 
+      MSSSUM(:,:) = 0. 
+      WTHSUM(:) = 0. 
+      PB(:) = 0. 
+      MSSSUM2(:,:) = 0. 
+      MSSLONG(:,:) = 0. 
+      PB2(:) = 0. 
+      EB(:) = 0. 
+      EB2(:) = 0. 
+      ALFA(:) = 0. 
+      K1(:,:) = 0. 
+      K2(:,:) = 0. 
+      SIGTAB(:,:) = 0. 
+      DCKI(:,:) = 0. 
+      QBI(:,:) = 0. 
+!$ACC END KERNELS      
 
       END SUBROUTINE W3SRC4_INIT
 !/ ------------------------------------------------------------------- /
@@ -217,11 +254,12 @@
       INTEGER                 :: IS, IK, ITH
 !/
       REAL                    :: TAUW, EBAND, EMEANWS, UNZ
-      REAL,ALLOCATABLE        :: EB(:), EB2(:), ALFA(:)
+!      REAL,ALLOCATABLE        :: EB(:), EB2(:), ALFA(:)
+!      ALLOCATE(EB(NK), EB2(NK), ALFA(NK))
 !/ ------------------------------------------------------------------- /
 !/
-      ALLOCATE(EB(NK), EB2(NK), ALFA(NK))
-!$ACC DATA CREATE(EB(:),EB2(:),ALFA(:))
+      WRITE(0,*)'TAG: W3SPR4'
+!$ACC DATA CREATE(EB(:),EB2(:),ALFA(:))  
 !$ACC KERNELS 
       UNZ    = MAX ( 0.01 , U )
       USTAR  = MAX ( 0.0001 , USTAR )
@@ -300,7 +338,6 @@
 ! 5.  Cd and z0 ------------------------------------------------------ *
 !
       TAUW = SQRT(TAUWX**2+TAUWY**2)
- 
       Z0=0.
 !$ACC END KERNELS
       CALL CALC_USTAR(U,TAUW,USTAR,Z0,CHARN)
@@ -447,6 +484,7 @@
       REAL                    :: COSWIND, XSTRESS, YSTRESS, TAUHF
       REAL                    :: TEMP, TEMP2 
       INTEGER                 :: IND,J,I,ISTAB
+      REAL :: TAUW_LOCAL
       REAL DVISC, DTURB
       REAL STRESSSTAB1, STRESSSTAB2, STRESSSTABN1,STRESSSTABN2
 !/
@@ -459,7 +497,7 @@
       !JDM: Initializing values to zero, they shouldn't be used unless
       !set in another place, but seems to solve some bugs with certain
       !compilers.
-!$ACC DATA CREATE(PTURB, PVISC, STRESSSTAB1, STRESSSTAB2)
+!$ACC DATA CREATE(PTURB,PVISC,STRESSSTAB1, STRESSSTAB2)
 !$ACC KERNELS
       D(:) =0.
 
@@ -539,6 +577,7 @@
 ! Abdalla & Cavaleri, JGR 2002 for Usigma. For USTARsigma ... I do not see where
 ! I got it from, maybe just made up from drag law ...
 !
+      !WRITE(0,*)'PTURB : ', PTURB
       UST=USTAR
       ISTAB=3
       TAUX = UST**2* COS(USDIR)
@@ -566,8 +605,7 @@
 !within this loop. Aiming to help the compiler implicitly produce
 !optimisations.
 
-!$ACC LOOP INDEPENDENT &
-!$ACC      REDUCTION(+:STRESSSTAB1, STRESSSTAB2, STRESSSTABN1, STRESSSTABN2)
+!$ACC LOOP INDEPENDENT REDUCTION(+:STRESSSTABN1,STRESSSTABN2,STRESSSTAB1,STRESSSTAB2)
         DO ITH=1,NTH
           USTP=MIN((TAUPX**2+TAUPY**2)**0.25,MAX(UST,0.3))
           USDIRP=ATAN2(TAUPY,TAUPX)
@@ -714,7 +752,7 @@
       TAUHF = CONST0*TEMP*UST**2*TAU1
       TAUWX = XSTRESS+TAUHF*COS(USDIRP)
       TAUWY = YSTRESS+TAUHF*SIN(USDIRP)
-!
+!    
 ! Reduces tail effect to make sure that wave-supported stress
 ! is less than total stress, this is borrowed from ECWAM Stresso.F
 !
@@ -816,8 +854,12 @@
       REAL     DIFF1, DIFF2, BINF, BSUP, CGG, PROF
       REAL     KIK, DHS, KD, KHS, KH, XT, GAM, DKH, PR, W, EPS
       REAL     DKD
-      REAL, DIMENSION(:,:)   , ALLOCATABLE :: SIGTAB
-      REAL, DIMENSION(:,:)   , ALLOCATABLE :: K1, K2
+!      ! Now declared in W3SRC4_INIT
+!      REAL, DIMENSION(:,:)   , ALLOCATABLE :: SIGTAB
+!      REAL, DIMENSION(:,:)   , ALLOCATABLE :: K1, K2
+!        ALLOCATE(K1(NK,NDTAB))
+!        ALLOCATE(K2(NK,NDTAB))
+!        ALLOCATE(SIGTAB(NK,NDTAB))
 !/
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
@@ -874,9 +916,6 @@
 !
 ! High frequency tail for convolution calculation
 !
-        ALLOCATE(K1(NK,NDTAB))
-        ALLOCATE(K2(NK,NDTAB))
-        ALLOCATE(SIGTAB(NK,NDTAB))
  
         SIGTAB=0. !contains frequency for upper windows boundaries
         IKTAB=0  ! contains indices for upper windows boundaries
@@ -919,8 +958,6 @@
         DHS=KHSMAX/NKHS ! max value of KHS=KHSMAX
         DKH=KHMAX/NKHI  ! max value of KH=KHMAX
         DKD=KDMAX/NKD
-        ALLOCATE(DCKI(NKHS,NKD))
-        ALLOCATE(QBI(NKHS,NKD))
         DCKI=0.
         QBI =0.
 !GPUnotes Another nested loop over dissipation table and frequency dimensions
@@ -949,8 +986,6 @@
           QBI = 1.
         END WHERE
  
-        DEALLOCATE(K1,K2)
-        DEALLOCATE(SIGTAB)
       ELSE
         IKTAB(:,:)=1
         DCKI(:,:) =0.
@@ -1638,7 +1673,7 @@
 ! 10. Source code :
 !
 !/ ------------------------------------------------------------------- /
-      USE CONSTANTS,ONLY: GRAV, DAIR, DWAT, PI, TPI, RADE, DEBUG_NODE, ONE
+      USE CONSTANTS,ONLY: GRAV, DAIR, DWAT, PI, TPI, RADE, DEBUG_NODE
       USE W3GDATMD, ONLY: NSPEC, NTH, NK, SSDSBR, DDEN,              &
                           SSDSC, EC2, ES2, ESC,                      &
                           SIG, SSDSP, ECOS, ESIN, DTH, DSIP,         &
@@ -1703,12 +1738,12 @@
 !               IMSSMAX(NK),SBKT(NK),MSSSUM(NK,5),PB(NSPEC),&
 !               MSSSUM2(NK,NTH),MSSLONG(NK,NTH),PB2(NSPEC))
 
-!!$ACC DATA CREATE(NSMOOTH(:),IKSUP(:),S1(:),E1(:),COEF4(:),NTIMES(:)  )&
-!!$ACC      CREATE(DK(:),HS(:),KBAR(:),DCK(:),EFDF(:),BTH0(:),QB(:)    )&
-!!$ACC      CREATE(S2(:),BTH0S(:),BTHS(:),SBK(:),IMSSMAX(:),WTHSUM(:)  )&
-!!$ACC      CREATE(S2(:),BTH0S(:),BTHS(:),SBK(:),IMSSMAX(:) )&
-!!$ACC      CREATE(SBKT(:),MSSSUM(:,:),PB(:),PB2(:),MSSLONG(:,:)       )&
-!!$ACC      CREATE(MSSSUM2(:,:), BTH(:))
+!$ACC DATA CREATE(NSMOOTH(:),IKSUP(:),S1(:),E1(:),COEF4(:),NTIMES(:)  )&
+!$ACC      CREATE(DK(:),HS(:),KBAR(:),DCK(:),EFDF(:),BTH0(:),QB(:)    )&
+!$ACC      CREATE(S2(:),BTH0S(:),BTHS(:),SBK(:),IMSSMAX(:),WTHSUM(:)  )&
+!$ACC      CREATE(S2(:),BTH0S(:),BTHS(:),SBK(:),IMSSMAX(:) )&
+!$ACC      CREATE(SBKT(:),MSSSUM(:,:),PB(:),PB2(:),MSSLONG(:,:)       )&
+!$ACC      CREATE(MSSSUM2(:,:), BTH(:))
 !
 !----------------------------------------------------------------------
 !
@@ -1717,47 +1752,6 @@
 !     found in certain compilers
 
 !$ACC KERNELS
-                 
-! Touch all the SCRATCH variables
-      NSMOOTH(:) = 0
-      IKSUP(:) = 0
-      S1(:) = 0.0
-      E1(:) = 0.0
-      COEF4(:) = 0.0
-      NTIMES(:) = 0
-      DK(:) = 0.0
-      HS(:) = 0.0
-      KBAR(:) = 0.0
-      DCK(:) = 0.0
-      EFDF(:) = 0.0
-      BTH0(:) = 0.0
-      QB(:) = 0.0
-      S2(:) = 0.0
-      BTH(:) = 0.0
-      BTH0S(:) = 0.0
-      BTHS(:) = 0.0
-      SBK(:) = 0.0
-      IMSSMAX(:) = 0
-      SBKT(:) = 0.0
-      MSSSUM(:,:) = 0.0
-      WTHSUM(:) = 0.0
-      PB(:) = 0.0
-      MSSSUM2(:,:) = 0.0
-      MSSLONG(:,:) = 0.0
-      PB2(:) = 0.0
-
-      ! Touch global variables
-      SSDSC(:) = ONE * SSDSC(:)
-      CUMULW(:,:) = ONE * CUMULW(:,:)
-
-      ECOS(:) = ONE * ECOS(:)
-      ESIN(:) = ONE * ESIN(:)
-      SIG(:) = ONE * SIG(:)
-      K(:) = ONE * K(:)
-      A(:) = ONE * A(:)
-      CG(:) = ONE * CG(:)
-!
-
 !CODENotes: Removed pre-initialization, this creates additional 
 !data transfers and are not needed for the mini-app to run.
        
@@ -2367,10 +2361,9 @@
 ! End of output computing
 1000  CONTINUE
 !$ACC END KERNELS
-!!$ACC END DATA
+!$ACC END DATA
 
 
-      !STOP       ! TODO - DONT LEAVE ME HERE! :)
 
 
 
