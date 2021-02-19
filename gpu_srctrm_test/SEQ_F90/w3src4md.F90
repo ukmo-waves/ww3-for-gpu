@@ -259,7 +259,7 @@
 !/ ------------------------------------------------------------------- /
 !/
       WRITE(0,*)'TAG: W3SPR4'
-!$ACC DATA CREATE(EB(:),EB2(:),ALFA(:))  
+!!$ACC DATA CREATE(EB(:),EB2(:),ALFA(:))  
 !$ACC KERNELS 
       UNZ    = MAX ( 0.01 , U )
       USTAR  = MAX ( 0.0001 , USTAR )
@@ -341,13 +341,13 @@
       Z0=0.
 !$ACC END KERNELS
       CALL CALC_USTAR(U,TAUW,USTAR,Z0,CHARN)
-!$ACC UPDATE HOST(USTAR)
+!!$ACC UPDATE HOST(USTAR)
 !$ACC KERNELS
       UNZ    = MAX ( 0.01 , U )
       CD     = (USTAR/UNZ)**2
       USDIR = UDIR
 !$ACC END KERNELS
-!$ACC END DATA
+!!$ACC END DATA
 ! 6.  Final test output ---------------------------------------------- *
 !
       RETURN
@@ -468,25 +468,25 @@
       REAL                    :: FACLN1, FACLN2, LAMBDA
       REAL                    :: COSU, SINU, TAUX, TAUY, USDIRP, USTP
       REAL                    :: TAUPX, TAUPY, UST2, TAUW, TAUWB
-      REAL   , PARAMETER      :: EPS1 = 0.00001, EPS2 = 0.000001
+      REAL, PARAMETER         :: EPS1 = 0.00001, EPS2 = 0.000001
       REAL                    :: Usigma           !standard deviation of U due to gustiness
       REAL                    :: USTARsigma       !standard deviation of USTAR due to gustiness
       REAL                    :: CM, UCN, ZCN, DSTAB, &
                                  Z0VISC, Z0NOZ, EB,  &
                                  EBX, EBY, AORB, AORB1, FW, UORB, TH2, &
                                  RE, FU, FUD, SWELLCOEFV, SWELLCOEFT
-      REAL                   ::  PTURB, PVISC, SMOOTH
-      REAL XI,DELI1,DELI2
-      REAL XJ,DELJ1,DELJ2
-      REAL XK,DELK1,DELK2
+      REAL                    :: SMOOTH
+      REAL                    :: XI,DELI1,DELI2
+      REAL                    :: XJ,DELJ1,DELJ2
+      REAL                    :: XK,DELK1,DELK2
       REAL                    :: CONST, CONST0, CONST2, TAU1
-      REAL X,ZARG,ZLOG,UST
+      REAL                    :: X,ZARG,ZLOG,UST
       REAL                    :: COSWIND, XSTRESS, YSTRESS, TAUHF
       REAL                    :: TEMP, TEMP2 
       INTEGER                 :: IND,J,I,ISTAB
-      REAL :: TAUW_LOCAL
-      REAL DVISC, DTURB
-      REAL STRESSSTAB1, STRESSSTAB2, STRESSSTABN1,STRESSSTABN2
+      REAL                    :: DVISC, DTURB, PVISC, PTURB,ZERO 
+      REAL                    :: STRESSSTABN1, STRESSSTABN2, &
+                                 STRESSSTAB1, STRESSSTAB2
 !/
 !/ ------------------------------------------------------------------- /
 !/
@@ -497,19 +497,15 @@
       !JDM: Initializing values to zero, they shouldn't be used unless
       !set in another place, but seems to solve some bugs with certain
       !compilers.
-!$ACC DATA CREATE(PTURB,PVISC,STRESSSTAB1, STRESSSTAB2)
-!$ACC KERNELS
-      D(:) =0.
 
-      ! ChrisB: STRESSSTAB[N] is a 2D array and does not reduce
-      ! properly in an ACC loop. Only element 3 is ever using in
-      ! the first dimension and the second dimension is size 2.
-      ! Splitting into two seperate scalars simplifies the handling
-      ! in ACC reduce operations.
-      STRESSSTAB1 = 0.
-      STRESSSTAB2 = 0.
-      STRESSSTABN1 = 0.
-      STRESSSTABN2 = 0.
+! As local arrays they should not be required to be created. However
+! with managed memory turned on and this statement removed the output
+! fails.
+!!$ACC DATA CREATE(STRESSSTAB1, STRESSSTAB2)
+!$ACC KERNELS
+      PTURB = 0.
+      PVISC = 0.
+      D(:) = 0.
 !
 ! 1.a  estimation of surface roughness parameters
 !
@@ -530,37 +526,42 @@
            UORB = UORB + A(IS) *SIG(IK)**2 * DDEN(IK) / CG(IK)
            AORB = AORB + A(IS)             * DDEN(IK) / CG(IK) 
         END DO
-!REFACTORED
       END DO
       UORB  = 2*UORB**0.5                  ! significant orbital amplitude
       AORB1 = 2*AORB**(1-0.5*SSWELLF(6))    ! half the significant wave height ... if SWELLF(6)=1
       RE = 4*UORB*AORB1 / NU_AIR           ! Reynolds number
+
 !
 ! Defines the swell dissipation based on the "Reynolds number"
-!
+      
+! GPUNotes Setting the loops to be more specific with ELSE IF removed
+! issues surrounding PTURB and PVISC.
+
       IF (SSWELLF(4).GT.0) THEN
         IF (SSWELLF(7).GT.0.) THEN
           SMOOTH = 0.5*TANH((RE-SSWELLF(4))/SSWELLF(7))
           PTURB=(0.5+SMOOTH)
           PVISC=(0.5-SMOOTH)
-        ELSE
+        ELSE IF (SSWELLF(7).LE.0) THEN
           IF (RE.LE.SSWELLF(4)) THEN
             PTURB =  0.
             PVISC =  1.
-          ELSE
+          ELSE IF (RE.LE.SSWELLF(4)) THEN
             PTURB =  1.
             PVISC =  0.
           END IF
         END IF
-      ELSE
+      ELSE IF (SSWELLF(4).LE.0) THEN
         PTURB=1.
         PVISC=1.
       END IF
-      IF (SSWELLF(2).EQ.0) THEN
-        FW=MAX(ABS(SSWELLF(3)),0.)
-        FU=0.
-        FUD=0.
-      ELSE
+
+! GPUNotes Order of the conditions has been changed to ensure the 
+! output is correct, this shouldn't be required and may be a sign
+! of another issue. Can a more specific condition be used to identify
+! positve entries for SSELLF(2)?
+
+      IF (SSWELLF(2).NE.0.) THEN
         FU=ABS(SSWELLF(3))
         FUD=SSWELLF(2)
         AORB=2*AORB**0.5
@@ -569,15 +570,17 @@
         DELI1= MIN (1. ,XI-FLOAT(IND))
         DELI2= 1. - DELI1
         FW = FWTABLE(IND)*DELI2+FWTABLE(IND+1)*DELI1
+      ELSE IF (SSWELLF(2).EQ.0.) THEN
+        FW=ABS(SSWELLF(3))
+        FU=0.
+        FUD=0.
       END IF
 !
 ! 2.  Diagonal
-!
 ! Here AS is the air-sea temperature difference in degrees. Expression given by
 ! Abdalla & Cavaleri, JGR 2002 for Usigma. For USTARsigma ... I do not see where
 ! I got it from, maybe just made up from drag law ...
 !
-      !WRITE(0,*)'PTURB : ', PTURB
       UST=USTAR
       ISTAB=3
       TAUX = UST**2* COS(USDIR)
@@ -585,9 +588,15 @@
 !
 ! Loop over the resolved part of the spectrum
 !
+      ! ChrisB: STRESSSTAB[N] is a 2D array and does not reduce
+      ! properly in an ACC loop. Only element 3 is ever using in
+      ! the first dimension and the second dimension is size 2.
+      ! Splitting into two seperate scalars simplifies the handling
+      ! in ACC reduce operations.
+
       !STRESSSTAB(ISTAB,:)=0.
       !STRESSSTABN(ISTAB,:)=0.
-      STRESSSTAB1 = 0. ! Already zeroed at L418, but what the hell...
+      STRESSSTAB1 = 0.
       STRESSSTAB2 = 0.
       STRESSSTABN1 = 0.
       STRESSSTABN1 = 0.
@@ -597,20 +606,21 @@
       CONST0=BBETA*DRAT/(KAPPA**2)
 !
 !GPUNotes loops over full spectrum
+!         Private is not required, applied implicitly if not written
+!         here. Is it possible to convert multiple variables into arrays
+!         to run this loop in parallel?
+
+!$ACC LOOP SEQ PRIVATE(STRESSSTAB1, STRESSSTAB2) 
       DO IK=1, NK
         TAUPX=TAUX-ABS(TTAUWSHELTER)*STRESSSTAB1
         TAUPY=TAUY-ABS(TTAUWSHELTER)*STRESSSTAB2
-
-!GPUNotes Added in DSTAB as a variable for simplifying the use of D
-!within this loop. Aiming to help the compiler implicitly produce
-!optimisations.
-
-!$ACC LOOP INDEPENDENT REDUCTION(+:STRESSSTABN1,STRESSSTABN2,STRESSSTAB1,STRESSSTAB2)
+        USTP=MIN((TAUPX**2+TAUPY**2)**0.25,MAX(UST,0.3))
+        USDIRP=ATAN2(TAUPY,TAUPX)
+        COSU   = COS(USDIRP) ! CB - these lines are problematic as the LAST 
+        SINU   = SIN(USDIRP) ! CB - value is used later outside the loop
+!$ACC LOOP INDEPENDENT & 
+!$ACC      REDUCTION(+:STRESSSTABN1,STRESSSTABN2,STRESSSTAB1,STRESSSTAB2)
         DO ITH=1,NTH
-          USTP=MIN((TAUPX**2+TAUPY**2)**0.25,MAX(UST,0.3))
-          USDIRP=ATAN2(TAUPY,TAUPX)
-          COSU   = COS(USDIRP) ! CB - these lines are problematic as the LAST 
-          SINU   = SIN(USDIRP) ! CB - value is used later outside the loop
           IS=1+(IK-1)*NTH
           CM=K(IS)/SIG2(IS) !inverse of phase speed
           UCN=USTP*CM+ZZALP  !this is the inverse wave age
@@ -623,6 +633,7 @@
           SWELLCOEFT=-DRAT*SSWELLF(1)*16*SIG2(IS)**2/GRAV
 
           IR=ITH+(IK-1)*NTH
+          !WRITE(0,*)'IR: ', IR
           COSWIND=(ECOS(IR)*COSU+ESIN(IR)*SINU)
           IF (COSWIND.GT.0.01) THEN
             X=COSWIND*UCN
@@ -632,12 +643,10 @@
             ! ZLOG is ALOG(MU) where MU is defined by Janssen 1991 eq. 15
             ! MU=
             ZLOG=ZCN+ZARG
- 
             IF (ZLOG.LT.0.) THEN
               ! The source term Sp is beta * omega * X**2
               ! as given by Janssen 1991 eq. 19
               DSTAB = CONST*EXP(ZLOG)*ZLOG**4*UCN*UCN*COSWIND**SSINTHP
- 
               LLWS(IR)=.TRUE.
             ELSE
               DSTAB = 0.
@@ -656,23 +665,21 @@
 !
           IF ((SSWELLF(1).NE.0.AND.DSTAB.LT.1E-7*SIG2(IR)) &
               .OR.SSWELLF(3).GT.0) THEN
-!
             DVISC=SWELLCOEFV
             DTURB=SWELLCOEFT*(FW*UORB+(FU+FUD*COSWIND)*USTP)
-!
-            !DSTAB(ISTAB,IS) = DSTAB(ISTAB,IS) + PTURB*DTURB +  PVISC*DVISC
-            D(IR) = DSTAB + PTURB*DTURB +  PVISC*DVISC
-          END IF
+            DSTAB = DSTAB + PTURB*DTURB +  PVISC*DVISC
+! GPUNotes Only update D(:) at the end of the time step, partially removes 
+! loop dependency. 
 
-!
+          END IF
 ! Sums up the wave-supported stress
 !
           ! Wave direction is "direction to"
           ! therefore there is a PLUS sign for the stress
           !TEMP2=CONST2*DSTAB(ISTAB,IS)*A(IS)
-          TEMP2=CONST2*D(IR)*A(IR)
+          TEMP2=CONST2*DSTAB*A(IR)
           !IF (DSTAB(ISTAB,IS).LT.0) THEN
-          IF (D(IR).LT.0) THEN
+          IF (DSTAB.LT.0) THEN
             !STRESSSTABN(ISTAB,1)=STRESSSTABN(ISTAB,1)+TEMP2*ECOS(IS)
             !STRESSSTABN(ISTAB,2)=STRESSSTABN(ISTAB,2)+TEMP2*ESIN(IS)
             STRESSSTABN1=STRESSSTABN1+TEMP2*ECOS(IR)
@@ -683,26 +690,34 @@
             STRESSSTAB1=STRESSSTAB1+TEMP2*ECOS(IR)
             STRESSSTAB2=STRESSSTAB2+TEMP2*ESIN(IR)
           END IF
+          D(IR) = DSTAB
         END DO
+
+! GPUNotes Calls to STRESSSTAB1/2 inside the outer loops means that
+! STRESSSTAB1/2 variable is local to the loop and not required outside.
+! This prevents issues arrising with TAUPX as the variable is not used
+! later on in the code, hence STRESSSTABN1/2 is unaffected.
+      XSTRESS=STRESSSTAB1
+      YSTRESS=STRESSSTAB2
       END DO
 
-
+      TAUWNX =STRESSSTABN1
+      TAUWNY =STRESSSTABN2
+      !------------
+      ! By adding the calls to the outer loop that is run sequentially
+      ! we can avoid the need of redoing the calls as the last value is
+      ! already being used. P.s. the outer loop must be seq anyway.
       !------------
       ! ChrisB: Need to repeat code from lines 548 - 554 here
       ! as COSU and SINU need to be the last calculated 
       ! values from the IK loop
-      TAUPX=TAUX-ABS(TTAUWSHELTER)*STRESSSTAB1
-      TAUPY=TAUY-ABS(TTAUWSHELTER)*STRESSSTAB2
-      USDIRP=ATAN2(TAUPY,TAUPX)
-      COSU   = COS(USDIRP) ! CB - these lines are problematic as the LAST 
-      SINU   = SIN(USDIRP) ! CB - value is used later outside the loop
+!      TAUPX=TAUX-ABS(TTAUWSHELTER)*STRESSSTAB1
+!      TAUPY=TAUY-ABS(TTAUWSHELTER)*STRESSSTAB2
+!      USDIRP=ATAN2(TAUPY,TAUPX)
+!      COSU   = COS(USDIRP) ! CB - these lines are problematic as the LAST 
+!      SINU   = SIN(USDIRP) ! CB - value is used later outside the loop
       !------------
 
-! Replaced DSTAB with D, 
-      XSTRESS=STRESSSTAB1
-      YSTRESS=STRESSSTAB2
-      TAUWNX =STRESSSTABN1
-      TAUWNY =STRESSSTABN2
       S(:) = D(:) * A(:)
 !
 ! ... Test output of arrays
@@ -764,7 +779,6 @@
         TAUWY=TAUWY*TAUWB/TAUW
       END IF
 !$ACC END KERNELS
-!$ACC END DATA
       RETURN
 !
 ! Formats
@@ -1572,7 +1586,7 @@
       REAL TAUW_LOCAL
 
       INTEGER IND,J
-!$ACC DATA COPYOUT(USTAR)
+!!$ACC DATA COPYOUT(USTAR)
 !$ACC KERNELS
       TAUW_LOCAL=MAX(MIN(TAUW,TAUWMAX),0.)
       XI      = SQRT(TAUW_LOCAL)/DELTAUW
@@ -1597,7 +1611,7 @@
       END IF
 !
 !$ACC END KERNELS
-!$ACC END DATA
+!!$ACC END DATA
       RETURN
       END SUBROUTINE CALC_USTAR
 !/ ------------------------------------------------------------------- /
@@ -1738,12 +1752,12 @@
 !               IMSSMAX(NK),SBKT(NK),MSSSUM(NK,5),PB(NSPEC),&
 !               MSSSUM2(NK,NTH),MSSLONG(NK,NTH),PB2(NSPEC))
 
-!$ACC DATA CREATE(NSMOOTH(:),IKSUP(:),S1(:),E1(:),COEF4(:),NTIMES(:)  )&
-!$ACC      CREATE(DK(:),HS(:),KBAR(:),DCK(:),EFDF(:),BTH0(:),QB(:)    )&
-!$ACC      CREATE(S2(:),BTH0S(:),BTHS(:),SBK(:),IMSSMAX(:),WTHSUM(:)  )&
-!$ACC      CREATE(S2(:),BTH0S(:),BTHS(:),SBK(:),IMSSMAX(:) )&
-!$ACC      CREATE(SBKT(:),MSSSUM(:,:),PB(:),PB2(:),MSSLONG(:,:)       )&
-!$ACC      CREATE(MSSSUM2(:,:), BTH(:))
+!!$ACC DATA CREATE(NSMOOTH(:),IKSUP(:),S1(:),E1(:),COEF4(:),NTIMES(:)  )&
+!!$ACC      CREATE(DK(:),HS(:),KBAR(:),DCK(:),EFDF(:),BTH0(:),QB(:)    )&
+!!$ACC      CREATE(S2(:),BTH0S(:),BTHS(:),SBK(:),IMSSMAX(:),WTHSUM(:)  )&
+!!$ACC      CREATE(S2(:),BTH0S(:),BTHS(:),SBK(:),IMSSMAX(:) )&
+!!$ACC      CREATE(SBKT(:),MSSSUM(:,:),PB(:),PB2(:),MSSLONG(:,:)       )&
+!!$ACC      CREATE(MSSSUM2(:,:), BTH(:))
 !
 !----------------------------------------------------------------------
 !
@@ -2361,7 +2375,7 @@
 ! End of output computing
 1000  CONTINUE
 !$ACC END KERNELS
-!$ACC END DATA
+!!$ACC END DATA
 
 
 

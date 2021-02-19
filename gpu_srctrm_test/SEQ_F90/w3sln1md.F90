@@ -159,10 +159,10 @@
 !/
 !
 !GPUNotes now running entire subroutine on GPU
-!$ACC DATA COPYIN (ECOS,ESIN,K,SIG)        &
-!$ACC      COPYIN (FSPM,FSHF,SLNC1,NTH,NK) &
-!$ACC      CREATE (DIRF,WNF)               & 
-!$ACC      COPY   (S)
+!!$ACC DATA COPYIN (ECOS,ESIN,K,SIG)        &
+!!$ACC      COPYIN (FSPM,FSHF,SLNC1,NTH,NK) &
+!!$ACC      CREATE (DIRF,WNF)               & 
+!!$ACC      COPY   (S)
 !$ACC KERNELS
 ! 1.  Set up factors ------------------------------------------------- *
 !
@@ -211,7 +211,7 @@
         END DO
       END DO
 !$ACC END KERNELS
-!$ACC END DATA
+!!$ACC END DATA
 !
       RETURN
 !

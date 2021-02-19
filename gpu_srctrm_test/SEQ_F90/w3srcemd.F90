@@ -442,7 +442,7 @@
       REAL, INTENT(IN)        :: REFLEC(4), DELX, DELY, DELA,         &
                                  TRNX, TRNY, BERG, ICEDMAX
       REAL, INTENT(INOUT)     :: WN1(:), CG1(:), &
-                                 SPEC(NSPEC), ALPHA(:), USTAR,       &
+                                 SPEC(:), ALPHA(:), USTAR,       &
                                  USTDIR, FPI, TAUOX, TAUOY,           &
                                  TAUWX, TAUWY, PHIAW, PHIOC, PHICE,   &
                                  CHARN, TWS, BEDFORM(3), PHIBBL,      &
@@ -512,22 +512,22 @@
       SPR4T = 0.0
       SIN4T = 0.0
       SDS4T = 0.0
-!$ACC DATA COPY   (WN1(:),CG1(:),SPEC(:),ALPHA(:),USTAR,USTDIR,FPI,TWS  )&
-!$ACC      COPY   (TAUOX,TAUOY,TAUWX,TAUWY,PHIAW,PHIOC,PHICE,CHARN,ICEF )&
-!$ACC      COPY   (BEDFORM(:),PHIBBL,TAUBBL(:),TAUICE(:),WHITECAP(:)    )&
-!$ACC      COPY   (TAUWIX,TAUWIY,TAUWNX,TAUWNY                          )&
-!$ACC      COPYIN (U10ABS,U10DIR,CX,CY,DTG,ICE,ICEH,D_INP,IT,IX         )&  
-!$ACC      COPYIN (IY,IMOD,SPECOLD(:),REFLED(:),BERG,COEF,TRNX,ICEDMAX  )&
-!$ACC      COPYIN (REFLEC(:),AS,TRNY,INFLAGS1,INFLAGS2                  )&
-!$ACC      COPYOUT(VSIO(:),VDIO(:),SHAVEIO,DTDYN,FCUT                   )&
-!$ACC      CREATE (SPECINIT(:),SPEC2(:),DAM(:),WN2(:),BRLAMBDA(:),VS(:) )&
-!$ACC      CREATE (VSLN(:),VSIN(:),VDIN(:),VSNL(:),VDNL(:),VSDS(:),VD(:))&
-!$ACC      CREATE (VDDS(:),VSBT(:),VDBT(:),COSI(:),LLWS(:),FOUT,ICECOEF2)&
-!$ACC      CREATE (SOUT(:,:),DOUT(:,:),WN_R(:),CG_ICE(:),ALPHA_LIU(:)   )&
-!$ACC      CREATE (R(:),EBAND,DIFF,EFINISH,HSTOT,PHINL,MWXINIT,MWYINIT  )&
-!$ACC      CREATE (FACTOR,FACTOR2,TAUWAX,TAUWAY,MWXFINISH,A1BAND        )&
-!$ACC      CREATE (MWYFINISH,B1BAND,EMEAN,FMEAN,WNMEAN,AMAX,CD,Z0,SCAT  )&
-!$ACC      CREATE (SMOOTH_ICEDISP,ICECOEF2,KDMEAN)
+!!$ACC DATA COPY   (WN1(:),CG1(:),SPEC(:),ALPHA(:),USTAR,USTDIR,FPI,TWS  )&
+!!$ACC      COPY   (TAUOX,TAUOY,TAUWX,TAUWY,PHIAW,PHIOC,PHICE,CHARN,ICEF )&
+!!$ACC      COPY   (BEDFORM(:),PHIBBL,TAUBBL(:),TAUICE(:),WHITECAP(:)    )&
+!!$ACC      COPY   (TAUWIX,TAUWIY,TAUWNX,TAUWNY                          )&
+!!$ACC      COPYIN (U10ABS,U10DIR,CX,CY,DTG,ICE,ICEH,D_INP,IT,IX         )&  
+!!$ACC      COPYIN (IY,IMOD,SPECOLD(:),REFLED(:),BERG,COEF,TRNX,ICEDMAX  )&
+!!$ACC      COPYIN (REFLEC(:),AS,TRNY,INFLAGS1,INFLAGS2                  )&
+!!$ACC      COPYOUT(VSIO(:),VDIO(:),SHAVEIO,DTDYN,FCUT                   )
+!!$ACC      CREATE (SPECINIT(:),SPEC2(:),DAM(:),WN2(:),BRLAMBDA(:),VS(:) )&
+!!$ACC      CREATE (VSLN(:),VSIN(:),VDIN(:),VSNL(:),VDNL(:),VSDS(:),VD(:))&
+!!$ACC      CREATE (VDDS(:),VSBT(:),VDBT(:),COSI(:),LLWS(:),FOUT,ICECOEF2)&
+!!$ACC      CREATE (SOUT(:,:),DOUT(:,:),WN_R(:),CG_ICE(:),ALPHA_LIU(:)   )&
+!!$ACC      CREATE (R(:),EBAND,DIFF,EFINISH,HSTOT,PHINL,MWXINIT,MWYINIT  )&
+!!$ACC      CREATE (FACTOR,FACTOR2,TAUWAX,TAUWAY,MWXFINISH,A1BAND        )&
+!!$ACC      CREATE (MWYFINISH,B1BAND,EMEAN,FMEAN,WNMEAN,AMAX,CD,Z0,SCAT  )&
+!!$ACC      CREATE (SMOOTH_ICEDISP,ICECOEF2,KDMEAN)
 !$ACC KERNELS      
 !
       
@@ -750,7 +750,6 @@
           DT     = MIN ( DT , AFAC / ( MAX ( 1.E-10,                  &
                          1. + OFFSET*AFAC*MIN(0.,VD(IS)) ) ) )
         END DO  ! end of loop on IS
-!
 !        WRITE(*,*) 'NODE_NUMBER', IX
 !        IF (IX == DEBUG_NODE) WRITE(*,*) 'TIMINGS 1', DT
         DT     = MAX ( 0.5, DT )                   ! Here we have a hardlimit, which is not too usefull, at least not as a fixed con
@@ -1054,7 +1053,7 @@
  
       SPEC = MAX(0., SPEC)
 !$ACC END KERNELS
-!$ACC END DATA
+!!$ACC END DATA
       RETURN
 
 ! Formats
