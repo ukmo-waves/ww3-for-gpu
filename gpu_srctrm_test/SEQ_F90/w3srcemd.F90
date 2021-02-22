@@ -75,34 +75,34 @@
       DOUT(NK,NTH), WN_R(NK), CG_ICE(NK), ALPHA_LIU(NK), R(NK),        &
       COSI(2), LLWS(NSPEC))
 
-!$ACC KERNELS
-      DAM(:) = 0.
-      WN2(:) = 0.
-      VSLN(:) = 0.
-      SPECINIT(:) = 0.
-      SPEC2(:) = 0.
-      VSIN(:) = 0.
-      VDIN(:) = 0.
-      VSNL(:) = 0.
-      VDNL(:) = 0.
-      VSDS(:) = 0.
-      VDDS(:) = 0.
-      VSBT(:) = 0.
-      VDBT(:) = 0.
-      VS(:) = 0.
-      VD(:) = 0.
-      EB(:) = 0.
-      BRLAMBDA(:) = 0.
-      FOUT(:,:) = 0.
-      SOUT(:,:) = 0.
-      DOUT(:,:) = 0.
-      WN_R(:) = 0.
-      CG_ICE(:) = 0.
-      ALPHA_LIU(:) = 0.
-      R(:) = 0.
-      COSI(:) = 0.
-      LLWS(:) = 0.
-!$ACC END KERNELS
+!!$ACC KERNELS
+!      DAM(:) = 0.
+!      WN2(:) = 0.
+!      VSLN(:) = 0.
+!      SPECINIT(:) = 0.
+!      SPEC2(:) = 0.
+!      VSIN(:) = 0.
+!      VDIN(:) = 0.
+!      VSNL(:) = 0.
+!      VDNL(:) = 0.
+!      VSDS(:) = 0.
+!      VDDS(:) = 0.
+!      VSBT(:) = 0.
+!      VDBT(:) = 0.
+!      VS(:) = 0.
+!      VD(:) = 0.
+!      EB(:) = 0.
+!      BRLAMBDA(:) = 0.
+!      FOUT(:,:) = 0.
+!      SOUT(:,:) = 0.
+!      DOUT(:,:) = 0.
+!      WN_R(:) = 0.
+!      CG_ICE(:) = 0.
+!      ALPHA_LIU(:) = 0.
+!      R(:) = 0.
+!      COSI(:) = 0.
+!      LLWS(:) = 0.
+!!$ACC END KERNELS
       END SUBROUTINE W3SRCE_INIT
 
 !/ ------------------------------------------------------------------- /
@@ -432,7 +432,7 @@
 !/ Parameter list
 !/
       INTEGER, INTENT(IN)     :: srce_call, IT, JSEA, IX, IY, IMOD
-      REAL, intent(in)        :: SPECOLD(NSPEC)
+      REAL, intent(IN)        :: SPECOLD(NSPEC)
       REAL, INTENT(OUT)       :: VSIO(NSPEC), VDIO(NSPEC)
       LOGICAL, INTENT(OUT)    :: SHAVEIO
       REAL, INTENT(IN)        :: D_INP, U10ABS,     &
@@ -519,15 +519,15 @@
 !$ACC      COPYIN (U10ABS,U10DIR,CX,CY,DTG,ICE,ICEH,D_INP,IT,IX         )&  
 !$ACC      COPYIN (IY,IMOD,SPECOLD(:),REFLED(:),BERG,COEF,TRNX,ICEDMAX  )&
 !$ACC      COPYIN (REFLEC(:),AS,TRNY,INFLAGS1,INFLAGS2                  )&
-!$ACC      COPYOUT(VSIO(:),VDIO(:),SHAVEIO,DTDYN,FCUT                   )&
-!$ACC      CREATE (SPECINIT(:),SPEC2(:),DAM(:),WN2(:),BRLAMBDA(:),VS(:) )&
-!$ACC      CREATE (VSLN(:),VSIN(:),VDIN(:),VSNL(:),VDNL(:),VSDS(:),VD(:))&
-!$ACC      CREATE (VDDS(:),VSBT(:),VDBT(:),COSI(:),LLWS(:),FOUT,ICECOEF2)&
-!$ACC      CREATE (SOUT(:,:),DOUT(:,:),WN_R(:),CG_ICE(:),ALPHA_LIU(:)   )&
-!$ACC      CREATE (R(:),EBAND,DIFF,EFINISH,HSTOT,PHINL,MWXINIT,MWYINIT  )&
-!$ACC      CREATE (FACTOR,FACTOR2,TAUWAX,TAUWAY,MWXFINISH,A1BAND        )&
-!$ACC      CREATE (MWYFINISH,B1BAND,EMEAN,FMEAN,WNMEAN,AMAX,CD,Z0,SCAT  )&
-!$ACC      CREATE (SMOOTH_ICEDISP,ICECOEF2,KDMEAN)
+!$ACC      COPYOUT(VSIO(:),VDIO(:),SHAVEIO,DTDYN,FCUT                   )
+!!$ACC      CREATE (SPECINIT(:),SPEC2(:),DAM(:),WN2(:),BRLAMBDA(:),VS(:) )&
+!!$ACC      CREATE (VSLN(:),VSIN(:),VDIN(:),VSNL(:),VDNL(:),VSDS(:),VD(:))&
+!!$ACC      CREATE (VDDS(:),VSBT(:),VDBT(:),COSI(:),LLWS(:),FOUT,ICECOEF2)&
+!!$ACC      CREATE (SOUT(:,:),DOUT(:,:),WN_R(:),CG_ICE(:),ALPHA_LIU(:)   )&
+!!$ACC      CREATE (R(:),EBAND,DIFF,EFINISH,HSTOT,PHINL,MWXINIT,MWYINIT  )&
+!!$ACC      CREATE (FACTOR,FACTOR2,TAUWAX,TAUWAY,MWXFINISH,A1BAND        )&
+!!$ACC      CREATE (MWYFINISH,B1BAND,EMEAN,FMEAN,WNMEAN,AMAX,CD,Z0,SCAT  )&
+!!$ACC      CREATE (SMOOTH_ICEDISP,ICECOEF2,KDMEAN)
 !$ACC KERNELS      
 !
       

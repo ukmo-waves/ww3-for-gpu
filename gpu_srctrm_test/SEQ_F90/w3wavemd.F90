@@ -1150,8 +1150,8 @@
 !$ACC      COPY   (TAUBBL(:,:),TAUICE(:,:),WHITECAP(:,:),TAUWIX(:)     )&
 !$ACC      COPY   (TAUWIY(:),TAUWNX(:),TAUWNY(:),ICEF(:),PHIBBL(:)     )&
 !$ACC      COPYOUT(VSioDummy(:),VDioDummy(:),SHAVETOTioDummy,FCUT(:)   )&
-!$ACC      COPYOUT(DTDYN(:)                                            )&
-!$ACC      CREATE (JSEA,IX,IY,DELX,DELY,DELA,TMP1(:),TMP2(:),TMP3(:),TMP4(:))
+!$ACC      COPYOUT(DTDYN(:)                                            )
+!!$ACC      CREATE (JSEA,IX,IY,DELX,DELY,DELA,TMP1(:),TMP2(:),TMP3(:),TMP4(:))
 !$ACC KERNELS
             D50=0.0002
             REFLEC(:)=0.

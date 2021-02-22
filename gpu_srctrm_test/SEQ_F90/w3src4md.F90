@@ -117,42 +117,42 @@
                MSSSUM2(NK,NTH),MSSLONG(NK,NTH),PB2(NSPEC),EB(NK),      &
                EB2(NK), ALFA(NK),K1(NK,NDTAB),K2(NK,NDTAB),            &
                SIGTAB(NK,NDTAB),DCKI(NKHS,NKD),QBI(NKHS,NKD))
-!$ACC KERNELS
-      NSMOOTH(:) = 0. 
-      IKSUP(:) = 0. 
-      S1(:) = 0. 
-      E1(:) = 0. 
-      COEF4(:) = 0. 
-      NTIMES(:) = 0. 
-      DK(:) = 0. 
-      HS(:) = 0. 
-      KBAR(:) = 0. 
-      DCK(:) = 0. 
-      EFDF(:) = 0. 
-      BTH0(:) = 0. 
-      QB(:) = 0. 
-      S2(:) = 0. 
-      BTH(:) = 0. 
-      BTH0S(:) = 0. 
-      BTHS(:) = 0. 
-      SBK(:) = 0. 
-      IMSSMAX(:) = 0. 
-      SBKT(:) = 0. 
-      MSSSUM(:,:) = 0. 
-      WTHSUM(:) = 0. 
-      PB(:) = 0. 
-      MSSSUM2(:,:) = 0. 
-      MSSLONG(:,:) = 0. 
-      PB2(:) = 0. 
-      EB(:) = 0. 
-      EB2(:) = 0. 
-      ALFA(:) = 0. 
-      K1(:,:) = 0. 
-      K2(:,:) = 0. 
-      SIGTAB(:,:) = 0. 
-      DCKI(:,:) = 0. 
-      QBI(:,:) = 0. 
-!$ACC END KERNELS      
+!!$ACC KERNELS
+!      NSMOOTH(:) = 0. 
+!      IKSUP(:) = 0. 
+!      S1(:) = 0. 
+!      E1(:) = 0. 
+!      COEF4(:) = 0. 
+!      NTIMES(:) = 0. 
+!      DK(:) = 0. 
+!      HS(:) = 0. 
+!      KBAR(:) = 0. 
+!      DCK(:) = 0. 
+!      EFDF(:) = 0. 
+!      BTH0(:) = 0. 
+!      QB(:) = 0. 
+!      S2(:) = 0. 
+!      BTH(:) = 0. 
+!      BTH0S(:) = 0. 
+!      BTHS(:) = 0. 
+!      SBK(:) = 0. 
+!      IMSSMAX(:) = 0. 
+!      SBKT(:) = 0. 
+!      MSSSUM(:,:) = 0. 
+!      WTHSUM(:) = 0. 
+!      PB(:) = 0. 
+!      MSSSUM2(:,:) = 0. 
+!      MSSLONG(:,:) = 0. 
+!      PB2(:) = 0. 
+!      EB(:) = 0. 
+!      EB2(:) = 0. 
+!      ALFA(:) = 0. 
+!      K1(:,:) = 0. 
+!      K2(:,:) = 0. 
+!      SIGTAB(:,:) = 0. 
+!      DCKI(:,:) = 0. 
+!      QBI(:,:) = 0. 
+!!$ACC END KERNELS      
 
       END SUBROUTINE W3SRC4_INIT
 !/ ------------------------------------------------------------------- /
