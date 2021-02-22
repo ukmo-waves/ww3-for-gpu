@@ -73,7 +73,7 @@
               DA1C(1-NTH:NSPECX), DA1P(1-NTH:NSPECX),                 &
               DA1M(1-NTH:NSPECX), DA2C(1-NTH:NSPECX),                 &
               DA2P(1-NTH:NSPECX), DA2M(1-NTH:NSPECX), CON(NSPEC))
-      !$ACC KERNELS
+      !!$ACC KERNELS
       UE(:) = 0. 
       SA1(:) = 0. 
       SA2(:) = 0. 
@@ -84,7 +84,7 @@
       DA2P(:) = 0. 
       DA2M(:) = 0. 
       CON(:) = 0.
-      !$ACC END KERNELS
+      !!$ACC END KERNELS
       END SUBROUTINE
 !/ ------------------------------------------------------------------- /
       SUBROUTINE W3SNL1 (A, CG, KDMEAN, S, D)
@@ -292,7 +292,7 @@
 !GPUNotes to run the serial section below in a separate kernel to
 !GPUNotes the other parallel parts. This prevents last two loop sections
 !GPUNotes becoming serial... Not sure why. 
-!$ACC KERNELS
+!!$ACC KERNELS
 ! 1.  Calculate prop. constant --------------------------------------- *
 !
       X      = MAX ( KDCON*KDMEAN , KDMN )
@@ -415,7 +415,7 @@
                 + SWG8 * ( DA1M(IC81(ISP)) + DA2M(IC82(ISP)) )
 !
       END DO
-!$ACC END KERNELS
+!!$ACC END KERNELS
 !!$ACC END DATA
 !!/DEBUGSRC     WRITE(740+IAPROC,*)  'W3SNL1 : sum(S)=', sum(S)
 !!/DEBUGSRC     WRITE(740+IAPROC,*)  'W3SNL1 : sum(D)=', sum(D)

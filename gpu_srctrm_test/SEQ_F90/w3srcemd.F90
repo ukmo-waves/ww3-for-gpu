@@ -75,34 +75,34 @@
       DOUT(NK,NTH), WN_R(NK), CG_ICE(NK), ALPHA_LIU(NK), R(NK),        &
       COSI(2), LLWS(NSPEC))
 
-!$ACC KERNELS
-      DAM(:) = 0.
-      WN2(:) = 0.
-      VSLN(:) = 0.
-      SPECINIT(:) = 0.
-      SPEC2(:) = 0.
-      VSIN(:) = 0.
-      VDIN(:) = 0.
-      VSNL(:) = 0.
-      VDNL(:) = 0.
-      VSDS(:) = 0.
-      VDDS(:) = 0.
-      VSBT(:) = 0.
-      VDBT(:) = 0.
-      VS(:) = 0.
-      VD(:) = 0.
-      EB(:) = 0.
-      BRLAMBDA(:) = 0.
-      FOUT(:,:) = 0.
-      SOUT(:,:) = 0.
-      DOUT(:,:) = 0.
-      WN_R(:) = 0.
-      CG_ICE(:) = 0.
-      ALPHA_LIU(:) = 0.
-      R(:) = 0.
-      COSI(:) = 0.
-      LLWS(:) = 0.
-!$ACC END KERNELS
+!!$ACC KERNELS
+!      DAM(:) = 0.
+!      WN2(:) = 0.
+!      VSLN(:) = 0.
+!      SPECINIT(:) = 0.
+!      SPEC2(:) = 0.
+!      VSIN(:) = 0.
+!      VDIN(:) = 0.
+!      VSNL(:) = 0.
+!      VDNL(:) = 0.
+!      VSDS(:) = 0.
+!      VDDS(:) = 0.
+!      VSBT(:) = 0.
+!      VDBT(:) = 0.
+!      VS(:) = 0.
+!      VD(:) = 0.
+!      EB(:) = 0.
+!      BRLAMBDA(:) = 0.
+!      FOUT(:,:) = 0.
+!      SOUT(:,:) = 0.
+!      DOUT(:,:) = 0.
+!      WN_R(:) = 0.
+!      CG_ICE(:) = 0.
+!      ALPHA_LIU(:) = 0.
+!      R(:) = 0.
+!      COSI(:) = 0.
+!      LLWS(:) = 0.
+!!$ACC END KERNELS
       END SUBROUTINE W3SRCE_INIT
 
 !/ ------------------------------------------------------------------- /
@@ -528,7 +528,7 @@
 !!$ACC      CREATE (FACTOR,FACTOR2,TAUWAX,TAUWAY,MWXFINISH,A1BAND        )&
 !!$ACC      CREATE (MWYFINISH,B1BAND,EMEAN,FMEAN,WNMEAN,AMAX,CD,Z0,SCAT  )&
 !!$ACC      CREATE (SMOOTH_ICEDISP,ICECOEF2,KDMEAN)
-!$ACC KERNELS      
+!!$ACC KERNELS      
 !
       
       DEPTH  = MAX ( DMIN , D_INP )
@@ -604,13 +604,13 @@
 !
       TAUWX=0.
       TAUWY=0.
-!$ACC END KERNELS
+!!$ACC END KERNELS
       IF ( IT .eq. 0 ) THEN
-!$ACC KERNELS
+!!$ACC KERNELS
          LLWS(:) = .TRUE.
          USTAR=0.
          USTDIR=0.
-!$ACC END KERNELS
+!!$ACC END KERNELS
       ELSE
 !GPUNotes calls to W3PSR4 and W3SIN4 below will contain source term specific spectral loops
 !GPUNotes the sequencing is important (although maybe excessive?)
@@ -635,7 +635,7 @@
                  TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
       CALL CPU_TIME(eTime1)
       SPR4T = SPR4T + eTime1 - sTime1
-!$ACC KERNELS
+!!$ACC KERNELS
       TWS = 1./FMEANWS
 !
 ! 1.c2 Stores the initial data
@@ -660,7 +660,7 @@
 !GPUNotes loop for explicit time integration of source terms
 !GPUNotes this might be a pain in the proverbial for tightening
 !GPUNotes the seapoint and spectral loops
-!$ACC END KERNELS
+!!$ACC END KERNELS
       DO
         NSTEPS = NSTEPS + 1
 ! 2.  Calculate source terms ----------------------------------------- *
@@ -708,7 +708,7 @@
 !
 ! 3.  Set frequency cut-off ------------------------------------------ *
 !
-!$ACC KERNELS 
+!!$ACC KERNELS 
         NKH    = MIN ( NK , INT(FACTI2+FACTI1*LOG(MAX(1.E-7,FHIGH))) )
         NKH1   = MIN ( NK , NKH+1 )
         NSPECH = NKH1*NTH
@@ -838,7 +838,7 @@
         TAUWIY= TAUWIY+ TAUWY * DRAT *DT
         TAUWNX= TAUWNX+ TAUWAX * DRAT *DT
         TAUWNY= TAUWNY+ TAUWAY * DRAT *DT
-!$ACC END KERNELS
+!!$ACC END KERNELS
         ! MISSING: TAIL TO BE ADDED ?
 ! 6.  Add tail ------------------------------------------------------- *
 !   a Mean parameters
@@ -850,7 +850,7 @@
                    TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
         CALL CPU_TIME(eTime1)
         SPR4T = SPR4T + eTime1 - sTime1
-!$ACC KERNELS
+!!$ACC KERNELS
 !
 ! Introduces a Long & Resio (JGR2007) type dependance on wave age
         FAGE   = FFXFA*TANH(0.3*U10ABS*FMEANWS*TPI/GRAV)
@@ -880,7 +880,7 @@
           END DO
         END DO
 !
-!$ACC END KERNELS
+!!$ACC END KERNELS
 ! 6.e  Update wave-supported stress----------------------------------- *
 !
 ! GPUNotes source term specific loops over spectrum in this call
@@ -905,7 +905,7 @@
 ! ... End point dynamic integration - - - - - - - - - - - - - - - - - -
 !
 ! 8.  Save integration data ------------------------------------------ *
-!$ACC KERNELS
+!!$ACC KERNELS
       DTDYN  = DTDYN / REAL(MAX(1,NSTEPS))
       FCUT   = FHIGH * TPIINV
 !
@@ -1052,7 +1052,7 @@
       IF (IT.EQ.0) SPEC = SPECINIT(:)
  
       SPEC = MAX(0., SPEC)
-!$ACC END KERNELS
+!!$ACC END KERNELS
 !!$ACC END DATA
       RETURN
 
