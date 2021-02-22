@@ -168,8 +168,8 @@
 !     RECT%SF0              = 1.       ! scaling division factor for x0,y0 coord
 ! -------------------------------------------------------------------- !
 &RECT_NML
-  RECT%NX           = 10 
-  RECT%NY           = 10 
+  RECT%NX           = 3 
+  RECT%NY           = 3 
   RECT%SX           =  1.
   RECT%SY           =  1.
   RECT%SF           =  1.E-2
