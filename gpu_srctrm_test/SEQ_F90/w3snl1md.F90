@@ -68,23 +68,23 @@
 
       IMPLICIT NONE
 
-      WRITE(0,*) "W3SRCE_INIT (WW3_SHEL): NSPECY/NSPECX: ",NSPECY,NSPECX
+      WRITE(0,*) "W3SNL1_INIT (WW3_SHEL): NSPECY/NSPECX: ",NSPECY,NSPECX
       ALLOCATE(UE(1-NTH:NSPECY), SA1(1-NTH:NSPECX), SA2(1-NTH:NSPECX), &
               DA1C(1-NTH:NSPECX), DA1P(1-NTH:NSPECX),                 &
               DA1M(1-NTH:NSPECX), DA2C(1-NTH:NSPECX),                 &
               DA2P(1-NTH:NSPECX), DA2M(1-NTH:NSPECX), CON(NSPEC))
-!      !$ACC KERNELS
-!      UE(:) = 0. 
-!      SA1(:) = 0. 
-!      SA2(:) = 0. 
-!      DA1C(:) = 0. 
-!      DA1P(:) = 0. 
-!      DA1M(:) = 0. 
-!      DA2C(:) = 0. 
-!      DA2P(:) = 0. 
-!      DA2M(:) = 0. 
-!      CON(:) = 0.
-!      !$ACC END KERNELS
+!$ACC KERNELS
+      !UE(:) = 0. 
+      !SA1(:) = 0. 
+      !SA2(:) = 0. 
+      !DA1C(:) = 0. 
+      !DA1P(:) = 0. 
+      !DA1M(:) = 0. 
+      !DA2C(:) = 0. 
+      !DA2P(:) = 0. 
+      !DA2M(:) = 0. 
+      !CON(:) = 0.
+!!$ACC END KERNELS
       END SUBROUTINE
 !/ ------------------------------------------------------------------- /
       SUBROUTINE W3SNL1 (A, CG, KDMEAN, S, D)
@@ -719,14 +719,14 @@
       SWG7   = AWG7**2
       SWG8   = AWG8**2
 !
-!$ACC ENTER DATA COPYIN(NFR,NFRHGH, NFRCHG, NSPECX, NSPECY)            &
-!$ACC            COPYIN(IP11, IP12, IP13, IP14, IM11, IM12, IM13, IM14)&
-!$ACC            COPYIN(IP21, IP22, IP23, IP24, IM21, IM22, IM23, IM24)&
-!$ACC            COPYIN(IC11, IC12, IC21, IC22, IC31, IC32, IC41, IC42)&
-!$ACC            COPYIN(IC51, IC52, IC61, IC62, IC71, IC72, IC81, IC82)&
-!$ACC            COPYIN(DAL1, DAL2, DAL3, AF11)                        &
-!$ACC            COPYIN(AWG1, AWG2, AWG3, AWG4, AWG5, AWG6, AWG7, AWG8)&
-!$ACC            COPYIN(SWG1, SWG2, SWG3, SWG4, SWG5, SWG6, SWG7, SWG8)
+!!$ACC ENTER DATA COPYIN(NFR,NFRHGH, NFRCHG, NSPECX, NSPECY)            &
+!!$ACC            COPYIN(IP11, IP12, IP13, IP14, IM11, IM12, IM13, IM14)&
+!!$ACC            COPYIN(IP21, IP22, IP23, IP24, IM21, IM22, IM23, IM24)&
+!!$ACC            COPYIN(IC11, IC12, IC21, IC22, IC31, IC32, IC41, IC42)&
+!!$ACC            COPYIN(IC51, IC52, IC61, IC62, IC71, IC72, IC81, IC82)&
+!!$ACC            COPYIN(DAL1, DAL2, DAL3, AF11)                        &
+!!$ACC            COPYIN(AWG1, AWG2, AWG3, AWG4, AWG5, AWG6, AWG7, AWG8)&
+!!$ACC            COPYIN(SWG1, SWG2, SWG3, SWG4, SWG5, SWG6, SWG7, SWG8)
 !RETURN
 !
 ! Formats

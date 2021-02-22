@@ -432,7 +432,7 @@
 !/ Parameter list
 !/
       INTEGER, INTENT(IN)     :: srce_call, IT, JSEA, IX, IY, IMOD
-      REAL, intent(in)        :: SPECOLD(NSPEC)
+      REAL, intent(IN)        :: SPECOLD(NSPEC)
       REAL, INTENT(OUT)       :: VSIO(NSPEC), VDIO(NSPEC)
       LOGICAL, INTENT(OUT)    :: SHAVEIO
       REAL, INTENT(IN)        :: D_INP, U10ABS,     &
@@ -512,14 +512,14 @@
       SPR4T = 0.0
       SIN4T = 0.0
       SDS4T = 0.0
-!!$ACC DATA COPY   (WN1(:),CG1(:),SPEC(:),ALPHA(:),USTAR,USTDIR,FPI,TWS  )&
-!!$ACC      COPY   (TAUOX,TAUOY,TAUWX,TAUWY,PHIAW,PHIOC,PHICE,CHARN,ICEF )&
-!!$ACC      COPY   (BEDFORM(:),PHIBBL,TAUBBL(:),TAUICE(:),WHITECAP(:)    )&
-!!$ACC      COPY   (TAUWIX,TAUWIY,TAUWNX,TAUWNY                          )&
-!!$ACC      COPYIN (U10ABS,U10DIR,CX,CY,DTG,ICE,ICEH,D_INP,IT,IX         )&  
-!!$ACC      COPYIN (IY,IMOD,SPECOLD(:),REFLED(:),BERG,COEF,TRNX,ICEDMAX  )&
-!!$ACC      COPYIN (REFLEC(:),AS,TRNY,INFLAGS1,INFLAGS2                  )&
-!!$ACC      COPYOUT(VSIO(:),VDIO(:),SHAVEIO,DTDYN,FCUT                   )
+!$ACC DATA COPY   (WN1(:),CG1(:),SPEC(:),ALPHA(:),USTAR,USTDIR,FPI,TWS  )&
+!$ACC      COPY   (TAUOX,TAUOY,TAUWX,TAUWY,PHIAW,PHIOC,PHICE,CHARN,ICEF )&
+!$ACC      COPY   (BEDFORM(:),PHIBBL,TAUBBL(:),TAUICE(:),WHITECAP(:)    )&
+!$ACC      COPY   (TAUWIX,TAUWIY,TAUWNX,TAUWNY                          )&
+!$ACC      COPYIN (U10ABS,U10DIR,CX,CY,DTG,ICE,ICEH,D_INP,IT,IX         )&  
+!$ACC      COPYIN (IY,IMOD,SPECOLD(:),REFLED(:),BERG,COEF,TRNX,ICEDMAX  )&
+!$ACC      COPYIN (REFLEC(:),AS,TRNY,INFLAGS1,INFLAGS2                  )&
+!$ACC      COPYOUT(VSIO(:),VDIO(:),SHAVEIO,DTDYN,FCUT                   )
 !!$ACC      CREATE (SPECINIT(:),SPEC2(:),DAM(:),WN2(:),BRLAMBDA(:),VS(:) )&
 !!$ACC      CREATE (VSLN(:),VSIN(:),VDIN(:),VSNL(:),VDNL(:),VSDS(:),VD(:))&
 !!$ACC      CREATE (VDDS(:),VSBT(:),VDBT(:),COSI(:),LLWS(:),FOUT,ICECOEF2)&
