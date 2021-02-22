@@ -73,18 +73,18 @@
               DA1C(1-NTH:NSPECX), DA1P(1-NTH:NSPECX),                 &
               DA1M(1-NTH:NSPECX), DA2C(1-NTH:NSPECX),                 &
               DA2P(1-NTH:NSPECX), DA2M(1-NTH:NSPECX), CON(NSPEC))
-      !$ACC KERNELS
-      UE(:) = 0. 
-      SA1(:) = 0. 
-      SA2(:) = 0. 
-      DA1C(:) = 0. 
-      DA1P(:) = 0. 
-      DA1M(:) = 0. 
-      DA2C(:) = 0. 
-      DA2P(:) = 0. 
-      DA2M(:) = 0. 
-      CON(:) = 0.
-      !$ACC END KERNELS
+!      !$ACC KERNELS
+!      UE(:) = 0. 
+!      SA1(:) = 0. 
+!      SA2(:) = 0. 
+!      DA1C(:) = 0. 
+!      DA1P(:) = 0. 
+!      DA1M(:) = 0. 
+!      DA2C(:) = 0. 
+!      DA2P(:) = 0. 
+!      DA2M(:) = 0. 
+!      CON(:) = 0.
+!      !$ACC END KERNELS
       END SUBROUTINE
 !/ ------------------------------------------------------------------- /
       SUBROUTINE W3SNL1 (A, CG, KDMEAN, S, D)

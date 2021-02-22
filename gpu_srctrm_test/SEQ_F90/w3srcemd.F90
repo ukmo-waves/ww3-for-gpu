@@ -75,34 +75,34 @@
       DOUT(NK,NTH), WN_R(NK), CG_ICE(NK), ALPHA_LIU(NK), R(NK),        &
       COSI(2), LLWS(NSPEC))
 
-!$ACC KERNELS
-      DAM(:) = 0.
-      WN2(:) = 0.
-      VSLN(:) = 0.
-      SPECINIT(:) = 0.
-      SPEC2(:) = 0.
-      VSIN(:) = 0.
-      VDIN(:) = 0.
-      VSNL(:) = 0.
-      VDNL(:) = 0.
-      VSDS(:) = 0.
-      VDDS(:) = 0.
-      VSBT(:) = 0.
-      VDBT(:) = 0.
-      VS(:) = 0.
-      VD(:) = 0.
-      EB(:) = 0.
-      BRLAMBDA(:) = 0.
-      FOUT(:,:) = 0.
-      SOUT(:,:) = 0.
-      DOUT(:,:) = 0.
-      WN_R(:) = 0.
-      CG_ICE(:) = 0.
-      ALPHA_LIU(:) = 0.
-      R(:) = 0.
-      COSI(:) = 0.
-      LLWS(:) = 0.
-!$ACC END KERNELS
+!!$ACC KERNELS
+!      DAM(:) = 0.
+!      WN2(:) = 0.
+!      VSLN(:) = 0.
+!      SPECINIT(:) = 0.
+!      SPEC2(:) = 0.
+!      VSIN(:) = 0.
+!      VDIN(:) = 0.
+!      VSNL(:) = 0.
+!      VDNL(:) = 0.
+!      VSDS(:) = 0.
+!      VDDS(:) = 0.
+!      VSBT(:) = 0.
+!      VDBT(:) = 0.
+!      VS(:) = 0.
+!      VD(:) = 0.
+!      EB(:) = 0.
+!      BRLAMBDA(:) = 0.
+!      FOUT(:,:) = 0.
+!      SOUT(:,:) = 0.
+!      DOUT(:,:) = 0.
+!      WN_R(:) = 0.
+!      CG_ICE(:) = 0.
+!      ALPHA_LIU(:) = 0.
+!      R(:) = 0.
+!      COSI(:) = 0.
+!      LLWS(:) = 0.
+!!$ACC END KERNELS
       END SUBROUTINE W3SRCE_INIT
 
 !/ ------------------------------------------------------------------- /
