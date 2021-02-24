@@ -750,6 +750,7 @@
 !$ACC            COPYIN(DCKI, SSDSBM, SSTXFTFTAIL, SSTXFTWN)     &
 !$ACC            COPYIN(WWNMEANP, WWNMEANPTAIL, FFXFM, FFXPM)    &
 !$ACC            COPYIN(FFXFA) 
+!$ACC UPDATE DEVICE(TAUT,DELU,DELTAUW)
         END IF
 !
 ! ... Nonlinear interactions

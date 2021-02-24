@@ -926,6 +926,7 @@
                                  SSDSBR,        &
                                  SSDSP, WWNMEANP, SSTXFTF, SSTXFTWN,  &
                                  SSDSBR2, SSDSCOS, SSDSDTH, SSDSBM(:)
+!$ACC DECLARE CREATE(AALPHA, ZZWND)
       REAL, POINTER           :: WWNMEANPTAIL, SSTXFTFTAIL
 !/
 !/ Data aliasses for structure SNLP(S)
@@ -959,6 +960,10 @@
       INTEGER, POINTER :: B_JGS_NLEVEL
       LOGICAL, POINTER :: B_JGS_SOURCE_NONLINEAR
 !/
+!$ACC DECLARE CREATE(SIG(:), DDEN(:), SSWELLF(:))
+!$ACC DECLARE CREATE(NTH,DTH,WWNMEANPTAIL, NK, NTH, NSPEC)&
+!$ACC         CREATE(WWNMEANP, WWNMEANPTAIL, FTE, FTF, SSTXFTF, SSTXFTWN)&
+!$ACC         CREATE(SSTXFTFTAIL)
 !/ Data aliasing for structure SICP(S)
 !/
       CONTAINS

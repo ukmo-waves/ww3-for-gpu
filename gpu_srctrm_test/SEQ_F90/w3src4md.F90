@@ -99,6 +99,14 @@
       REAL, DIMENSION(:,:)   , ALLOCATABLE :: K1, K2
       REAL,ALLOCATABLE        :: EB(:), EB2(:), ALFA(:)
 !/
+!$ACC DECLARE CREATE(TAUT(:,:), DELU, DELTAUW)
+!$ACC DECLARE CREATE(EB(:),EB2(:),ALFA(:))
+!!$ACC DECLARE CREATE(NSMOOTH(:),IKSUP(:),S1(:),E1(:),COEF4(:),NTIMES(:))&
+!!$ACC         CREATE(DK(:),HS(:),KBAR(:),DCK(:),EFDF(:),BTH0(:),QB(:)  )&
+!!$ACC         CREATE(S2(:),BTH(:),BTH0S(:),BTHS(:),SBK(:),IMSSMAX(:)   )&
+!!$ACC         CREATE(SBKT(:),MSSSUM(:,:),WTHSUM(:),PB(:),MSSSUM2(:,:)  )&
+!!$ACC         CREATE(MSSLONG(:,:),PB2(:),EB(:),EB2(:),ALFA(:),K1(:,:)  )&
+!!$ACC         CREATE(K2(:,:), SIGTAB(:,:))
       CONTAINS
 
 !/ ------------------------------------------------------------------- /
@@ -159,6 +167,7 @@
       SUBROUTINE W3SPR4 (A, CG, WN, EMEAN, FMEAN, FMEAN1, WNMEAN,     &
                     AMAX, U, UDIR, USTAR, USDIR, TAUWX, TAUWY, CD, Z0,&
                     CHARN, LLWS, FMEANWS)
+!$ACC ROUTINE VECTOR
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III                SHOM |
@@ -254,11 +263,12 @@
       INTEGER                 :: IS, IK, ITH
 !/
       REAL                    :: TAUW, EBAND, EMEANWS, UNZ
+!$ACC DECLARE COPYIN(DDEN(:),SIG(:),SSWELLF(:))
 !      REAL,ALLOCATABLE        :: EB(:), EB2(:), ALFA(:)
 !      ALLOCATE(EB(NK), EB2(NK), ALFA(NK))
 !/ ------------------------------------------------------------------- /
 !/
-      WRITE(0,*)'TAG: W3SPR4'
+!      WRITE(0,*)'TAG: W3SPR4'
 !!$ACC DATA CREATE(EB(:),EB2(:),ALFA(:))  
 !!$ACC KERNELS 
       UNZ    = MAX ( 0.01 , U )
@@ -339,10 +349,12 @@
 !
       TAUW = SQRT(TAUWX**2+TAUWY**2)
       Z0=0.
-!!$ACC END KERNELS
-      CALL CALC_USTAR(U,TAUW,USTAR,Z0,CHARN)
-!!$ACC UPDATE HOST(USTAR)
+!!$ACC DATA COPYOUT(USTAR,Z0,CHARN )&
+!!$ACC      COPYIN(U,TAUW)
 !!$ACC KERNELS
+      CALL CALC_USTAR(U,TAUW,USTAR,Z0,CHARN)
+!!$ACC END KERNELS
+!!$ACC END DATA 
       UNZ    = MAX ( 0.01 , U )
       CD     = (USTAR/UNZ)**2
       USDIR = UDIR
@@ -1518,6 +1530,7 @@
  
 !/ ------------------------------------------------------------------- /
       SUBROUTINE CALC_USTAR(WINDSPEED,TAUW,USTAR,Z0,CHARN)
+!$ACC ROUTINE SEQ
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -1582,7 +1595,7 @@
       REAL, intent(out) :: USTAR, Z0, CHARN
       ! local variables
       REAL SQRTCDM1
-      REAL XI,DELI1,DELI2,XJ,delj1,delj2
+      REAL XI,DELI1,DELI2,XJ,DELJ1,DELJ2
       REAL TAUW_LOCAL
 
       INTEGER IND,J
