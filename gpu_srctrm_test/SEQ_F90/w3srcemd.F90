@@ -605,53 +605,59 @@
       TAUWX=0.
       TAUWY=0.
 !!$ACC END KERNELS
-      IF ( IT .eq. 0 ) THEN
-!!$ACC KERNELS
+!GPUNotes calls to W3SPR4 and W3SIN4 below will contain source term specific spectral loops
+!GPUNotes the sequencing is important (although maybe excessive?)
+!        CALL CPU_TIME(sTime1)
+      IF (IT .eq. 0) THEN
          LLWS(:) = .TRUE.
          USTAR=0.
          USTDIR=0.
-!!$ACC END KERNELS
       ELSE
-!GPUNotes calls to W3PSR4 and W3SIN4 below will contain source term specific spectral loops
-!GPUNotes the sequencing is important (although maybe excessive?)
-        CALL CPU_TIME(sTime1)
-!!$ACC DATA COPYIN (SPEC(:),CG1(:),WN1(:),U10ABS,U10DIR,TAUWX,TAUWY,LLWS(:))&
-!!$ACC      COPY   (USTAR,USTDIR)&
-!!$ACC      COPYOUT(EMEAN,FMEAN,FMEAN1,WNMEAN,AMAX,CD,Z0,CHARN,FMEANWS) 
-!$ACC KERNELS
+!!$ACC DATA COPYIN (SPEC, CG1, WN1, TAUWX, TAUWY, LLWS, U10ABS, U10DIR  )&
+!!$ACC      COPY   (USTAR, USTDIR                                       )&
+!!$ACC      COPYOUT(AMAX, CD, Z0, CHARN, FMEANWS                        )&
+!!$ACC      COPYOUT(EMEAN, FMEAN, FMEAN1, WNMEAN)
+!$ACC KERNELS 
         CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN, &
                    AMAX, U10ABS, U10DIR, USTAR, USTDIR,            &
                    TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
+!        CALL CPU_TIME(eTime1)
+!        SPR4T = SPR4T + eTime1 - sTime1
 !$ACC END KERNELS
 !!$ACC END DATA
-        CALL CPU_TIME(eTime1)
-        SPR4T = SPR4T + eTime1 - sTime1
-        CALL CPU_TIME(sTime2) 
+!        CALL CPU_TIME(sTime2) 
+
+!$ACC DATA COPYIN (SPEC(:), BRLAMBDA(:), CG1(:), WN2(:), Z0, U10ABS    )&
+!$ACC      COPYIN (CD, USTAR, U10DIR, AS, DRAT, IX, IY                 )&
+!$ACC      COPYOUT(VSIN, VDIN, TAUWX, TAUWY, TAUWNX, TAUWNY, LLWS)
+!$ACC KERNELS 
         CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
                  U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,       &
                  VSIN, VDIN, LLWS, IX, IY, BRLAMBDA )
-        CALL CPU_TIME(eTime2)
-        SIN4T = SIN4T + eTime2 - sTime2
+!        CALL CPU_TIME(eTime2)
+!        SIN4T = SIN4T + eTime2 - sTime2
+!$ACC END KERNELS
+!$ACC END DATA
       END IF
- 
 !GPUNotes call below will contain source term specific spectral loops
       CALL CPU_TIME(sTime1)
-!!$ACC DATA COPYIN (SPEC(:),CG1(:),WN1(:),U10ABS,U10DIR,TAUWX,TAUWY,LLWS(:))&
-!!$ACC      COPY   (USTAR,USTDIR)&
-!!$ACC      COPYOUT(EMEAN,FMEAN,FMEAN1,WNMEAN,AMAX,CD,Z0,CHARN,FMEANWS) 
-!$ACC KERNELS
+!!$ACC DATA COPYIN (SPEC, CG1, WN1, TAUWX, TAUWY, LLWS, U10ABS, U10DIR  )&
+!!$ACC      COPY   (USTAR, USTDIR                                       )&
+!!$ACC      COPYOUT(AMAX, CD, Z0, CHARN, FMEANWS                        )&
+!!$ACC      COPYOUT(EMEAN, FMEAN, FMEAN1, WNMEAN)
+!!$ACC KERNELS
       CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN, &
                  AMAX, U10ABS, U10DIR, USTAR, USTDIR,            &
                  TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
-!$ACC END KERNELS
+!!$ACC END KERNELS
 !!$ACC END DATA
       CALL CPU_TIME(eTime1)
       SPR4T = SPR4T + eTime1 - sTime1
-!!$ACC KERNELS
       TWS = 1./FMEANWS
 !
 ! 1.c2 Stores the initial data
 !
+!$ACC LOOP SEQ
       DO ISPEC=1,NSPEC
          SPECINIT(ISPEC) = SPEC(ISPEC)
       END DO
@@ -687,11 +693,17 @@
 !GPUNotes subrotuine will contain source term specific spectral loops
 !Breaks if include TAUWX/Y 
         CALL CPU_TIME(sTime2) 
+!$ACC DATA COPYIN (SPEC(:), BRLAMBDA(:), CG1(:), WN2(:), Z0, U10ABS    )&
+!$ACC      COPYIN (CD, USTAR, U10DIR, AS, DRAT, IX, IY                 )&
+!$ACC      COPYOUT(VSIN, VDIN, TAUWX, TAUWY, TAUWNX, TAUWNY, LLWS)
+!$ACC KERNELS 
         CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
                  U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,       &
                  VSIN, VDIN, LLWS, IX, IY, BRLAMBDA )
-        CALL CPU_TIME(eTime2)
-        SIN4T = SIN4T + eTime2 - sTime2
+!        CALL CPU_TIME(eTime2)
+!        SIN4T = SIN4T + eTime2 - sTime2
+!$ACC END KERNELS
+!$ACC END DATA
 !
 ! 2.b Nonlinear interactions.
 !
@@ -858,20 +870,19 @@
 !GPUNotes source term specific loops over spectrum in this call
         CALL CPU_TIME(sTime1)
 
-!!$ACC DATA COPYIN (SPEC(:),CG1(:),WN1(:),U10ABS,U10DIR,TAUWX,TAUWY,LLWS(:))&
-!!$ACC      COPY   (USTAR,USTDIR)&
-!!$ACC      COPYOUT(EMEAN,FMEAN,FMEAN1,WNMEAN,AMAX,CD,Z0,CHARN,FMEANWS) 
-!$ACC KERNELS
+!!$ACC DATA COPYIN (SPEC, CG1, WN1, TAUWX, TAUWY, LLWS, U10ABS, U10DIR  )&
+!!$ACC      COPY   (USTAR, USTDIR                                       )&
+!!$ACC      COPYOUT(AMAX, CD, Z0, CHARN, FMEANWS                        )&
+!!$ACC      COPYOUT(EMEAN, FMEAN, FMEAN1, WNMEAN)
+      WRITE(0,*)'TAG: W3SPR4'
+!!$ACC KERNELS
         CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN, &
                    AMAX, U10ABS, U10DIR, USTAR, USTDIR,            &
                    TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
-!$ACC END KERNELS
+!!$ACC END KERNELS
 !!$ACC END DATA
         CALL CPU_TIME(eTime1)
         SPR4T = SPR4T + eTime1 - sTime1
-      WRITE(0,*)'CPU:CD',CD
-      WRITE(0,*)'CPU:CHARN',CHARN
-      WRITE(0,*)'CPU:USTAR',USTAR
 !!$ACC KERNELS
 !
 ! Introduces a Long & Resio (JGR2007) type dependance on wave age
@@ -908,11 +919,17 @@
 ! GPUNotes source term specific loops over spectrum in this call
 !Breaks if include TAUWX/Y 
         CALL CPU_TIME(sTime2) 
+!$ACC DATA COPYIN (SPEC(:), BRLAMBDA(:), CG1(:), WN2(:), Z0, U10ABS    )&
+!$ACC      COPYIN (CD, USTAR, U10DIR, AS, DRAT, IX, IY                 )&
+!$ACC      COPYOUT(VSIN, VDIN, TAUWX, TAUWY, TAUWNX, TAUWNY, LLWS)
+!$ACC KERNELS 
         CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
                  U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,       &
                  VSIN, VDIN, LLWS, IX, IY, BRLAMBDA )
-        CALL CPU_TIME(eTime2)
-        SIN4T = SIN4T + eTime2 - sTime2
+!        CALL CPU_TIME(eTime2)
+!        SIN4T = SIN4T + eTime2 - sTime2
+!$ACC END KERNELS
+!$ACC END DATA
 ! 7.  Check if integration complete ---------------------------------- *
 !
         IF (srce_call .eq. srce_imp_post) THEN

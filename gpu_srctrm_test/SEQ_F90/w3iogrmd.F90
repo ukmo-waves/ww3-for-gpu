@@ -263,6 +263,8 @@
 !/
  
  
+!!$ACC DECLARE CREATE(SIG2(:), ESIN(:), ECOS(:),DDEN2(:))          
+!!$ACC DECLARE CREATE(SSINTHP,ZZALP,TTAUWSHELTER) 
 !/ ------------------------------------------------------------------- /
 !/
 !
@@ -749,8 +751,9 @@
 !$ACC            COPYIN(ZZWND, AALPHA, TTAUWSHELTER, QBI, IKTAB) &
 !$ACC            COPYIN(DCKI, SSDSBM, SSTXFTFTAIL, SSTXFTWN)     &
 !$ACC            COPYIN(WWNMEANP, WWNMEANPTAIL, FFXFM, FFXPM)    &
-!$ACC            COPYIN(FFXFA) 
-!$ACC UPDATE DEVICE(TAUT,DELU,DELTAUW)
+!$ACC            COPYIN(FFXFA,SSINBR) 
+!$ACC UPDATE DEVICE(TAUT,DELU,DELTAUW,TAUHFT,TAUHFT2,DELTAIL,&
+!$ACC               DELUST,DELALP,SSWELLF)
         END IF
 !
 ! ... Nonlinear interactions

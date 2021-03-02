@@ -110,6 +110,8 @@
 !     module during initialization.
       LOGICAL :: IS_ESMF_COMPONENT = .FALSE.
 !
+!$ACC DECLARE COPYIN(DELAB, FWTABLE(:),TPIINV,GRAV, NU_AIR, KAPPA, TPI)& 
+!$ACC         COPYIN(SIZEFWTABLE, ABMIN)
       CONTAINS
 ! ----------------------------------------------------------------------
       SUBROUTINE TABU_FW

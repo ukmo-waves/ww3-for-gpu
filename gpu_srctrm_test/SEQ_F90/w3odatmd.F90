@@ -473,6 +473,7 @@
       INTEGER, POINTER        :: PTMETH   ! C. Bunney; Partitioning method
       REAL, POINTER           :: PTFCUT   ! C. Bunney; Part. 5 freq cut
 !/
+!$ACC DECLARE CREATE(IAPROC,NDTO)
       CONTAINS
 !/ ------------------------------------------------------------------- /
       SUBROUTINE W3NOUT ( NDSERR, NDSTST )

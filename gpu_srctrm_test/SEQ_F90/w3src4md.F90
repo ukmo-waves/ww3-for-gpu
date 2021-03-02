@@ -99,21 +99,14 @@
       REAL, DIMENSION(:,:)   , ALLOCATABLE :: K1, K2
       REAL,ALLOCATABLE        :: EB(:), EB2(:), ALFA(:)
 !/
-!$ACC DECLARE CREATE(TAUT(:,:), DELU, DELTAUW)
-!$ACC DECLARE CREATE(EB(:),EB2(:),ALFA(:))
-!!$ACC DECLARE CREATE(NSMOOTH(:),IKSUP(:),S1(:),E1(:),COEF4(:),NTIMES(:))&
-!!$ACC         CREATE(DK(:),HS(:),KBAR(:),DCK(:),EFDF(:),BTH0(:),QB(:)  )&
-!!$ACC         CREATE(S2(:),BTH(:),BTH0S(:),BTHS(:),SBK(:),IMSSMAX(:)   )&
-!!$ACC         CREATE(SBKT(:),MSSSUM(:,:),WTHSUM(:),PB(:),MSSSUM2(:,:)  )&
-!!$ACC         CREATE(MSSLONG(:,:),PB2(:),EB(:),EB2(:),ALFA(:),K1(:,:)  )&
-!!$ACC         CREATE(K2(:,:), SIGTAB(:,:))
+!$ACC DECLARE CREATE(TAUT(:,:),TAUHFT(:,:),TAUHFT2(:,:,:),EB(:),EB2(:))&
+!$ACC         CREATE(ALFA(:),DELU,DELTAUW,DELTAIL,DELALP,DELUST)
       CONTAINS
 
 !/ ------------------------------------------------------------------- /
       SUBROUTINE W3SRC4_INIT()
 
       USE W3GDATMD, ONLY: NK, NTH, NSPEC, NKHS, NKD, NDTAB,QBI,DCKI
-
       IMPLICIT NONE
 
       WRITE(0,*) "W3SRC4_INIT: NK/NTH/NSPEC: ", NK, NTH, NSPEC
@@ -263,7 +256,9 @@
       INTEGER                 :: IS, IK, ITH
 !/
       REAL                    :: TAUW, EBAND, EMEANWS, UNZ
-!$ACC DECLARE COPYIN(DDEN(:),SIG(:),SSWELLF(:))
+!$ACC DECLARE COPYIN(DDEN(:),SIG(:),SSWELLF(:),NK, NTH, NSPEC, DTH)&
+!$ACC         COPYIN(WWNMEANP, WWNMEANPTAIL, FTE, FTF, SSTXFTF    )&
+!$ACC         COPYIN(SSTXFTFTAIL, SSTXFTWN ,IAPROC, TPIINV)
 !      REAL,ALLOCATABLE        :: EB(:), EB2(:), ALFA(:)
 !      ALLOCATE(EB(NK), EB2(NK), ALFA(NK))
 !/ ------------------------------------------------------------------- /
@@ -375,6 +370,7 @@
                          TAUWX, TAUWY, TAUWNX, TAUWNY, S, D, LLWS,     &
                          IX, IY, BRLAMBDA)
 !/
+!$ACC ROUTINE VECTOR
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III                SHOM |
 !/                  !            F. Ardhuin             !
@@ -459,7 +455,7 @@
                           TTAUWSHELTER, SSWELLF, DDEN2, DTH, SSINTHP,  &
                           ZZ0RAT, SSINBR
       USE W3ODATMD, ONLY: IAPROC, NDTO
-      USE W3PARALL, ONLY: PRINT_MY_TIME
+!      USE W3PARALL, ONLY: PRINT_MY_TIME
 !
       IMPLICIT NONE
 !/
@@ -484,7 +480,7 @@
       REAL                    :: Usigma           !standard deviation of U due to gustiness
       REAL                    :: USTARsigma       !standard deviation of USTAR due to gustiness
       REAL                    :: CM, UCN, ZCN, DSTAB, &
-                                 Z0VISC, Z0NOZ, EB,  &
+                                 Z0VISC, Z0NOZ,  &
                                  EBX, EBY, AORB, AORB1, FW, UORB, TH2, &
                                  RE, FU, FUD, SWELLCOEFV, SWELLCOEFT
       REAL                    :: SMOOTH
@@ -499,8 +495,17 @@
       REAL                    :: DVISC, DTURB, PVISC, PTURB,ZERO 
       REAL                    :: STRESSSTABN1, STRESSSTABN2, &
                                  STRESSSTAB1, STRESSSTAB2
-!/
+!$ACC DECLARE COPYIN(SIG(:),SIG2(:), ESIN(:), ECOS(:),DDEN2(:),DDEN(:))&
+!$ACC         COPYIN(SSWELLF(:), FWTABLE(:),TH(:),EC2(:), NK, NTH, NSPEC)&
+!$ACC         COPYIN(XFR, ZZWND, AALPHA, BBETA, DTH, SSINTHP, ZZ0RAT)&
+!$ACC         COPYIN(SSINBR, IAPROC, NDTO, GRAV, NU_AIR)&
+!$ACC         COPYIN(KAPPA,TPI,SIZEFWTABLE, DELAB, ABMIN, ZZALP, TTAUWSHELTER)
 !/ ------------------------------------------------------------------- /
+!!$ACC DECLARE COPYIN(SIG2(:), ESIN(:), ECOS(:),DDEN2(:))&
+!!$ACC         COPYIN(FWTABLE(:),TH(:),EC2(:))&
+!!$ACC         COPYIN(XFR, ZZWND, AALPHA, BBETA, SSINTHP, ZZ0RAT)&
+!!$ACC         COPYIN(SSINBR, IAPROC, NDTO, GRAV,NU_AIR )&
+!!$ACC         COPYIN(KAPPA,TPI,SIZEFWTABLE, DELAB, ABMIN, ZZALP, TTAUWSHELTER)
 !/
 !
 !      CALL PRINT_MY_TIME("    Calculate input source terms",NDTO)
