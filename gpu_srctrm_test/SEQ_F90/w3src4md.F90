@@ -546,7 +546,7 @@
           IF (RE.LE.SSWELLF(4)) THEN
             PTURB =  0.
             PVISC =  1.
-          ELSE IF (RE.LE.SSWELLF(4)) THEN
+          ELSE IF (RE.GT.SSWELLF(4)) THEN
             PTURB =  1.
             PVISC =  0.
           END IF
