@@ -468,7 +468,7 @@
       REAL                    :: FACLN1, FACLN2, LAMBDA
       REAL                    :: COSU, SINU, TAUX, TAUY, USDIRP, USTP
       REAL                    :: TAUPX, TAUPY, UST2, TAUW, TAUWB
-      REAL, PARAMETER         :: EPS1 = 0.00001, EPS2 = 0.000001
+      REAL,PARAMETER          :: EPS1 = 0.00001, EPS2 = 0.000001
       REAL                    :: Usigma           !standard deviation of U due to gustiness
       REAL                    :: USTARsigma       !standard deviation of USTAR due to gustiness
       REAL                    :: CM, UCN, ZCN, DSTAB, &
@@ -497,16 +497,45 @@
       !JDM: Initializing values to zero, they shouldn't be used unless
       !set in another place, but seems to solve some bugs with certain
       !compilers.
-
 ! As local arrays they should not be required to be created. However
 ! with managed memory turned on and this statement removed the output
 ! fails.
+!!$ACC DATA COPY  (  IS,IK,ITH, IR)&
+!!$ACC COPY       (FACLN1, FACLN2, LAMBDA)&
+!!$ACC COPY       (COSU, SINU, TAUX, TAUY, USDIRP, USTP)&
+!!$ACC COPY       (TAUPX, TAUPY, UST2, TAUW, TAUWB)&
+!!$ACC COPY       (EPS1, EPS2 )&
+!!$ACC COPY       (Usigma)&
+!!$ACC COPY       (USTARsigma )&
+!!$ACC COPY       (CM, UCN, ZCN, DSTAB) &
+!!$ACC COPY       (Z0VISC, Z0NOZ, EB)  &
+!!$ACC COPY       (EBX, EBY, AORB, AORB1, FW, UORB, TH2) &
+!!$ACC COPY       (RE, FU, FUD, SWELLCOEFV, SWELLCOEFT)&
+!!$ACC COPY       (SMOOTH) &
+!!$ACC COPY       (XI,DELI1,DELI2) &
+!!$ACC COPY       (XJ,DELJ1,DELJ2) &
+!!$ACC COPY       (XK,DELK1,DELK2) &
+!!$ACC COPY       (CONST, CONST0, CONST2, TAU1) &
+!!$ACC COPY       (X,ZARG,ZLOG,UST) &
+!!$ACC COPY       (COSWIND, XSTRESS, YSTRESS, TAUHF) &
+!!$ACC COPY       (TEMP, TEMP2 ) &
+!!$ACC COPY       (IND,J,I,ISTAB) &
+!!$ACC COPY       (DVISC, DTURB, PVISC, PTURB,ZERO ) &
+!!$ACC COPY       (STRESSSTABN1, STRESSSTABN2) &
+!!$ACC COPY       (STRESSSTAB1, STRESSSTAB2) 
 !!$ACC DATA CREATE(STRESSSTAB1, STRESSSTAB2)
-!$ACC KERNELS
+
+!GPUNotes : The variables set within the IF tests need to be copyied in
+!at this level in the code. This is not the ideal behaviour and will be
+!examined going forward.
+
+!$ACC KERNELS COPY(PTURB,PVISC,FW,FU,FUD)
+
+!!$ACC KERNELS COPY(PTURB,PVISC,SMOOTH,DELI1,DELI2,AORB,IND,XI,FW,FU,FUD)
+
       PTURB = 0.
       PVISC = 0.
       D(:) = 0.
-!
 ! 1.a  estimation of surface roughness parameters
 !
       Z0VISC = 0.1*NU_AIR/MAX(USTAR,0.0001)
@@ -533,25 +562,27 @@
 
 !
 ! Defines the swell dissipation based on the "Reynolds number"
-      
+
+
 ! GPUNotes Setting the loops to be more specific with ELSE IF removed
-! issues surrounding PTURB and PVISC.
+! issues surrounding PTURB and PVISC. NO LONGER NEEDS ELSE IF DUE TO
+! COPY STATEMENT.      
 
       IF (SSWELLF(4).GT.0) THEN
         IF (SSWELLF(7).GT.0.) THEN
           SMOOTH = 0.5*TANH((RE-SSWELLF(4))/SSWELLF(7))
           PTURB=(0.5+SMOOTH)
           PVISC=(0.5-SMOOTH)
-        ELSE IF (SSWELLF(7).LE.0) THEN
+        ELSE 
           IF (RE.LE.SSWELLF(4)) THEN
             PTURB =  0.
             PVISC =  1.
-          ELSE IF (RE.GT.SSWELLF(4)) THEN
+          ELSE 
             PTURB =  1.
             PVISC =  0.
           END IF
         END IF
-      ELSE IF (SSWELLF(4).LE.0) THEN
+      ELSE 
         PTURB=1.
         PVISC=1.
       END IF
@@ -559,9 +590,14 @@
 ! GPUNotes Order of the conditions has been changed to ensure the 
 ! output is correct, this shouldn't be required and may be a sign
 ! of another issue. Can a more specific condition be used to identify
-! positve entries for SSELLF(2)?
+! positve entries for SSELLF(2)? ORDER CAN BE CHANGED NOW DUE TO THE
+! COPY STATEMENT.
 
-      IF (SSWELLF(2).NE.0.) THEN
+      IF (SSWELLF(2).EQ.0.) THEN
+        FW=ABS(SSWELLF(3))
+        FU=0.
+        FUD=0.
+      ELSE 
         FU=ABS(SSWELLF(3))
         FUD=SSWELLF(2)
         AORB=2*AORB**0.5
@@ -570,12 +606,8 @@
         DELI1= MIN (1. ,XI-FLOAT(IND))
         DELI2= 1. - DELI1
         FW = FWTABLE(IND)*DELI2+FWTABLE(IND+1)*DELI1
-      ELSE IF (SSWELLF(2).EQ.0.) THEN
-        FW=ABS(SSWELLF(3))
-        FU=0.
-        FUD=0.
       END IF
-!
+
 ! 2.  Diagonal
 ! Here AS is the air-sea temperature difference in degrees. Expression given by
 ! Abdalla & Cavaleri, JGR 2002 for Usigma. For USTARsigma ... I do not see where
@@ -609,8 +641,7 @@
 !         Private is not required, applied implicitly if not written
 !         here. Is it possible to convert multiple variables into arrays
 !         to run this loop in parallel?
-
-!$ACC LOOP SEQ PRIVATE(STRESSSTAB1, STRESSSTAB2) 
+!$ACC LOOP SEQ 
       DO IK=1, NK
         TAUPX=TAUX-ABS(TTAUWSHELTER)*STRESSSTAB1
         TAUPY=TAUY-ABS(TTAUWSHELTER)*STRESSSTAB2
@@ -779,6 +810,7 @@
         TAUWY=TAUWY*TAUWB/TAUW
       END IF
 !$ACC END KERNELS
+!!$ACC END DATA
       RETURN
 !
 ! Formats
