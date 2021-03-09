@@ -507,7 +507,13 @@
 !      VD(NSPEC), EB(NK), BRLAMBDA(NSPEC), FOUT(NK,NTH), SOUT(NK,NTH),  &
 !      DOUT(NK,NTH), WN_R(NK), CG_ICE(NK), ALPHA_LIU(NK), R(NK),        &
 !      COSI(2), LLWS(NSPEC))
+
+!GPUNotes SIN4 requires these values from constants.f90, however it does
+!not automatically transfer the data even if they are declared with
+!copyin. This seemed to be the best place to put the updates. 
      
+!!$ACC UPDATE DEVICE(DELAB, FWTABLE(:),TPIINV,GRAV, NU_AIR, KAPPA, TPI,&
+!!$ACC              SIZEFWTABLE, ABMIN)
       WRITE(0,*)'TAG: W3SRCE'
       SPR4T = 0.0
       SIN4T = 0.0
@@ -613,31 +619,31 @@
          USTAR=0.
          USTDIR=0.
       ELSE
-!!$ACC DATA COPYIN (SPEC, CG1, WN1, TAUWX, TAUWY, LLWS, U10ABS, U10DIR  )&
-!!$ACC      COPY   (USTAR, USTDIR                                       )&
-!!$ACC      COPYOUT(AMAX, CD, Z0, CHARN, FMEANWS                        )&
-!!$ACC      COPYOUT(EMEAN, FMEAN, FMEAN1, WNMEAN)
-!$ACC KERNELS 
+!!$ACC DATA COPYIN (SPEC, CG1, WN1, TAUWX, TAUWY, U10ABS, U10DIR  )&
+!!$ACC      COPY   (USTAR, USTDIR, LLWS                                  )&
+!!$ACC      COPY(AMAX, CD, Z0, CHARN, FMEANWS                        )&
+!!$ACC      COPY(EMEAN, FMEAN, FMEAN1, WNMEAN)
+!!$ACC KERNELS 
         CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN, &
                    AMAX, U10ABS, U10DIR, USTAR, USTDIR,            &
                    TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
 !        CALL CPU_TIME(eTime1)
 !        SPR4T = SPR4T + eTime1 - sTime1
-!$ACC END KERNELS
+!!$ACC END KERNELS
 !!$ACC END DATA
 !        CALL CPU_TIME(sTime2) 
 
-!$ACC DATA COPYIN (SPEC(:), BRLAMBDA(:), CG1(:), WN2(:), Z0, U10ABS    )&
-!$ACC      COPYIN (CD, USTAR, U10DIR, AS, DRAT, IX, IY                 )&
-!$ACC      COPYOUT(VSIN, VDIN, TAUWX, TAUWY, TAUWNX, TAUWNY, LLWS)
-!$ACC KERNELS 
+!!$ACC DATA COPYIN (SPEC(:), BRLAMBDA(:), CG1(:), WN2(:), Z0, U10ABS    )&
+!!$ACC      COPYIN (CD, USTAR, U10DIR, AS, DRAT, IX, IY                 )&
+!!$ACC      COPYOUT(VSIN, VDIN, TAUWX, TAUWY, TAUWAX, TAUWAY, LLWS)
+!!$ACC KERNELS 
         CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
                  U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,       &
                  VSIN, VDIN, LLWS, IX, IY, BRLAMBDA )
 !        CALL CPU_TIME(eTime2)
 !        SIN4T = SIN4T + eTime2 - sTime2
-!$ACC END KERNELS
-!$ACC END DATA
+!!$ACC END KERNELS
+!!$ACC END DATA
       END IF
 !GPUNotes call below will contain source term specific spectral loops
       CALL CPU_TIME(sTime1)
@@ -661,6 +667,7 @@
       DO ISPEC=1,NSPEC
          SPECINIT(ISPEC) = SPEC(ISPEC)
       END DO
+
 ! 1.d Stresses
 !
 ! 1.e Prepare cut-off beyond which the tail is imposed with a power law
@@ -695,7 +702,7 @@
         CALL CPU_TIME(sTime2) 
 !$ACC DATA COPYIN (SPEC(:), BRLAMBDA(:), CG1(:), WN2(:), Z0, U10ABS    )&
 !$ACC      COPYIN (CD, USTAR, U10DIR, AS, DRAT, IX, IY                 )&
-!$ACC      COPYOUT(VSIN, VDIN, TAUWX, TAUWY, TAUWNX, TAUWNY, LLWS)
+!$ACC      COPYOUT(VSIN, VDIN, TAUWX, TAUWY, TAUWAX, TAUWAY, LLWS)
 !$ACC KERNELS 
         CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
                  U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,       &
@@ -870,11 +877,11 @@
 !GPUNotes source term specific loops over spectrum in this call
         CALL CPU_TIME(sTime1)
 
-!!$ACC DATA COPYIN (SPEC, CG1, WN1, TAUWX, TAUWY, LLWS, U10ABS, U10DIR  )&
-!!$ACC      COPY   (USTAR, USTDIR                                       )&
+!!$ACC DATA COPYIN (SPEC, CG1, WN1, LLWS, U10ABS, U10DIR , TAUWX,TAUWY   )&
+!!$ACC      COPY   (USTAR, USTDIR                        )&
 !!$ACC      COPYOUT(AMAX, CD, Z0, CHARN, FMEANWS                        )&
 !!$ACC      COPYOUT(EMEAN, FMEAN, FMEAN1, WNMEAN)
-      WRITE(0,*)'TAG: W3SPR4'
+!      WRITE(0,*)'TAG: W3SPR4'
 !!$ACC KERNELS
         CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN, &
                    AMAX, U10ABS, U10DIR, USTAR, USTDIR,            &
@@ -921,7 +928,7 @@
         CALL CPU_TIME(sTime2) 
 !$ACC DATA COPYIN (SPEC(:), BRLAMBDA(:), CG1(:), WN2(:), Z0, U10ABS    )&
 !$ACC      COPYIN (CD, USTAR, U10DIR, AS, DRAT, IX, IY                 )&
-!$ACC      COPYOUT(VSIN, VDIN, TAUWX, TAUWY, TAUWNX, TAUWNY, LLWS)
+!$ACC      COPYOUT(VSIN, VDIN, TAUWX, TAUWY, TAUWAX, TAUWAY, LLWS)
 !$ACC KERNELS 
         CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
                  U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,       &
@@ -1024,9 +1031,7 @@
         END IF
 !
         R(:)=1 ! In case IC2 is defined but not IS2
-!
- 
-!
+
         SPEC2(:) = SPEC(:)
 !
         TAUICE(:) = 0.

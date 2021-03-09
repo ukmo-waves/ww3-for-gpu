@@ -118,6 +118,7 @@
                MSSSUM2(NK,NTH),MSSLONG(NK,NTH),PB2(NSPEC),EB(NK),      &
                EB2(NK), ALFA(NK),K1(NK,NDTAB),K2(NK,NDTAB),            &
                SIGTAB(NK,NDTAB),DCKI(NKHS,NKD),QBI(NKHS,NKD))
+!!$ACC UPDATE DEVICE(EB, EB2, ALFA)
 !!$ACC KERNELS
 !      NSMOOTH(:) = 0. 
 !      IKSUP(:) = 0. 
@@ -246,7 +247,7 @@
       REAL, INTENT(IN)        :: A(NTH,NK), CG(NK), WN(NK), U, UDIR
       REAL, INTENT(IN)        :: TAUWX, TAUWY
       LOGICAL, INTENT(IN)     :: LLWS(NSPEC)
-      REAL, INTENT(INOUT)     :: USTAR ,USDIR
+      REAL, INTENT(INOUT)     :: USTAR, USDIR
       REAL, INTENT(OUT)       :: EMEAN, FMEAN, FMEAN1, WNMEAN, AMAX,  &
                                  CD, Z0, CHARN, FMEANWS
 !/
@@ -256,9 +257,9 @@
       INTEGER                 :: IS, IK, ITH
 !/
       REAL                    :: TAUW, EBAND, EMEANWS, UNZ
-!$ACC DECLARE COPYIN(DDEN(:),SIG(:),SSWELLF(:),NK, NTH, NSPEC, DTH)&
-!$ACC         COPYIN(WWNMEANP, WWNMEANPTAIL, FTE, FTF, SSTXFTF    )&
-!$ACC         COPYIN(SSTXFTFTAIL, SSTXFTWN ,IAPROC, TPIINV)
+!!$ACC DECLARE COPYIN(DDEN(:),SIG(:),SSWELLF(:),NK, NTH, NSPEC, DTH)&
+!!$ACC         COPYIN(WWNMEANP, WWNMEANPTAIL, FTE, FTF, SSTXFTF    )&
+!!$ACC         COPYIN(SSTXFTFTAIL, SSTXFTWN ,IAPROC, TPIINV)
 !      REAL,ALLOCATABLE        :: EB(:), EB2(:), ALFA(:)
 !      ALLOCATE(EB(NK), EB2(NK), ALFA(NK))
 !/ ------------------------------------------------------------------- /
@@ -455,7 +456,7 @@
                           TTAUWSHELTER, SSWELLF, DDEN2, DTH, SSINTHP,  &
                           ZZ0RAT, SSINBR
       USE W3ODATMD, ONLY: IAPROC, NDTO
-!      USE W3PARALL, ONLY: PRINT_MY_TIME
+      USE W3PARALL, ONLY: PRINT_MY_TIME
 !
       IMPLICIT NONE
 !/
@@ -495,17 +496,17 @@
       REAL                    :: DVISC, DTURB, PVISC, PTURB,ZERO 
       REAL                    :: STRESSSTABN1, STRESSSTABN2, &
                                  STRESSSTAB1, STRESSSTAB2
-!$ACC DECLARE COPYIN(SIG(:),SIG2(:), ESIN(:), ECOS(:),DDEN2(:),DDEN(:))&
-!$ACC         COPYIN(SSWELLF(:), FWTABLE(:),TH(:),EC2(:), NK, NTH, NSPEC)&
-!$ACC         COPYIN(XFR, ZZWND, AALPHA, BBETA, DTH, SSINTHP, ZZ0RAT)&
-!$ACC         COPYIN(SSINBR, IAPROC, NDTO, GRAV, NU_AIR)&
-!$ACC         COPYIN(KAPPA,TPI,SIZEFWTABLE, DELAB, ABMIN, ZZALP, TTAUWSHELTER)
-!/ ------------------------------------------------------------------- /
-!!$ACC DECLARE COPYIN(SIG2(:), ESIN(:), ECOS(:),DDEN2(:))&
-!!$ACC         COPYIN(FWTABLE(:),TH(:),EC2(:))&
-!!$ACC         COPYIN(XFR, ZZWND, AALPHA, BBETA, SSINTHP, ZZ0RAT)&
-!!$ACC         COPYIN(SSINBR, IAPROC, NDTO, GRAV,NU_AIR )&
+
+!ROUTINENotes: The USE associated variables must be used in UPDATE
+!device calls with iogr or constants.F90 at the earliest time. DECLARE
+!COPYIN does not bring them onto the device. 
+
+!!$ACC DECLARE COPYIN(SIG(:),SIG2(:), ESIN(:), ECOS(:),DDEN2(:),DDEN(:))&
+!!$ACC         COPYIN(SSWELLF(:), FWTABLE(:),TH(:),EC2(:), NK, NTH, NSPEC)&
+!!$ACC         COPYIN(XFR, ZZWND, AALPHA, BBETA, DTH, SSINTHP, ZZ0RAT)&
+!!$ACC         COPYIN(SSINBR, IAPROC, NDTO, GRAV, NU_AIR)&
 !!$ACC         COPYIN(KAPPA,TPI,SIZEFWTABLE, DELAB, ABMIN, ZZALP, TTAUWSHELTER)
+!/ ------------------------------------------------------------------- /
 !/
 !
 !      CALL PRINT_MY_TIME("    Calculate input source terms",NDTO)
@@ -518,7 +519,7 @@
 ! As local arrays they should not be required to be created. However
 ! with managed memory turned on and this statement removed the output
 ! fails.
-!!$ACC DATA CREATE(STRESSSTAB1, STRESSSTAB2)
+!!$ACC DATA CREATE(STRESSSTAB1, STRESSSTAB2,PTURB,PVISC)
 !!$ACC KERNELS
       PTURB = 0.
       PVISC = 0.
@@ -559,16 +560,16 @@
           SMOOTH = 0.5*TANH((RE-SSWELLF(4))/SSWELLF(7))
           PTURB=(0.5+SMOOTH)
           PVISC=(0.5-SMOOTH)
-        ELSE IF (SSWELLF(7).LE.0) THEN
+        ELSE 
           IF (RE.LE.SSWELLF(4)) THEN
             PTURB =  0.
             PVISC =  1.
-          ELSE IF (RE.LE.SSWELLF(4)) THEN
+          ELSE
             PTURB =  1.
             PVISC =  0.
           END IF
         END IF
-      ELSE IF (SSWELLF(4).LE.0) THEN
+      ELSE 
         PTURB=1.
         PVISC=1.
       END IF
@@ -578,7 +579,11 @@
 ! of another issue. Can a more specific condition be used to identify
 ! positve entries for SSELLF(2)?
 
-      IF (SSWELLF(2).NE.0.) THEN
+      IF (SSWELLF(2).EQ.0.) THEN
+        FW=ABS(SSWELLF(3))
+        FU=0.
+        FUD=0.
+      ELSE
         FU=ABS(SSWELLF(3))
         FUD=SSWELLF(2)
         AORB=2*AORB**0.5
@@ -587,10 +592,6 @@
         DELI1= MIN (1. ,XI-FLOAT(IND))
         DELI2= 1. - DELI1
         FW = FWTABLE(IND)*DELI2+FWTABLE(IND+1)*DELI1
-      ELSE IF (SSWELLF(2).EQ.0.) THEN
-        FW=ABS(SSWELLF(3))
-        FU=0.
-        FUD=0.
       END IF
 !
 ! 2.  Diagonal
@@ -627,7 +628,7 @@
 !         here. Is it possible to convert multiple variables into arrays
 !         to run this loop in parallel?
 
-!$ACC LOOP SEQ PRIVATE(STRESSSTAB1, STRESSSTAB2) 
+!$ACC LOOP SEQ 
       DO IK=1, NK
         TAUPX=TAUX-ABS(TTAUWSHELTER)*STRESSSTAB1
         TAUPY=TAUY-ABS(TTAUWSHELTER)*STRESSSTAB2
@@ -796,6 +797,7 @@
         TAUWY=TAUWY*TAUWB/TAUW
       END IF
 !!$ACC END KERNELS
+!!$ACC END DATA
       RETURN
 !
 ! Formats
