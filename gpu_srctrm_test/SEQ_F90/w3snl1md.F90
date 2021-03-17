@@ -73,7 +73,7 @@
               DA1C(1-NTH:NSPECX), DA1P(1-NTH:NSPECX),                 &
               DA1M(1-NTH:NSPECX), DA2C(1-NTH:NSPECX),                 &
               DA2P(1-NTH:NSPECX), DA2M(1-NTH:NSPECX), CON(NSPEC))
-!$ACC KERNELS
+!!$ACC KERNELS
       !UE(:) = 0. 
       !SA1(:) = 0. 
       !SA2(:) = 0. 

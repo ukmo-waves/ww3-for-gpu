@@ -1213,7 +1213,7 @@
                 VA(:,JSEA)  = 0.
               END IF
             END DO
-!!$ACC END DATA
+!$ACC END DATA
 !GPUNotes end of seapoint loop for source terms  
 !
             CALL WAV_MY_WTIME(eTime1)

@@ -1053,7 +1053,7 @@
  
       SPEC = MAX(0., SPEC)
 !$ACC END KERNELS
-!!$ACC END DATA
+!$ACC END DATA
       RETURN
 
 ! Formats
