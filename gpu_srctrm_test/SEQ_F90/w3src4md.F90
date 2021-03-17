@@ -99,8 +99,8 @@
       REAL, DIMENSION(:,:)   , ALLOCATABLE :: K1, K2
       REAL,ALLOCATABLE        :: EB(:), EB2(:), ALFA(:)
 !/
-!$ACC DECLARE CREATE(TAUT(:,:),TAUHFT(:,:),TAUHFT2(:,:,:),EB(:),EB2(:))&
-!$ACC         CREATE(ALFA(:),DELU,DELTAUW,DELTAIL,DELALP,DELUST)
+!$ACC DECLARE CREATE(TAUT(:,:),TAUHFT(:,:),TAUHFT2(:,:,:),ALFA)&
+!$ACC         CREATE(DELU,DELTAUW,DELTAIL,DELALP,DELUST,EB,EB2)
       CONTAINS
 
 !/ ------------------------------------------------------------------- /
@@ -115,8 +115,8 @@
                ,DK(NK),HS(NK),KBAR(NK),DCK(NK),EFDF(NK),BTH0(NK),QB(NK)&
                ,S2(NK),BTH(NSPEC),BTH0S(NK),BTHS(NSPEC),SBK(NSPEC),    &
                IMSSMAX(NK),SBKT(NK),MSSSUM(NK,5),WTHSUM(NTH),PB(NSPEC),&
-               MSSSUM2(NK,NTH),MSSLONG(NK,NTH),PB2(NSPEC),EB(NK),      &
-               EB2(NK), ALFA(NK),K1(NK,NDTAB),K2(NK,NDTAB),            &
+               MSSSUM2(NK,NTH),MSSLONG(NK,NTH),PB2(NSPEC),  EB(NK) ,    &
+               K1(NK,NDTAB),K2(NK,NDTAB),  EB2(NK), ALFA(NK)  ,         &
                SIGTAB(NK,NDTAB),DCKI(NKHS,NKD),QBI(NKHS,NKD))
 !!$ACC UPDATE DEVICE(EB, EB2, ALFA)
 !!$ACC KERNELS
@@ -161,6 +161,7 @@
       SUBROUTINE W3SPR4 (A, CG, WN, EMEAN, FMEAN, FMEAN1, WNMEAN,     &
                     AMAX, U, UDIR, USTAR, USDIR, TAUWX, TAUWY, CD, Z0,&
                     CHARN, LLWS, FMEANWS)
+
 !$ACC ROUTINE VECTOR
 !/
 !/                  +-----------------------------------+
@@ -236,7 +237,7 @@
 !/ ------------------------------------------------------------------- /
       USE W3ODATMD, ONLY: IAPROC
       USE CONSTANTS, ONLY: TPIINV
-      USE W3GDATMD, ONLY: NK, NTH, NSPEC, SIG, DTH, DDEN, WWNMEANP, &
+      USE W3GDATMD, ONLY: NK, NTH, NSPEC, DDEN, SIG, DTH, WWNMEANP, &
                           WWNMEANPTAIL, FTE, FTF, SSTXFTF, SSTXFTWN,&
                           SSTXFTFTAIL, SSWELLF
       IMPLICIT NONE
@@ -250,6 +251,10 @@
       REAL, INTENT(INOUT)     :: USTAR, USDIR
       REAL, INTENT(OUT)       :: EMEAN, FMEAN, FMEAN1, WNMEAN, AMAX,  &
                                  CD, Z0, CHARN, FMEANWS
+!      REAL,INTENT(IN)        :: DDEN(:), SIG(:), DTH, WWNMEANP, &
+!                                WWNMEANPTAIL, FTE, FTF, SSTXFTF, SSTXFTWN,&
+!                                SSTXFTFTAIL, SSWELLF(:)
+!      INTEGER, INTENT(IN) :: NK, NTH, NSPEC 
 !/
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
@@ -314,6 +319,7 @@
 ! 3.  Add tail beyond discrete spectrum and get mean pars ------------ *
 !     ( DTH * SIG absorbed in FTxx )
 !
+
       EBAND  = EB(NK) / DDEN(NK)
       EMEAN  = EMEAN  + EBAND * FTE
       FMEAN  = FMEAN  + EBAND * FTF
@@ -519,6 +525,7 @@
 ! As local arrays they should not be required to be created. However
 ! with managed memory turned on and this statement removed the output
 ! fails.
+
 !!$ACC DATA CREATE(STRESSSTAB1, STRESSSTAB2,PTURB,PVISC)
 !!$ACC KERNELS
       PTURB = 0.
@@ -552,9 +559,6 @@
 !
 ! Defines the swell dissipation based on the "Reynolds number"
       
-! GPUNotes Setting the loops to be more specific with ELSE IF removed
-! issues surrounding PTURB and PVISC.
-
       IF (SSWELLF(4).GT.0) THEN
         IF (SSWELLF(7).GT.0.) THEN
           SMOOTH = 0.5*TANH((RE-SSWELLF(4))/SSWELLF(7))
@@ -573,11 +577,6 @@
         PTURB=1.
         PVISC=1.
       END IF
-
-! GPUNotes Order of the conditions has been changed to ensure the 
-! output is correct, this shouldn't be required and may be a sign
-! of another issue. Can a more specific condition be used to identify
-! positve entries for SSELLF(2)?
 
       IF (SSWELLF(2).EQ.0.) THEN
         FW=ABS(SSWELLF(3))

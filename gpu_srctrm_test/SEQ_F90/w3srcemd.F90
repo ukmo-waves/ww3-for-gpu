@@ -485,7 +485,7 @@
                                  FACTOR, FACTOR2, DRAT, TAUWAX, TAUWAY,&
                                  MWXFINISH, MWYFINISH, A1BAND, B1BAND
       LOGICAL, SAVE           :: FLTEST = .FALSE., FLAGNN = .TRUE.
-      LOGICAL                 :: SHAVE
+      LOGICAL                 :: SHAVE, IT_BOOL
       LOGICAL                 :: LBREAK
       LOGICAL, SAVE           :: FIRST = .TRUE.
       LOGICAL                 :: PrintDeltaSmDA
@@ -511,20 +511,26 @@
 !GPUNotes SIN4 requires these values from constants.f90, however it does
 !not automatically transfer the data even if they are declared with
 !copyin. This seemed to be the best place to put the updates. 
-     
 !!$ACC UPDATE DEVICE(DELAB, FWTABLE(:),TPIINV,GRAV, NU_AIR, KAPPA, TPI,&
 !!$ACC              SIZEFWTABLE, ABMIN)
       WRITE(0,*)'TAG: W3SRCE'
       SPR4T = 0.0
       SIN4T = 0.0
       SDS4T = 0.0
+         WRITE(0,*)'TEST',IT
+      IF (IT .eq. 0) THEN
+         IT_BOOL = .true.
+      ELSE
+         IT_BOOL = .false.
+      END IF 
 !!$ACC DATA COPY   (WN1(:),CG1(:),SPEC(:),ALPHA(:),USTAR,USTDIR,FPI,TWS  )&
 !!$ACC      COPY   (TAUOX,TAUOY,TAUWX,TAUWY,PHIAW,PHIOC,PHICE,CHARN,ICEF )&
 !!$ACC      COPY   (BEDFORM(:),PHIBBL,TAUBBL(:),TAUICE(:),WHITECAP(:)    )&
-!!$ACC      COPY   (TAUWIX,TAUWIY,TAUWNX,TAUWNY                          )&
+!!$ACC      COPY   (TAUWIX,TAUWIY,TAUWNX,TAUWNY,WN2(:), DAM(:)           )&
 !!$ACC      COPYIN (U10ABS,U10DIR,CX,CY,DTG,ICE,ICEH,D_INP,IT,IX         )&  
 !!$ACC      COPYIN (IY,IMOD,SPECOLD(:),REFLED(:),BERG,COEF,TRNX,ICEDMAX  )&
-!!$ACC      COPYIN (REFLEC(:),AS,TRNY,INFLAGS1,INFLAGS2                  )&
+!!$ACC      COPYIN (REFLEC(:),AS,TRNY,INFLAGS1,INFLAGS2,DMIN,ICESCALES(:))&
+!!$ACC      COPYIN (FACP) &
 !!$ACC      COPYOUT(VSIO(:),VDIO(:),SHAVEIO,DTDYN,FCUT                   )
 !!$ACC      CREATE (SPECINIT(:),SPEC2(:),DAM(:),WN2(:),BRLAMBDA(:),VS(:) )&
 !!$ACC      CREATE (VSLN(:),VSIN(:),VDIN(:),VSNL(:),VDNL(:),VSDS(:),VD(:))&
@@ -536,7 +542,9 @@
 !!$ACC      CREATE (SMOOTH_ICEDISP,ICECOEF2,KDMEAN)
 !!$ACC KERNELS      
 !
-      
+!!$ACC      copy(vsbt(:),vdbt(:))&
+!!$ACC      copyin(facp)&
+!!$ACC      copy(dam(:))
       DEPTH  = MAX ( DMIN , D_INP )
       IKS1 = 1
       ICESCALELN = MAX(0.,MIN(1.,1.-ICE*ICESCALES(1)))
@@ -565,6 +573,7 @@
 !XP     = 0.15
 !FACP   = XP / PI * 0.62E-3 * TPI**4 / GRAV**2
 
+!$ACC PARALLEL
 !GPUNotes loop over frequencies
 !$ACC LOOP INDEPENDENT
       DO IK=1, NK
@@ -582,6 +591,18 @@
         END DO
       END DO
 !
+!$ACC END PARALLEL
+#ifdef MM
+#else
+!$ACC DATA COPY (SPEC(:), CG1(:), WN1(:)                  )&
+!$ACC      COPYIN (U10ABS, U10DIR, AS, IX, IY , IT          )&
+!$ACC      COPY   (VSIN(:),VDIN(:), WN2(:)     )&
+!$ACC      COPY   (EMEAN, FMEAN,  AMAX, CD, Z0, CHARN  )&
+!$ACC      COPY   (FMEANWS, FMEAN1, WNMEAN)&
+!$ACC      COPY(FACP, SIG, DAM)&
+!$ACC      COPYOUT(BRLAMBDA(:),CHARN,TAUWAX,TAUWAY,LLWS)
+#endif
+!$ACC PARALLEL
 ! 1.b Prepare dynamic time stepping
 !
       DTDYN  = 0.
@@ -613,51 +634,36 @@
 !!$ACC END KERNELS
 !GPUNotes calls to W3SPR4 and W3SIN4 below will contain source term specific spectral loops
 !GPUNotes the sequencing is important (although maybe excessive?)
-!        CALL CPU_TIME(sTime1)
-      IF (IT .eq. 0) THEN
+
+!GPUNotes Two changes were made to make the ACC ROUTINE function, the
+!first is an additional variable (BOOL) to process the if conditional
+!and second was to use PARALLEL instead of KERNEL.
+
+      IF (IT_BOOL .eq. .true.) THEN
          LLWS(:) = .TRUE.
          USTAR=0.
          USTDIR=0.
       ELSE
-!!$ACC DATA COPYIN (SPEC, CG1, WN1, TAUWX, TAUWY, U10ABS, U10DIR  )&
-!!$ACC      COPY   (USTAR, USTDIR, LLWS                                  )&
-!!$ACC      COPY(AMAX, CD, Z0, CHARN, FMEANWS                        )&
-!!$ACC      COPY(EMEAN, FMEAN, FMEAN1, WNMEAN)
-!!$ACC KERNELS 
-        CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN, &
+         CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN, &
                    AMAX, U10ABS, U10DIR, USTAR, USTDIR,            &
                    TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
-!        CALL CPU_TIME(eTime1)
-!        SPR4T = SPR4T + eTime1 - sTime1
-!!$ACC END KERNELS
-!!$ACC END DATA
-!        CALL CPU_TIME(sTime2) 
 
-!!$ACC DATA COPYIN (SPEC(:), BRLAMBDA(:), CG1(:), WN2(:), Z0, U10ABS    )&
-!!$ACC      COPYIN (CD, USTAR, U10DIR, AS, DRAT, IX, IY                 )&
-!!$ACC      COPYOUT(VSIN, VDIN, TAUWX, TAUWY, TAUWAX, TAUWAY, LLWS)
-!!$ACC KERNELS 
-        CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
-                 U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,       &
-                 VSIN, VDIN, LLWS, IX, IY, BRLAMBDA )
-!        CALL CPU_TIME(eTime2)
-!        SIN4T = SIN4T + eTime2 - sTime2
-!!$ACC END KERNELS
-!!$ACC END DATA
+         CALL W3SIN4 (SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
+                  U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,  &
+                  VSIN, VDIN, LLWS, IX, IY, BRLAMBDA)
       END IF
 !GPUNotes call below will contain source term specific spectral loops
-      CALL CPU_TIME(sTime1)
-!!$ACC DATA COPYIN (SPEC, CG1, WN1, TAUWX, TAUWY, LLWS, U10ABS, U10DIR  )&
-!!$ACC      COPY   (USTAR, USTDIR                                       )&
-!!$ACC      COPYOUT(AMAX, CD, Z0, CHARN, FMEANWS                        )&
-!!$ACC      COPYOUT(EMEAN, FMEAN, FMEAN1, WNMEAN)
-!!$ACC KERNELS
-      CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN, &
-                 AMAX, U10ABS, U10DIR, USTAR, USTDIR,            &
-                 TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
-!!$ACC END KERNELS
-!!$ACC END DATA
-      CALL CPU_TIME(eTime1)
+!      CALL CPU_TIME(sTime1)
+        CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN, &
+                   AMAX, U10ABS, U10DIR, USTAR, USTDIR,            &
+                   TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)!,&
+!$ACC END PARALLEL
+!      CALL CPU_TIME(eTime1)
+       WRITE(0,*)'AFTER',USTAR
+#ifdef MM
+#else
+!$ACC END DATA
+#endif
       SPR4T = SPR4T + eTime1 - sTime1
       TWS = 1./FMEANWS
 !
@@ -700,9 +706,12 @@
 !GPUNotes subrotuine will contain source term specific spectral loops
 !Breaks if include TAUWX/Y 
         CALL CPU_TIME(sTime2) 
+#ifdef MM
+#else
 !$ACC DATA COPYIN (SPEC(:), BRLAMBDA(:), CG1(:), WN2(:), Z0, U10ABS    )&
 !$ACC      COPYIN (CD, USTAR, U10DIR, AS, DRAT, IX, IY                 )&
 !$ACC      COPYOUT(VSIN, VDIN, TAUWX, TAUWY, TAUWAX, TAUWAY, LLWS)
+#endif
 !$ACC KERNELS 
         CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
                  U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,       &
@@ -710,7 +719,10 @@
 !        CALL CPU_TIME(eTime2)
 !        SIN4T = SIN4T + eTime2 - sTime2
 !$ACC END KERNELS
+#ifdef MM
+#else
 !$ACC END DATA
+#endif
 !
 ! 2.b Nonlinear interactions.
 !
@@ -791,11 +803,14 @@
         SHAVE  = DT.LT.DTMIN .AND. DT.LT.DTG-DTTOT   ! limiter check ...
         SHAVEIO = SHAVE
         DT     = MAX ( DT , MIN (DTMIN,DTG-DTTOT) ) ! override dt with input time step or last time step if it is bigger ... anyway
+
 !CODENotes: This call is to a variable that is not defined, this causes
 !issues on GPU but is just ignored on CPU. 
 !        IF (srce_call .eq. srce_imp_post) DT = DTG  ! for implicit part
+
         HDT    = OFFSET * DT
         DTTOT  = DTTOT + DT
+
 !GPUNotes calls below may be for implicit source term update
 !GPUNotes would this remove the need for the NSTEPS loop?
 !GPUNotes discussed in section 3.6 of manual, although maybe
@@ -814,6 +829,7 @@
           IF ( SHAVE ) THEN
 !GPUNotes Running sequentially due to the recursive use of eIncX, adding
 !loop independent does not force the loop to be parallel as it should.
+
             DO IS=IS1, NSPECH
               eInc1 = VS(IS) * DT / MAX ( 1. , (1.-HDT*VD(IS)))
               eInc2 = SIGN ( MIN (DAM(IS),ABS(eInc1)) , eInc1 )
@@ -876,18 +892,26 @@
 !
 !GPUNotes source term specific loops over spectrum in this call
         CALL CPU_TIME(sTime1)
-
-!!$ACC DATA COPYIN (SPEC, CG1, WN1, LLWS, U10ABS, U10DIR , TAUWX,TAUWY   )&
-!!$ACC      COPY   (USTAR, USTDIR                        )&
-!!$ACC      COPYOUT(AMAX, CD, Z0, CHARN, FMEANWS                        )&
-!!$ACC      COPYOUT(EMEAN, FMEAN, FMEAN1, WNMEAN)
+#ifdef MM
+#else
+!$ACC DATA COPYIN (SPEC, CG1, WN1, LLWS, U10ABS, U10DIR , TAUWX,TAUWY   )&
+!$ACC      COPY   (USTAR, USTDIR                        )&
+!$ACC      COPYOUT(AMAX, CD, Z0, CHARN, FMEANWS                        )&
+!$ACC      COPYOUT(EMEAN, FMEAN, FMEAN1, WNMEAN)
+#endif
 !      WRITE(0,*)'TAG: W3SPR4'
-!!$ACC KERNELS
+!$ACC KERNELS
         CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN, &
                    AMAX, U10ABS, U10DIR, USTAR, USTDIR,            &
-                   TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
-!!$ACC END KERNELS
-!!$ACC END DATA
+                   TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)!,&
+!                   NK, NTH, NSPEC, SIG, DTH, WWNMEANP, &
+!                        WWNMEANPTAIL, FTE, FTF, SSTXFTF, SSTXFTWN,&
+!                          SSTXFTFTAIL, SSWELLF)
+!$ACC END KERNELS
+#ifdef MM
+#else
+!$ACC END DATA
+#endif
         CALL CPU_TIME(eTime1)
         SPR4T = SPR4T + eTime1 - sTime1
 !!$ACC KERNELS
@@ -926,9 +950,12 @@
 ! GPUNotes source term specific loops over spectrum in this call
 !Breaks if include TAUWX/Y 
         CALL CPU_TIME(sTime2) 
+#ifdef MM
+#else
 !$ACC DATA COPYIN (SPEC(:), BRLAMBDA(:), CG1(:), WN2(:), Z0, U10ABS    )&
 !$ACC      COPYIN (CD, USTAR, U10DIR, AS, DRAT, IX, IY                 )&
 !$ACC      COPYOUT(VSIN, VDIN, TAUWX, TAUWY, TAUWAX, TAUWAY, LLWS)
+#endif
 !$ACC KERNELS 
         CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
                  U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,       &
@@ -936,7 +963,10 @@
 !        CALL CPU_TIME(eTime2)
 !        SIN4T = SIN4T + eTime2 - sTime2
 !$ACC END KERNELS
+#ifdef MM
+#else
 !$ACC END DATA
+#endif
 ! 7.  Check if integration complete ---------------------------------- *
 !
         IF (srce_call .eq. srce_imp_post) THEN

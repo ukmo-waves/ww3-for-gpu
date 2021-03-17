@@ -708,8 +708,7 @@
       END TYPE SLNP
 !
       TYPE SRCP
-        REAL                       :: WWNMEANPTAIL, SSTXFTFTAIL
-!
+        REAL                  :: WWNMEANPTAIL, SSTXFTFTAIL
         INTEGER               :: SSWELLFPAR, SSDSISO, SSDSBRFDF
         INTEGER, ALLOCATABLE  :: IKTAB(:,:), SATINDICES(:,:)
         REAL,    ALLOCATABLE  :: DCKI(:,:), SATWEIGHTS(:,:),          &
@@ -719,7 +718,7 @@
                                  FFXPM, FFXFM, FFXFA, FFXFI, FFXFD,   &
                                  SSDSBRF1, SSDSBRF2, SSDSBINT,SSDSBCK,&
                                  SSDSHCK, SSDSABK, SSDSPBK 
-        REAL, ALLOCATABLE     :: ZZWND, AALPHA, BBETA, ZZALP,         &
+        REAL,ALLOCATABLE      :: ZZWND, AALPHA, BBETA, ZZALP,         &
                                  TTAUWSHELTER, SSINTHP, SSINBR, ZZ0RAT&
                                  ,ZZ0MAX
         REAL                  :: SSDSCOS, SSDSDTH, SSDSBR2
@@ -959,7 +958,7 @@
       INTEGER, POINTER :: B_JGS_NLEVEL
       LOGICAL, POINTER :: B_JGS_SOURCE_NONLINEAR
 !/
-!$ACC DECLARE CREATE(SIG(:), SIG2(:), ESIN(:), ECOS(:), DDEN(:),QBI(:,:) )&
+!$ACC DECLARE CREATE(SIG(:), SIG2(:), ESIN(:), ECOS(:), QBI(:,:),DDEN(:))&
 !$ACC         CREATE(DDEN2(:), SSWELLF(:), SSDSC(:), CUMULW(:,:), SATINDICES)&
 !$ACC         CREATE(SATWEIGHTS(:,:), IKTAB(:,:), DCKI(:,:), SSDSBM(:), DTH, NK )&
 !$ACC         CREATE(NTH, NSPEC, WWNMEANP, WWNMEANPTAIL, FTE, FTF     )& 

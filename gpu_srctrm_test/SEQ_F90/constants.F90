@@ -110,8 +110,9 @@
 !     module during initialization.
       LOGICAL :: IS_ESMF_COMPONENT = .FALSE.
 !
-!$ACC DECLARE COPYIN(DELAB, FWTABLE(:),TPIINV,GRAV, NU_AIR, KAPPA, TPI)& 
-!$ACC         COPYIN(SIZEFWTABLE, ABMIN)
+!$ACC DECLARE CREATE(FWTABLE(:),DELAB)
+!!$ACC DECLARE COPYIN(DELAB, FWTABLE(:),TPIINV,GRAV, NU_AIR, KAPPA, TPI)& 
+!!$ACC         COPYIN(SIZEFWTABLE, ABMIN)
       CONTAINS
 ! ----------------------------------------------------------------------
       SUBROUTINE TABU_FW
@@ -186,6 +187,7 @@
 !
       ALLOCATE(FWTABLE(0:SIZEFWTABLE))
       DELAB   = (ABMAX-ABMIN)/REAL(SIZEFWTABLE)
+
       L10=ALOG(10.)
       DO I=0,SIZEFWTABLE
 !

@@ -12,14 +12,17 @@ while [ -n "$1" ]; do
 done
 
 cd ../RUN/ 
+ln -sf inp/ww3_grid.nml .
 ../SEQ_F90/ww3_grid
+ln -sf inp/ww3_shel.inp . 
 #nvprof ../SEQ_F90/ww3_shel 2> prof
-NV_ACC_NOTIFY=2 nvprof ../SEQ_F90/ww3_shel 2> prof
+NV_ACC_NOTIFY=3 nvprof ../SEQ_F90/ww3_shel 2> prof
 #nsys profile --force-overwrite true -o profile --stats=true ../SEQ_F90/ww3_shel 2> nsys_prof
 #nvprof --metrics dram_read_throughput,dram_write_throughput ../SEQ_F90/ww3_shel 2> metrics
 #NV_ACC_NOTIFY=2 ../SEQ_F90/ww3_shel 2> NV_NOTIFY
 #../SEQ_F90/ww3_shel
 
+ln -sf inp/ww3_outp.inp .
 ../SEQ_F90/ww3_outp
 
 vimdiff ww3.68060600.spc out/checking_outp/ww3.68060600.spc

@@ -1286,9 +1286,9 @@
                 TAUWY  = 0.
                 USTAR  = 1.
 !
-                CALL W3SPR4 (A, CG, WN, EMEAN, FMEAN,  FMEAN1,        &
-                             WNMEAN, AMAX, UABS, UDIRR, USTAR, USTD,&
-                             TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS )
+                CALL W3SPR4 (A, CG, WN, EMEAN, FMEAN,  FMEAN1,         &
+                             WNMEAN, AMAX, UABS, UDIRR, USTAR, USTD,   &
+                             TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
 !
                 DO ITT=1, 3
                   IX=1
