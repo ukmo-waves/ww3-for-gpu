@@ -74,6 +74,7 @@
       REAL,    PARAMETER      :: UMAX    = 50.
       REAL,    PARAMETER      :: TAUWMAX = 2.2361 !SQRT(5.)
       INTEGER                 :: DIKCUMUL
+
 !  Size of wave height table for integrating the PDF of wave heights
       INTEGER,    PARAMETER      :: NKHI=100
       REAL,    PARAMETER      :: FAC_KD1=1.01, FAC_KD2=1000., KHSMAX=2., KHMAX=2.
@@ -99,14 +100,20 @@
       REAL, DIMENSION(:,:)   , ALLOCATABLE :: K1, K2
       REAL,ALLOCATABLE        :: EB(:), EB2(:), ALFA(:)
 !/
-!$ACC DECLARE CREATE(TAUT(:,:),TAUHFT(:,:),TAUHFT2(:,:,:),ALFA)&
-!$ACC         CREATE(DELU,DELTAUW,DELTAIL,DELALP,DELUST,EB,EB2)
+!$ACC DECLARE COPYIN(TAUT(:,:), TAUHFT(:,:), TAUHFT2(:,:,:), ALFA(:))&
+!$ACC         COPYIN(DELU,DELTAUW,DELTAIL,DELALP,DELUST,EB,EB2,DIKCUMUL)&
+!$ACC         COPYIN(NSMOOTH(:),IKSUP(:),S1(:),E1(:),COEF4(:),NTIMES(:))&
+!$ACC         COPYIN(DK(:),HS(:),KBAR(:),DCK(:),EFDF(:),BTH0(:),QB(:)  )&
+!$ACC         COPYIN(S2(:),BTH(:),BTH0S(:),BTHS(:),SBK(:),IMSSMAX(:)   )&
+!$ACC         COPYIN(SBKT(:),MSSSUM(:,:),WTHSUM(:),PB(:), MSSSUM2(:,:) )&
+!$ACC         COPYIN(MSSLONG(:,:), PB2(:),K1(:,:), K2(:,:))&
+!$ACC         COPYIN(SIGTAB(:,:))
       CONTAINS
 
 !/ ------------------------------------------------------------------- /
       SUBROUTINE W3SRC4_INIT()
 
-      USE W3GDATMD, ONLY: NK, NTH, NSPEC, NKHS, NKD, NDTAB,QBI,DCKI
+      USE W3GDATMD, ONLY: NK, NTH, NSPEC, NKHS, NKD, NDTAB
       IMPLICIT NONE
 
       WRITE(0,*) "W3SRC4_INIT: NK/NTH/NSPEC: ", NK, NTH, NSPEC
@@ -115,9 +122,9 @@
                ,DK(NK),HS(NK),KBAR(NK),DCK(NK),EFDF(NK),BTH0(NK),QB(NK)&
                ,S2(NK),BTH(NSPEC),BTH0S(NK),BTHS(NSPEC),SBK(NSPEC),    &
                IMSSMAX(NK),SBKT(NK),MSSSUM(NK,5),WTHSUM(NTH),PB(NSPEC),&
-               MSSSUM2(NK,NTH),MSSLONG(NK,NTH),PB2(NSPEC),  EB(NK) ,    &
-               K1(NK,NDTAB),K2(NK,NDTAB),  EB2(NK), ALFA(NK)  ,         &
-               SIGTAB(NK,NDTAB),DCKI(NKHS,NKD),QBI(NKHS,NKD))
+               MSSSUM2(NK,NTH),MSSLONG(NK,NTH),PB2(NSPEC),  EB(NK) ,   &
+               K1(NK,NDTAB),K2(NK,NDTAB),  EB2(NK), ALFA(NK)  ,        &
+               SIGTAB(NK,NDTAB))
 !!$ACC UPDATE DEVICE(EB, EB2, ALFA)
 !!$ACC KERNELS
 !      NSMOOTH(:) = 0. 
@@ -1018,6 +1025,8 @@
           QBI = 1.
         END WHERE
  
+        DEALLOCATE(K1,K2)
+        DEALLOCATE(SIGTAB)
       ELSE
         IKTAB(:,:)=1
         DCKI(:,:) =0.
@@ -1636,6 +1645,7 @@
 !/ ------------------------------------------------------------------- /
       SUBROUTINE W3SDS4 (A, K, CG, USTAR, USDIR, DEPTH, SRHS,      &
                          DDIAG, IX, IY, BRLAMBDA, WHITECAP )
+!$ACC ROUTINE VECTOR
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -1788,6 +1798,7 @@
 !CODENotes: Removed pre-initialization, this creates additional 
 !data transfers and are not needed for the mini-app to run.
        
+!!$ACC ENTER DATA COPYIN(FLOGRD)
 ! 1.  Initialization and numerical factors
 !
       FACTURB=SSDSC(5)*USTAR**2/GRAV*DAIR/DWAT
@@ -1820,12 +1831,16 @@
 ! 2.a.1 Computes saturation
 !
         SDSNTH = MIN(NINT(SSDSDTH/(DTH*RADE)),NTH/2-1)
+        !MSSLONG(:,:) = 0.
+        MSSSUM2(:,:) = 0.
+        MSSSUM(:,:) = 0.
+        !BTH(:) = 0.
 !$ACC LOOP INDEPENDENT
         DO IK=1,NK
           DO ITH=1,NTH
             MSSLONG(IK,ITH) = 0.
-            MSSSUM2(IK,ITH) = 0.
-            MSSSUM(IK,ITH) = 0. 
+!            MSSSUM2(IK,ITH) = 0.
+!            MSSSUM(IK,ITH) = 0. 
 !       SSDSDIK is the integer difference in frequency bands
 !       between the "large breakers" and short "wiped-out waves"
           END DO
@@ -2248,7 +2263,7 @@
 !GPUNotes Loops over the full spectrum
       SBKT(:)=0.
       SBK(:)=0.
-!$ACC LOOP INDEPENDENT GANG COLLAPSE(2)
+!$ACC LOOP INDEPENDENT COLLAPSE(2)
       DO  IK=IK1, NK
         DO ITH=1,NTH
           IS=ITH+(IK-1)*NTH
@@ -2391,6 +2406,7 @@
         END DO
       END IF
 !
+!$ACC EXIT DATA COPYOUT(FLOGRD)
 ! End of output computing
 1000  CONTINUE
 !!$ACC END KERNELS

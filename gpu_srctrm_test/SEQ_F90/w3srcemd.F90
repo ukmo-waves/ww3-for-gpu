@@ -468,7 +468,7 @@
       REAL                    :: ICESCALELN, ICESCALEIN, ICESCALENL,   &
                                  ICESCALEDS
       REAL                    :: EMEAN, FMEAN, WNMEAN, AMAX, CD, Z0,   &
-                                 SCAT, SMOOTH_ICEDISP, ICECOEF2
+                                 SCAT, SMOOTH_ICEDISP,ICECOEF2
 !      REAL,ALLOCATABLE        :: WN_R(:),CG_ICE(:),ALPHA_LIU(:),R(:)
 !      REAL,ALLOCATABLE        :: SPECINIT(:), SPEC2(:)
 !      REAL,ALLOCATABLE        :: DAM (:), WN2 (:), BRLAMBDA(:),        &
@@ -485,7 +485,7 @@
                                  FACTOR, FACTOR2, DRAT, TAUWAX, TAUWAY,&
                                  MWXFINISH, MWYFINISH, A1BAND, B1BAND
       LOGICAL, SAVE           :: FLTEST = .FALSE., FLAGNN = .TRUE.
-      LOGICAL                 :: SHAVE, IT_BOOL
+      LOGICAL                 :: SHAVE
       LOGICAL                 :: LBREAK
       LOGICAL, SAVE           :: FIRST = .TRUE.
       LOGICAL                 :: PrintDeltaSmDA
@@ -518,11 +518,6 @@
       SIN4T = 0.0
       SDS4T = 0.0
          WRITE(0,*)'TEST',IT
-      IF (IT .eq. 0) THEN
-         IT_BOOL = .true.
-      ELSE
-         IT_BOOL = .false.
-      END IF 
 !!$ACC DATA COPY   (WN1(:),CG1(:),SPEC(:),ALPHA(:),USTAR,USTDIR,FPI,TWS  )&
 !!$ACC      COPY   (TAUOX,TAUOY,TAUWX,TAUWY,PHIAW,PHIOC,PHICE,CHARN,ICEF )&
 !!$ACC      COPY   (BEDFORM(:),PHIBBL,TAUBBL(:),TAUICE(:),WHITECAP(:)    )&
@@ -542,9 +537,17 @@
 !!$ACC      CREATE (SMOOTH_ICEDISP,ICECOEF2,KDMEAN)
 !!$ACC KERNELS      
 !
-!!$ACC      copy(vsbt(:),vdbt(:))&
-!!$ACC      copyin(facp)&
-!!$ACC      copy(dam(:))
+#ifdef MM
+#else
+!$ACC DATA COPY (SPEC(:), CG1(:), WN1(:)                  )&
+!$ACC      COPYIN (U10ABS, U10DIR, AS, IX, IY , IT          )&
+!$ACC      COPY   (VSIN(:),VDIN(:), WN2(:)     )&
+!$ACC      COPY   (EMEAN, FMEAN,  AMAX, CD, Z0, CHARN  )&
+!$ACC      COPY   (FMEANWS, FMEAN1, WNMEAN)&
+!$ACC      COPY(FACP, SIG, DAM)&
+!$ACC      COPYOUT(BRLAMBDA(:),CHARN,TAUWAX,TAUWAY,LLWS)
+#endif
+!$ACC PARALLEL
       DEPTH  = MAX ( DMIN , D_INP )
       IKS1 = 1
       ICESCALELN = MAX(0.,MIN(1.,1.-ICE*ICESCALES(1)))
@@ -573,16 +576,15 @@
 !XP     = 0.15
 !FACP   = XP / PI * 0.62E-3 * TPI**4 / GRAV**2
 
-!$ACC PARALLEL
 !GPUNotes loop over frequencies
-!$ACC LOOP INDEPENDENT
+!$ACC LOOP INDEPENDENT VECTOR
       DO IK=1, NK
         DAM(1+(IK-1)*NTH) = FACP / ( SIG(IK) * WN1(IK)**3 )
         WN2(1+(IK-1)*NTH) = WN1(IK)
       END DO
 
 !GPUNotes loop over full spectrum
-!$ACC LOOP INDEPENDENT COLLAPSE(2) GANG VECTOR
+!$ACC LOOP INDEPENDENT COLLAPSE(2) VECTOR
       DO IK=1, NK
         DO ITH=2, NTH
           IS0    = (IK-1)*NTH
@@ -591,18 +593,6 @@
         END DO
       END DO
 !
-!$ACC END PARALLEL
-#ifdef MM
-#else
-!$ACC DATA COPY (SPEC(:), CG1(:), WN1(:)                  )&
-!$ACC      COPYIN (U10ABS, U10DIR, AS, IX, IY , IT          )&
-!$ACC      COPY   (VSIN(:),VDIN(:), WN2(:)     )&
-!$ACC      COPY   (EMEAN, FMEAN,  AMAX, CD, Z0, CHARN  )&
-!$ACC      COPY   (FMEANWS, FMEAN1, WNMEAN)&
-!$ACC      COPY(FACP, SIG, DAM)&
-!$ACC      COPYOUT(BRLAMBDA(:),CHARN,TAUWAX,TAUWAY,LLWS)
-#endif
-!$ACC PARALLEL
 ! 1.b Prepare dynamic time stepping
 !
       DTDYN  = 0.
@@ -627,19 +617,17 @@
       PHICE  = 0.
       BRLAMBDA(:)=0.
 !
+
 ! 1.c Set mean parameters
 !
       TAUWX=0.
       TAUWY=0.
-!!$ACC END KERNELS
 !GPUNotes calls to W3SPR4 and W3SIN4 below will contain source term specific spectral loops
 !GPUNotes the sequencing is important (although maybe excessive?)
 
-!GPUNotes Two changes were made to make the ACC ROUTINE function, the
-!first is an additional variable (BOOL) to process the if conditional
-!and second was to use PARALLEL instead of KERNEL.
-
-      IF (IT_BOOL .eq. .true.) THEN
+!GPUNotes We needed to use PARALLEL instead of KERNEL for this section
+!of the code. Presumeably due to treatment of the IF condition.
+      IF (IT .eq. 0) THEN
          LLWS(:) = .TRUE.
          USTAR=0.
          USTDIR=0.
@@ -657,19 +645,13 @@
         CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN, &
                    AMAX, U10ABS, U10DIR, USTAR, USTDIR,            &
                    TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)!,&
-!$ACC END PARALLEL
 !      CALL CPU_TIME(eTime1)
-       WRITE(0,*)'AFTER',USTAR
-#ifdef MM
-#else
-!$ACC END DATA
-#endif
       SPR4T = SPR4T + eTime1 - sTime1
       TWS = 1./FMEANWS
 !
 ! 1.c2 Stores the initial data
 !
-!$ACC LOOP SEQ
+!$ACC LOOP VECTOR
       DO ISPEC=1,NSPEC
          SPECINIT(ISPEC) = SPEC(ISPEC)
       END DO
@@ -684,6 +666,11 @@
       FHIGH  = MAX( (FFXFM + FAGE ) * MAX(FMEAN1,FMEANWS), FFXPM / USTAR)
       FHIGI  = FFXFA * FMEAN1
      
+!$ACC END PARALLEL
+#ifdef MM
+#else
+!$ACC END DATA
+#endif
 !
 ! 1.f Prepare output file for !/NNT option
 !
@@ -708,35 +695,34 @@
         CALL CPU_TIME(sTime2) 
 #ifdef MM
 #else
-!$ACC DATA COPYIN (SPEC(:), BRLAMBDA(:), CG1(:), WN2(:), Z0, U10ABS    )&
-!$ACC      COPYIN (CD, USTAR, U10DIR, AS, DRAT, IX, IY                 )&
-!$ACC      COPYOUT(VSIN, VDIN, TAUWX, TAUWY, TAUWAX, TAUWAY, LLWS)
+!$ACC DATA COPYIN (DEPTH, USTAR, USTDIR, IX, IY, WNMEAN, WN2(:), Z0)&
+!$ACC      COPYIN (CD, U10DIR, AS, DRAT, U10ABS, XFLT, INFLAGS2(4) )&
+!$ACC      COPYIN (DAM, DTMAX, FACTI1, FACTI2                      )&
+!$ACC      COPY   (SPEC(:), WN1(:), CG1(:),VSNL(:), VDNL(:)        )&
+!$ACC      COPY   (BRLAMBDA(:), VSLN(:), VSIN(:), VDIN(:)          )&
+!$ACC      COPYOUT(VSDS(:), VDDS(:), WHITECAP(:), LLWS(:)          )&
+!$ACC      COPYOUT(VSIN(:), VDIN(:), TAUWX, TAUWY, TAUWAX, TAUWAY) 
 #endif
+
 !$ACC KERNELS 
         CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
                  U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,       &
                  VSIN, VDIN, LLWS, IX, IY, BRLAMBDA )
 !        CALL CPU_TIME(eTime2)
 !        SIN4T = SIN4T + eTime2 - sTime2
-!$ACC END KERNELS
-#ifdef MM
-#else
-!$ACC END DATA
-#endif
 !
 ! 2.b Nonlinear interactions.
-!
+
 !GPUnotes subruoutine will contain source term specific spectral loops
         CALL W3SNL1 ( SPEC, CG1, DEPTH*WNMEAN, VSNL, VDNL )
-!
 ! 2.c Dissipation... except for ST4
 ! 2.c1   as in source term package
 !GPUNotes subroutine will contain source term specific spectral loops
-        CALL CPU_TIME(sTime3)
+!        CALL CPU_TIME(sTime3)
         CALL W3SDS4 ( SPEC, WN1, CG1, USTAR, USTDIR, DEPTH, VSDS,    &
                       VDDS, IX, IY, BRLAMBDA, WHITECAP )
-        CALL CPU_TIME(eTime3)
-        SDS4T = SDS4T + eTime3 - sTime3
+!        CALL CPU_TIME(eTime3)
+!        SDS4T = SDS4T + eTime3 - sTime3
  
 !
 ! 2.c2   optional dissipation parameterisations
@@ -767,6 +753,11 @@
 !             SIN = (1-ICE)**ISCALEIN*SIN and SDS=(1-ICE)**ISCALEDS*SDS ------------------ *
 !     INFLAGS2(4) is true if ice concentration was ever read during
 !             this simulation
+!$ACC END KERNELS
+#ifdef MM
+#else
+!$ACC END DATA
+#endif
 !$ACC WAIT
         IF ( INFLAGS2(4) ) THEN
           VSNL(1:NSPECH) = ICESCALENL * VSNL(1:NSPECH)

@@ -697,6 +697,7 @@
 !
       FLOUT(1) = .FALSE.
       FLOGRD   = FLGRD
+!$ACC ENTER DATA COPYIN(FLOGRD)
       FLOGD    = FLGD
       DO J=1, NOGRP
         DO K=1, NGRPP
