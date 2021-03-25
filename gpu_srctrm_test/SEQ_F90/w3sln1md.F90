@@ -54,6 +54,7 @@
       CONTAINS
 !/ ------------------------------------------------------------------- /
       SUBROUTINE W3SLN1 (K, FHIGH, USTAR, USDIR, S)
+!$ACC ROUTINE VECTOR
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -135,7 +136,7 @@
 ! 10. Source code :
 !
 !/ ------------------------------------------------------------------- /
-      USE CONSTANTS
+      USE CONSTANTS,ONLY: GRAV
       USE W3GDATMD, ONLY: NTH, NK, ECOS, ESIN, SIG, SLNC1, FSPM, FSHF
       USE W3ODATMD, ONLY: NDSE, NDST
       USE W3SERVMD, ONLY: EXTCDE
