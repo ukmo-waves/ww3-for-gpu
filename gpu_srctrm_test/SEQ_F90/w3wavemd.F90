@@ -1152,7 +1152,6 @@
 !!$ACC      COPYOUT(VSioDummy(:),VDioDummy(:),SHAVETOTioDummy,FCUT(:)   )&
 !!$ACC      COPYOUT(DTDYN(:)                                            )
 !!$ACC      CREATE (JSEA,IX,IY,DELX,DELY,DELA,TMP1(:),TMP2(:),TMP3(:),TMP4(:))
-!!$ACC KERNELS
             D50=0.0002
             REFLEC(:)=0.
             REFLED(:)=0
@@ -1161,14 +1160,12 @@
             SPR4TOT=0.
             SIN4TOT=0.
             SDS4TOT=0.
-!!$ACC END KERNELS
 !GPUNotes Outer seapoint loop for source term calculations
             DO JSEA=1, NSEAL
               CALL INIT_GET_ISEA(ISEA, JSEA)
               IX     = MAPSF(ISEA,1)
               IY     = MAPSF(ISEA,2)
               IF ( MAPSTA(IY,IX) .EQ. 1 .AND. FLAGST(JSEA)) THEN
-!!$ACC KERNELS
                 DELA=1.
                 DELX=1.
                 DELY=1.
@@ -1176,7 +1173,6 @@
                 TMP2   = BEDFORMS(ISEA,1:3)
                 TMP3   = TAUBBL(ISEA,1:2)
                 TMP4   = TAUICE(ISEA,1:2)
-!!$ACC END KERNELS
                 CALL W3SRCE(srce_direct, IT, ISEA, IX, IY, IMOD, &
                             VAoldDummy, VA(:,ISEA),                     &
                             VSioDummy, VDioDummy, SHAVETOTioDummy,      &
@@ -1199,12 +1195,10 @@
                 SIN4TOT = SIN4TOT + SIN4T
                 SPR4TOT = SPR4TOT + SPR4T
                 SDS4TOT = SDS4TOT + SDS4T
-!!$ACC KERNELS   
                 WHITECAP(ISEA,1:4) = TMP1
                 BEDFORMS(ISEA,1:3) = TMP2
                 TAUBBL(ISEA,1:2) = TMP3
                 TAUICE(ISEA,1:2) = TMP4
-!!$ACC END KERNELS
               ELSE
                 UST   (JSEA) = UNDEF
                 USTDIR(JSEA) = UNDEF

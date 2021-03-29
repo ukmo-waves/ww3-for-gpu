@@ -75,34 +75,6 @@
       DOUT(NK,NTH), WN_R(NK), CG_ICE(NK), ALPHA_LIU(NK), R(NK),        &
       COSI(2), LLWS(NSPEC))
 
-!!$ACC KERNELS
-!      DAM(:) = 0.
-!      WN2(:) = 0.
-!      VSLN(:) = 0.
-!      SPECINIT(:) = 0.
-!      SPEC2(:) = 0.
-!      VSIN(:) = 0.
-!      VDIN(:) = 0.
-!      VSNL(:) = 0.
-!      VDNL(:) = 0.
-!      VSDS(:) = 0.
-!      VDDS(:) = 0.
-!      VSBT(:) = 0.
-!      VDBT(:) = 0.
-!      VS(:) = 0.
-!      VD(:) = 0.
-!      EB(:) = 0.
-!      BRLAMBDA(:) = 0.
-!      FOUT(:,:) = 0.
-!      SOUT(:,:) = 0.
-!      DOUT(:,:) = 0.
-!      WN_R(:) = 0.
-!      CG_ICE(:) = 0.
-!      ALPHA_LIU(:) = 0.
-!      R(:) = 0.
-!      COSI(:) = 0.
-!      LLWS(:) = 0.
-!!$ACC END KERNELS
       END SUBROUTINE W3SRCE_INIT
 
 !/ ------------------------------------------------------------------- /
@@ -511,60 +483,29 @@
 !GPUNotes SIN4 requires these values from constants.f90, however it does
 !not automatically transfer the data even if they are declared with
 !copyin. This seemed to be the best place to put the updates. 
-!!$ACC UPDATE DEVICE(DELAB, FWTABLE(:),TPIINV,GRAV, NU_AIR, KAPPA, TPI,&
-!!$ACC              SIZEFWTABLE, ABMIN)
       WRITE(0,*)'TAG: W3SRCE'
       SPR4T = 0.0
       SIN4T = 0.0
       SDS4T = 0.0
-         WRITE(0,*)'TEST',IT
-!!$ACC DATA COPY   (WN1(:),CG1(:),SPEC(:),ALPHA(:),USTAR,USTDIR,FPI,TWS  )&
-!!$ACC      COPY   (TAUOX,TAUOY,TAUWX,TAUWY,PHIAW,PHIOC,PHICE,CHARN,ICEF )&
-!!$ACC      COPY   (BEDFORM(:),PHIBBL,TAUBBL(:),TAUICE(:),WHITECAP(:)    )&
-!!$ACC      COPY   (TAUWIX,TAUWIY,TAUWNX,TAUWNY,WN2(:), DAM(:)           )&
-!!$ACC      COPYIN (U10ABS,U10DIR,CX,CY,DTG,ICE,ICEH,D_INP,IT,IX         )&  
-!!$ACC      COPYIN (IY,IMOD,SPECOLD(:),REFLED(:),BERG,COEF,TRNX,ICEDMAX  )&
-!!$ACC      COPYIN (REFLEC(:),AS,TRNY,INFLAGS1,INFLAGS2,DMIN,ICESCALES(:))&
-!!$ACC      COPYIN (FACP) &
-!!$ACC      COPYOUT(VSIO(:),VDIO(:),SHAVEIO,DTDYN,FCUT                   )
-!!$ACC      CREATE (SPECINIT(:),SPEC2(:),DAM(:),WN2(:),BRLAMBDA(:),VS(:) )&
-!!$ACC      CREATE (VSLN(:),VSIN(:),VDIN(:),VSNL(:),VDNL(:),VSDS(:),VD(:))&
-!!$ACC      CREATE (VDDS(:),VSBT(:),VDBT(:),COSI(:),LLWS(:),FOUT,ICECOEF2)&
-!!$ACC      CREATE (SOUT(:,:),DOUT(:,:),WN_R(:),CG_ICE(:),ALPHA_LIU(:)   )&
-!!$ACC      CREATE (R(:),EBAND,DIFF,EFINISH,HSTOT,PHINL,MWXINIT,MWYINIT  )&
-!!$ACC      CREATE (FACTOR,FACTOR2,TAUWAX,TAUWAY,MWXFINISH,A1BAND        )&
-!!$ACC      CREATE (MWYFINISH,B1BAND,EMEAN,FMEAN,WNMEAN,AMAX,CD,Z0,SCAT  )&
-!!$ACC      CREATE (SMOOTH_ICEDISP,ICECOEF2,KDMEAN)
-!!$ACC KERNELS      
 !
 #ifdef MM
 #else
-!$ACC DATA COPYIN (INFLAGS2(:) )&
-!$ACC      COPYIN (DEPTH, U10DIR, U10ABS, AS, DMIN         )&
-!$ACC      COPYIN (DRAT, XFLT, DTMAX, FACTI1, FACTI2, XREL, PHIAW   )&
-!$ACC      COPYIN (DTMIN, IX, IY, FFXPM                             )&
-!$ACC      COPY   (SPEC(:), WN1(:), WN2(:), CG1(:), VSNL(:), VDNL(:))&
+!$ACC DATA COPYIN (INFLAGS2(:), DEPTH, U10DIR, U10ABS, AS, IX, IY   )&
+!$ACC      COPYIN (DRAT, XFLT, XREL, FACTI1, FACTI2, PHIAW, FFXPM   )&
+!$ACC      COPYIN (DTMAX, DTMIN, DMIN                               )&
+!$ACC      COPY   (SPEC(:), SPEC2(:), WN1(:), WN2(:), WN_R(:), R(:) )&
 !$ACC      COPY   (BRLAMBDA(:), VSLN(:), VSIN(:), VDIN(:), LLWS(:)  )&
-!$ACC      COPY   (VS(:), VD(:), COSI(:), VSBT(:), VDBT(:), DAM(:) )&
-!$ACC      COPY   (ICESCALES(:), SPECINIT(:), USTAR, USTDIR, CD, Z0 )&
+!$ACC      COPY   (VS(:), VD(:), VSNL(:), VDNL(:), VSBT(:), VDBT(:) )&
+!$ACC      COPY   (ICESCALES(:), SPECINIT(:), CG1(:), CG_ICE(:)     )&
+!$ACC      COPY   (TAUBBL(:), TAUICE(:), COSI(:), DAM(:)            )&
 !$ACC      COPY   (FFXFA, FFXFM, FAGE, PHIBBL, TAUWX, TAUWY, FACHFA )&
 !$ACC      COPY   (WNMEAN, FHIGH, FHIGI, NKH, NKH1, EMEAN, FMEAN    )&
 !$ACC      COPY   (AMAX, CHARN, FACP, SIG, FMEANWS, AFILT, NSPECH   )&
-!$ACC      COPY   (FMEAN1, DT)&
-!$ACC      COPYOUT(VSDS(:), VDDS(:), WHITECAP(:)  )&
-!$ACC      COPYOUT(TAUWAX, TAUWAY, FH1, FH2)
+!$ACC      COPY   (FMEAN1, DT, CD, Z0, USTAR, USTDIR                )&
+!$ACC      COPYOUT(VSDS(:), VDDS(:), WHITECAP(:), TAUWAX, TAUWAY    )&
+!$ACC      COPYOUT(FH1, FH2)
 #endif
 
-#ifdef MM
-#else
-!!$ACC DATA COPYIN (SPEC(:), CG1(:), WN1(:), U10ABS, U10DIR, AS, IX, IY )&
-!!$ACC      COPYIN (FFXPM, DMIN, FFXFM, FFXFA                           )&
-!!$ACC      COPY   (VSIN(:), VDIN(:), VSBT(:), VDBT(:), ICESCALES(:)     )&
-!!$ACC      COPY   (WN2(:), SPECINIT(:), DAM(:), EMEAN, FMEAN,  AMAX    )&
-!!$ACC      COPY   (CHARN, FACP, SIG, TAUWX, TAUWY, USTDIR, USTAR       )&
-!!$ACC      COPY   (FMEANWS, FMEAN1, WNMEAN, CD, Z0                     )&
-!!$ACC      COPYOUT(BRLAMBDA(:), TAUWAX, TAUWAY, LLWS,FAGE, FHIGH, FHIGI)
-#endif
 !$ACC PARALLEL
       DEPTH  = MAX ( DMIN , D_INP )
       IKS1 = 1
@@ -665,7 +606,7 @@
                    AMAX, U10ABS, U10DIR, USTAR, USTDIR,            &
                    TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)!,&
 !      CALL CPU_TIME(eTime1)
-      SPR4T = SPR4T + eTime1 - sTime1
+!      SPR4T = SPR4T + eTime1 - sTime1
       TWS = 1./FMEANWS
 !
 ! 1.c2 Stores the initial data
@@ -687,10 +628,6 @@
       FHIGI  = FFXFA * FMEAN1
      
 !$ACC END PARALLEL
-#ifdef MM
-#else
-!!$ACC END DATA
-#endif
 !
 ! 1.f Prepare output file for !/NNT option
 !
@@ -698,28 +635,14 @@
 !GPUNotes loop for explicit time integration of source terms
 !GPUNotes this might be a pain in the proverbial for tightening
 !GPUNotes the seapoint and spectral loops
-#ifdef MM
-#else
-!!$ACC DATA COPYIN (VDBT(:), SPECINIT(:), INFLAGS2(:), WN2(:), DAM(:))&
-!!$ACC      COPYIN (VSBT(:), DEPTH, U10DIR, U10ABS, AS               )&
-!!$ACC      COPYIN (DRAT, XFLT, DTMAX, FACTI1, FACTI2, XREL, PHIAW   )&
-!!$ACC      COPYIN (DTMIN, IX, IY, FFXPM                             )&
-!!$ACC      COPY   (SPEC(:), WN1(:), CG1(:), VSNL(:), VDNL(:)        )&
-!!$ACC      COPY   (BRLAMBDA(:), VSLN(:), VSIN(:), VDIN(:), LLWS(:)  )&
-!!$ACC      COPY   (VS(:), VD(:), COSI(:), USTAR, USTDIR, CD, Z0     )&
-!!$ACC      COPY   (FFXFA, FFXFM, FAGE, PHIBBL, TAUWX, TAUWY         )&
-!!$ACC      COPY   (WNMEAN, FHIGH, FHIGI, NKH, NKH1, FACHFA          )&
-!!$ACC      COPYOUT(VSDS(:), VDDS(:), VDIN(:), VSIN(:), WHITECAP(:)  )&
-!!$ACC      COPYOUT(AMAX, CHARN, FMEANWS, FMEAN1, EMEAN, FMEAN       )&
-!!$ACC      COPYOUT(TAUWAX, TAUWAY, FH1, FH2)
-#endif
+
       DO
+!$ACC KERNELS
         NSTEPS = NSTEPS + 1
 ! 2.  Calculate source terms ----------------------------------------- *
 !
 ! 2.a Input.
 !
-!$ACC KERNELS
         CALL W3SLN1 (       WN1, FHIGH, USTAR, U10DIR , VSLN       )
 
         NKH    = MIN ( NK , INT(FACTI2+FACTI1*LOG(MAX(1.E-7,FHIGH))) )
@@ -908,14 +831,10 @@
 !GPUNotes source term specific loops over spectrum in this call
 !$ACC END KERNELS
 !        CALL CPU_TIME(sTime1)
-!      WRITE(0,*)'TAG: W3SPR4'
 !$ACC KERNELS
         CALL W3SPR4 (SPEC, CG1, WN1, EMEAN, FMEAN, FMEAN1, WNMEAN, &
                    AMAX, U10ABS, U10DIR, USTAR, USTDIR,            &
                    TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)!,&
-!                   NK, NTH, NSPEC, SIG, DTH, WWNMEANP, &
-!                        WWNMEANPTAIL, FTE, FTF, SSTXFTF, SSTXFTWN,&
-!                          SSTXFTFTAIL, SSWELLF)
 !        CALL CPU_TIME(eTime1)
 !        SPR4T = SPR4T + eTime1 - sTime1
 !
@@ -955,8 +874,6 @@
 !
 ! 6.e  Update wave-supported stress----------------------------------- *
 !
-! GPUNotes source term specific loops over spectrum in this call
-!Breaks if include TAUWX/Y 
 !        CALL CPU_TIME(sTime2) 
         CALL W3SIN4 ( SPEC, CG1, WN2, U10ABS, USTAR, DRAT, AS,       &
                  U10DIR, Z0, CD, TAUWX, TAUWY, TAUWAX, TAUWAY,       &
@@ -975,14 +892,10 @@
         ENDIF
       END DO ! INTEGRATION LOOP
 !
-#ifdef MM
-#else
-!$ACC END DATA
-#endif
 ! ... End point dynamic integration - - - - - - - - - - - - - - - - - -
 !
 ! 8.  Save integration data ------------------------------------------ *
-!!$ACC KERNELS
+!$ACC KERNELS
       DTDYN  = DTDYN / REAL(MAX(1,NSTEPS))
       FCUT   = FHIGH * TPIINV
 !
@@ -1127,8 +1040,8 @@
       IF (IT.EQ.0) SPEC = SPECINIT(:)
  
       SPEC = MAX(0., SPEC)
-!!$ACC END KERNELS
-!!$ACC END DATA
+!$ACC END KERNELS
+!$ACC END DATA
       RETURN
 
 ! Formats

@@ -125,43 +125,6 @@
                MSSSUM2(NK,NTH),MSSLONG(NK,NTH),PB2(NSPEC),  EB(NK) ,   &
                K1(NK,NDTAB),K2(NK,NDTAB),  EB2(NK), ALFA(NK)  ,        &
                SIGTAB(NK,NDTAB))
-!!$ACC UPDATE DEVICE(EB, EB2, ALFA)
-!!$ACC KERNELS
-!      NSMOOTH(:) = 0. 
-!      IKSUP(:) = 0. 
-!      S1(:) = 0. 
-!      E1(:) = 0. 
-!      COEF4(:) = 0. 
-!      NTIMES(:) = 0. 
-!      DK(:) = 0. 
-!      HS(:) = 0. 
-!      KBAR(:) = 0. 
-!      DCK(:) = 0. 
-!      EFDF(:) = 0. 
-!      BTH0(:) = 0. 
-!      QB(:) = 0. 
-!      S2(:) = 0. 
-!      BTH(:) = 0. 
-!      BTH0S(:) = 0. 
-!      BTHS(:) = 0. 
-!      SBK(:) = 0. 
-!      IMSSMAX(:) = 0. 
-!      SBKT(:) = 0. 
-!      MSSSUM(:,:) = 0. 
-!      WTHSUM(:) = 0. 
-!      PB(:) = 0. 
-!      MSSSUM2(:,:) = 0. 
-!      MSSLONG(:,:) = 0. 
-!      PB2(:) = 0. 
-!      EB(:) = 0. 
-!      EB2(:) = 0. 
-!      ALFA(:) = 0. 
-!      K1(:,:) = 0. 
-!      K2(:,:) = 0. 
-!      SIGTAB(:,:) = 0. 
-!      DCKI(:,:) = 0. 
-!      QBI(:,:) = 0. 
-!!$ACC END KERNELS      
 
       END SUBROUTINE W3SRC4_INIT
 !/ ------------------------------------------------------------------- /
@@ -269,16 +232,11 @@
       INTEGER                 :: IS, IK, ITH
 !/
       REAL                    :: TAUW, EBAND, EMEANWS, UNZ
-!!$ACC DECLARE COPYIN(DDEN(:),SIG(:),SSWELLF(:),NK, NTH, NSPEC, DTH)&
-!!$ACC         COPYIN(WWNMEANP, WWNMEANPTAIL, FTE, FTF, SSTXFTF    )&
-!!$ACC         COPYIN(SSTXFTFTAIL, SSTXFTWN ,IAPROC, TPIINV)
 !      REAL,ALLOCATABLE        :: EB(:), EB2(:), ALFA(:)
 !      ALLOCATE(EB(NK), EB2(NK), ALFA(NK))
 !/ ------------------------------------------------------------------- /
 !/
 !      WRITE(0,*)'TAG: W3SPR4'
-!!$ACC DATA CREATE(EB(:),EB2(:),ALFA(:))  
-!!$ACC KERNELS 
       UNZ    = MAX ( 0.01 , U )
       USTAR  = MAX ( 0.0001 , USTAR )
 !
@@ -358,17 +316,10 @@
 !
       TAUW = SQRT(TAUWX**2+TAUWY**2)
       Z0=0.
-!!$ACC DATA COPYOUT(USTAR,Z0,CHARN )&
-!!$ACC      COPYIN(U,TAUW)
-!!$ACC KERNELS
       CALL CALC_USTAR(U,TAUW,USTAR,Z0,CHARN)
-!!$ACC END KERNELS
-!!$ACC END DATA 
       UNZ    = MAX ( 0.01 , U )
       CD     = (USTAR/UNZ)**2
       USDIR = UDIR
-!!$ACC END KERNELS
-!!$ACC END DATA
 ! 6.  Final test output ---------------------------------------------- *
 !
       RETURN
@@ -514,11 +465,6 @@
 !device calls with iogr or constants.F90 at the earliest time. DECLARE
 !COPYIN does not bring them onto the device. 
 
-!!$ACC DECLARE COPYIN(SIG(:),SIG2(:), ESIN(:), ECOS(:),DDEN2(:),DDEN(:))&
-!!$ACC         COPYIN(SSWELLF(:), FWTABLE(:),TH(:),EC2(:), NK, NTH, NSPEC)&
-!!$ACC         COPYIN(XFR, ZZWND, AALPHA, BBETA, DTH, SSINTHP, ZZ0RAT)&
-!!$ACC         COPYIN(SSINBR, IAPROC, NDTO, GRAV, NU_AIR)&
-!!$ACC         COPYIN(KAPPA,TPI,SIZEFWTABLE, DELAB, ABMIN, ZZALP, TTAUWSHELTER)
 !/ ------------------------------------------------------------------- /
 !/
 !
@@ -533,8 +479,6 @@
 ! with managed memory turned on and this statement removed the output
 ! fails.
 
-!!$ACC DATA CREATE(STRESSSTAB1, STRESSSTAB2,PTURB,PVISC)
-!!$ACC KERNELS
       PTURB = 0.
       PVISC = 0.
       D(:) = 0.
@@ -802,8 +746,6 @@
         TAUWX=TAUWX*TAUWB/TAUW
         TAUWY=TAUWY*TAUWB/TAUW
       END IF
-!!$ACC END KERNELS
-!!$ACC END DATA
       RETURN
 !
 ! Formats
@@ -1614,8 +1556,6 @@
       REAL TAUW_LOCAL
 
       INTEGER IND,J
-!!$ACC DATA COPYOUT(USTAR)
-!!$ACC KERNELS
       TAUW_LOCAL=MAX(MIN(TAUW,TAUWMAX),0.)
       XI      = SQRT(TAUW_LOCAL)/DELTAUW
       IND     = MIN ( ITAUMAX-1, INT(XI)) ! index for stress table
@@ -1638,8 +1578,6 @@
         CHARN = AALPHA
       END IF
 !
-!!$ACC END KERNELS
-!!$ACC END DATA
       RETURN
       END SUBROUTINE CALC_USTAR
 !/ ------------------------------------------------------------------- /
@@ -1781,12 +1719,6 @@
 !               IMSSMAX(NK),SBKT(NK),MSSSUM(NK,5),PB(NSPEC),&
 !               MSSSUM2(NK,NTH),MSSLONG(NK,NTH),PB2(NSPEC))
 
-!!$ACC DATA CREATE(NSMOOTH(:),IKSUP(:),S1(:),E1(:),COEF4(:),NTIMES(:)  )&
-!!$ACC      CREATE(DK(:),HS(:),KBAR(:),DCK(:),EFDF(:),BTH0(:),QB(:)    )&
-!!$ACC      CREATE(S2(:),BTH0S(:),BTHS(:),SBK(:),IMSSMAX(:),WTHSUM(:)  )&
-!!$ACC      CREATE(S2(:),BTH0S(:),BTHS(:),SBK(:),IMSSMAX(:) )&
-!!$ACC      CREATE(SBKT(:),MSSSUM(:,:),PB(:),PB2(:),MSSLONG(:,:)       )&
-!!$ACC      CREATE(MSSSUM2(:,:), BTH(:))
 !
 !----------------------------------------------------------------------
 !
@@ -1794,11 +1726,9 @@
 !     within the computation, but these are helping with some bugs
 !     found in certain compilers
 
-!!$ACC KERNELS
 !CODENotes: Removed pre-initialization, this creates additional 
 !data transfers and are not needed for the mini-app to run.
        
-!!$ACC ENTER DATA COPYIN(FLOGRD)
 ! 1.  Initialization and numerical factors
 !
       FACTURB=SSDSC(5)*USTAR**2/GRAV*DAIR/DWAT
@@ -1814,13 +1744,11 @@
       ELSE
         WTHSUM(1)=2*SSDSC(10)
       END IF
-!!$ACC END KERNELS
 !
 ! 2.   Estimation of spontaneous breaking
 !GPUNotes Attempted to use ACC wait but the code continues to break
 !using this, requires further research as to why. 
 
-!!$ACC KERNELS
 !
       IF ( (SSDSBCK-SSDSC(1)).LE.0 ) THEN
 !
@@ -2406,11 +2334,8 @@
         END DO
       END IF
 !
-!$ACC EXIT DATA COPYOUT(FLOGRD)
 ! End of output computing
 1000  CONTINUE
-!!$ACC END KERNELS
-!!$ACC END DATA
 
 
 
