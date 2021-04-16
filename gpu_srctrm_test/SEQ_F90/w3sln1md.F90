@@ -54,7 +54,7 @@
       CONTAINS
 !/ ------------------------------------------------------------------- /
       SUBROUTINE W3SLN1 (K, FHIGH, USTAR, USDIR, S)
-!$ACC ROUTINE VECTOR
+!$ACC ROUTINE SEQ
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -211,6 +211,7 @@
           S(ITH,IK) = WNF(IK) * DIRF(ITH)
         END DO
       END DO
+!      WRITE(0,*)'S(NTH,NK)',S(NTH,NK)
 !!$ACC END KERNELS
 !!$ACC END DATA
 !
