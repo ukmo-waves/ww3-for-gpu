@@ -407,8 +407,7 @@
 !
       INTEGER, ALLOCATABLE    :: TCALC(:), REFLED(:), TOUT(:), TLST(:),&
                                  TTEST(:)
-      REAL, ALLOCATABLE       :: FIELD(:),  TMP1(:), TMP2(:), TMP3(:),&
-                                 TMP4(:), REFLEC(:)
+      REAL, ALLOCATABLE       :: FIELD(:),  REFLEC(:)
 !
 ! Orphaned arrays from old data structure
 !
@@ -458,9 +457,8 @@
  
 !
       ALLOCATE(TAUWX(NSEAL), TAUWY(NSEAL), TCALC(2), REFLED(6),TOUT(2),&
-               TLST(2), TTEST(2), TMP1(4), TMP2(3), TMP3(2), TMP4(2),  &
-               REFLEC(4), VSioDummy(NSPEC), VDioDummy(NSPEC),          &
-               VAoldDummy(NSPEC))
+               TLST(2), TTEST(2),  REFLEC(4), VSioDummy(NSPEC), &
+               VDioDummy(NSPEC), VAoldDummy(NSPEC))
 !
 !
       IF ( PRESENT(STAMP) ) THEN
@@ -615,7 +613,7 @@
 !GPUNotes loop over seapoints
       DO
 !      DO JSEA = 1, NSEAL
-!        DO IS = 1, NSPEC
+!        DO NSPECIS = 1, NSPEC
 !          IF (VA(IS, JSEA) .LT. 0.) THEN
 !            WRITE(740+IAPROC,*) 'TEST W3WAVE 2', VA(IS,JSEA)
 !            CALL FLUSH(740+IAPROC)
@@ -1144,7 +1142,7 @@
 !!$ACC      COPYIN (U10D(:),AS(:),CX(:),CY(:),ICE(:),ICEH(:),ICEDMAX(:) )&
 !!$ACC      COPYIN (TRNX(:,:),TRNY(:,:),BERG(:),ASF(:),DTG,D50,PSIC     )&
 !!$ACC      COPYIN (INFLAGS1,INFLAGS2                                   )&
-!!$ACC      COPY   (ALPHA(:,:),WN(:,:),CG(:,:),VA(:,:),UST(:),USTDIR(:) )&
+!!$ACC      COPY   (ALPHA(:,:),WN1(:,:),CG(:,:),VA(:,:),UST(:),USTDIR(:) )&
 !!$ACC      COPY   (FPIS(:),TAUOX(:),TAUOY(:),TAUWX(:),TAUWY(:),PHIAW(:))&
 !!$ACC      COPY   (PHIOC(:),PHICE(:),CHARN(:),TWS(:),BEDFORMS(:,:)     )&
 !!$ACC      COPY   (TAUBBL(:,:),TAUICE(:,:),WHITECAP(:,:),TAUWIX(:)     )&
@@ -1160,53 +1158,26 @@
             SPR4TOT=0.
             SIN4TOT=0.
             SDS4TOT=0.
-!GPUNotes Outer seapoint loop for source term calculations
-            DO JSEA=1, NSEAL
-              CALL INIT_GET_ISEA(ISEA, JSEA)
-              IX     = MAPSF(ISEA,1)
-              IY     = MAPSF(ISEA,2)
-              IF ( MAPSTA(IY,IX) .EQ. 1 .AND. FLAGST(JSEA)) THEN
-                DELA=1.
-                DELX=1.
-                DELY=1.
-                TMP1   = WHITECAP(ISEA,1:4)
-                TMP2   = BEDFORMS(ISEA,1:3)
-                TMP3   = TAUBBL(ISEA,1:2)
-                TMP4   = TAUICE(ISEA,1:2)
-                CALL W3SRCE(srce_direct, IT, ISEA, IX, IY, IMOD, &
-                            VAoldDummy, VA(:,ISEA),                     &
+                CALL W3SRCE(srce_direct, IT, IMOD, &
+                            VAoldDummy, VA(:,:),                     &
                             VSioDummy, VDioDummy, SHAVETOTioDummy,      &
-                            ALPHA(1:NK,ISEA), WN(1:NK,ISEA),            &
-                            CG(1:NK,ISEA), DW(ISEA), U10(ISEA),         &
-                            U10D(ISEA), AS(ISEA), UST(ISEA),            &
-                            USTDIR(ISEA), CX(ISEA), CY(ISEA),           &
-                            ICE(ISEA), ICEH(ISEA), ICEF(ISEA),          &
-                            ICEDMAX(ISEA),                              &
-                            REFLEC, REFLED, DELX, DELY, DELA,           &
-                            TRNX(IY,IX), TRNY(IY,IX), BERG(ISEA),       &
-                            FPIS(ISEA), DTDYN(ISEA),                    &
-                            FCUT(ISEA), DTG, TAUWX(ISEA), TAUWY(ISEA), &
-                            TAUOX(ISEA), TAUOY(ISEA), TAUWIX(ISEA),     &
-                            TAUWIY(ISEA), TAUWNX(ISEA),                 &
-                            TAUWNY(ISEA),  PHIAW(ISEA), CHARN(ISEA),    &
-                            TWS(ISEA), PHIOC(ISEA), TMP1, D50, PSIC,TMP2,&
-                            PHIBBL(ISEA), TMP3, TMP4 , PHICE(ISEA),     &
-                            ASF(ISEA), SIN4T, SPR4T, SDS4T)
-                SIN4TOT = SIN4TOT + SIN4T
-                SPR4TOT = SPR4TOT + SPR4T
-                SDS4TOT = SDS4TOT + SDS4T
-                WHITECAP(ISEA,1:4) = TMP1
-                BEDFORMS(ISEA,1:3) = TMP2
-                TAUBBL(ISEA,1:2) = TMP3
-                TAUICE(ISEA,1:2) = TMP4
-              ELSE
-                UST   (JSEA) = UNDEF
-                USTDIR(JSEA) = UNDEF
-                DTDYN (JSEA) = UNDEF
-                FCUT  (JSEA) = UNDEF
-                VA(:,JSEA)  = 0.
-              END IF
-            END DO
+                            ALPHA(1:NK,1:NSEAL), WN(1:NK,1:NSEAL),            &
+                            CG(1:NK,1:NSEAL), DW(:), U10(:),         &
+                            U10D(:), AS(:), UST(:),            &
+                            USTDIR(:), CX(:), CY(:),           &
+                            ICE(:), ICEH(:), ICEF(:),          &
+                            ICEDMAX(:),                              &
+                            REFLEC(:), REFLED(:),            &
+                            TRNX(:,:), TRNY(:,:), BERG(:),       &
+                            FPIS(:), DTDYN(:),                    &
+                            FCUT(:), DTG, TAUWX(:), TAUWY(:), &
+                            TAUOX(:), TAUOY(:), TAUWIX(:),     &
+                            TAUWIY(:), TAUWNX(:),                 &
+                            TAUWNY(:),  PHIAW(:), CHARN(:),    &
+                            TWS(:), PHIOC(:), WHITECAP(:,1:4), D50,PSIC,&
+                            BEDFORMS(:,1:3), PHIBBL(:), TAUBBL(:,1:2), &
+                            TAUICE(:,1:2), PHICE(:), ASF(:),&
+                            SIN4T, SPR4T, SDS4T)
 !!$ACC END DATA
 !GPUNotes end of seapoint loop for source terms  
 !

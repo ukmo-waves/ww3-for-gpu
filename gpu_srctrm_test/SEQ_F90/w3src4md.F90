@@ -132,7 +132,7 @@
                     AMAX, U, UDIR, USTAR, USDIR, TAUWX, TAUWY, CD, Z0,&
                     CHARN, LLWS, FMEANWS)
 
-!$ACC ROUTINE VECTOR
+!$ACC ROUTINE SEQ 
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III                SHOM |
@@ -215,7 +215,7 @@
 !/ ------------------------------------------------------------------- /
 !/ Parameter list
 !/
-      REAL, INTENT(IN)        :: A(NTH,NK), CG(NK), WN(NK), U, UDIR
+      REAL, INTENT(IN)        :: A(NSPEC), CG(NK), WN(NK), U, UDIR
       REAL, INTENT(IN)        :: TAUWX, TAUWY
       LOGICAL, INTENT(IN)     :: LLWS(NSPEC)
       REAL, INTENT(INOUT)     :: USTAR, USDIR
@@ -260,9 +260,9 @@
       DO IK=1, NK
         DO ITH=1, NTH
           IS=ITH+(IK-1)*NTH
-          EB(IK) = EB(IK) + A(ITH,IK)
-          IF (LLWS(IS)) EB2(IK) = EB2(IK) + A(ITH,IK)
-          AMAX   = MAX (AMAX, A(ITH,IK))
+          EB(IK) = EB(IK) + A(IS)
+          IF (LLWS(IS)) EB2(IK) = EB2(IK) + A(IS)
+          AMAX   = MAX (AMAX, A(IS))
         END DO
       END DO
 ! 2.  Integrate over directions -------------------------------------- *
@@ -314,6 +314,8 @@
  
 ! 5.  Cd and z0 ------------------------------------------------------ *
 !
+!      WRITE(0,*)'EMEAN',EMEAN
+!      WRITE(0,*)'FMEAN1',FMEAN1
       TAUW = SQRT(TAUWX**2+TAUWY**2)
       Z0=0.
       CALL CALC_USTAR(U,TAUW,USTAR,Z0,CHARN)
@@ -335,7 +337,7 @@
                          TAUWX, TAUWY, TAUWNX, TAUWNY, S, D, LLWS,     &
                          IX, IY, BRLAMBDA)
 !/
-!$ACC ROUTINE VECTOR
+!$ACC ROUTINE SEQ 
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III                SHOM |
 !/                  !            F. Ardhuin             !
@@ -1583,8 +1585,8 @@
 !/ ------------------------------------------------------------------- /
       SUBROUTINE W3SDS4 (A, K, CG, USTAR, USDIR, DEPTH, SRHS,      &
                          DDIAG, IX, IY, BRLAMBDA, WHITECAP )
-!$ACC ROUTINE VECTOR
-!/
+!$ACC ROUTINE SEQ
+!/ 
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
 !/                  !            F. Ardhuin             !
@@ -2201,7 +2203,7 @@
           RENEWALFREQ = 0.
           IF (SSDSC(3).NE.0 .AND. IK.GT.DIKCUMUL) THEN
 !GPUNotes loop over frequencies
-!$ACC LOOP INDEPENDENT VECTOR
+!$ACC LOOP SEQ
             DO IK2=IK1,IK-DIKCUMUL
               IF (BTH0(IK2).GT.SSDSBR) THEN
                 IS2=(IK2-1)*NTH

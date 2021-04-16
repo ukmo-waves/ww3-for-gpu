@@ -21,7 +21,7 @@ NV_ACC_NOTIFY=3 nvprof ../SEQ_F90/ww3_shel 2> prof
 #nvprof --metrics dram_read_throughput,dram_write_throughput ../SEQ_F90/ww3_shel 2> metrics
 #NV_ACC_NOTIFY=2 ../SEQ_F90/ww3_shel 2> NV_NOTIFY
 #../SEQ_F90/ww3_shel
-
+#cuda-gdb ../SEQ_F90/ww3_shel
 ln -sf inp/ww3_outp.inp .
 ../SEQ_F90/ww3_outp
 

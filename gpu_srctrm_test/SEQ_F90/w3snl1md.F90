@@ -90,7 +90,7 @@
       END SUBROUTINE
 !/ ------------------------------------------------------------------- /
       SUBROUTINE W3SNL1 (A, CG, KDMEAN, S, D)
-!$ACC ROUTINE VECTOR
+!$ACC ROUTINE SEQ
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
