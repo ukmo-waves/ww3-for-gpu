@@ -10,7 +10,6 @@
 # >    LANG=en_GB.utf8
 # >    export LANG
 
-import numpy as np
 import sys, getopt
 
 def main(argv):
@@ -28,7 +27,7 @@ def main(argv):
 
         # Make changes to the input file for ww3_grid.nml.
         X = open('HOMOGENEOUS.depth','w+')
-        for x in np.linspace(1,n,n+1):
+        for x in range(1,n+1):
                 X.write(s)
         X.close()
 

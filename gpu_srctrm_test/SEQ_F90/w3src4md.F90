@@ -100,6 +100,9 @@
       REAL, DIMENSION(:,:)   , ALLOCATABLE :: K1, K2
       REAL,ALLOCATABLE        :: EB(:), EB2(:), ALFA(:)
 !/
+
+! Declare global allocatable arrays for use in ACC ROUTINE subroutines.
+
 !$ACC DECLARE COPYIN(TAUT(:,:), TAUHFT(:,:), TAUHFT2(:,:,:), ALFA(:))&
 !$ACC         COPYIN(DELU,DELTAUW,DELTAIL,DELALP,DELUST,EB,EB2,DIKCUMUL)&
 !$ACC         COPYIN(NSMOOTH(:),IKSUP(:),S1(:),E1(:),COEF4(:),NTIMES(:))&
@@ -221,10 +224,6 @@
       REAL, INTENT(INOUT)     :: USTAR, USDIR
       REAL, INTENT(OUT)       :: EMEAN, FMEAN, FMEAN1, WNMEAN, AMAX,  &
                                  CD, Z0, CHARN, FMEANWS
-!      REAL,INTENT(IN)        :: DDEN(:), SIG(:), DTH, WWNMEANP, &
-!                                WWNMEANPTAIL, FTE, FTF, SSTXFTF, SSTXFTWN,&
-!                                SSTXFTFTAIL, SSWELLF(:)
-!      INTEGER, INTENT(IN) :: NK, NTH, NSPEC 
 !/
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
@@ -232,11 +231,8 @@
       INTEGER                 :: IS, IK, ITH
 !/
       REAL                    :: TAUW, EBAND, EMEANWS, UNZ
-!      REAL,ALLOCATABLE        :: EB(:), EB2(:), ALFA(:)
-!      ALLOCATE(EB(NK), EB2(NK), ALFA(NK))
 !/ ------------------------------------------------------------------- /
 !/
-!      WRITE(0,*)'TAG: W3SPR4'
       UNZ    = MAX ( 0.01 , U )
       USTAR  = MAX ( 0.0001 , USTAR )
 !
@@ -314,8 +310,6 @@
  
 ! 5.  Cd and z0 ------------------------------------------------------ *
 !
-!      WRITE(0,*)'EMEAN',EMEAN
-!      WRITE(0,*)'FMEAN1',FMEAN1
       TAUW = SQRT(TAUWX**2+TAUWY**2)
       Z0=0.
       CALL CALC_USTAR(U,TAUW,USTAR,Z0,CHARN)
@@ -336,8 +330,8 @@
       SUBROUTINE W3SIN4 (A, CG, K, U, USTAR, DRAT, AS, USDIR, Z0, CD,  &
                          TAUWX, TAUWY, TAUWNX, TAUWNY, S, D, LLWS,     &
                          IX, IY, BRLAMBDA)
-!/
 !$ACC ROUTINE SEQ 
+!/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III                SHOM |
 !/                  !            F. Ardhuin             !
@@ -576,9 +570,6 @@
       CONST0=BBETA*DRAT/(KAPPA**2)
 !
 !GPUNotes loops over full spectrum
-!         Private is not required, applied implicitly if not written
-!         here. Is it possible to convert multiple variables into arrays
-!         to run this loop in parallel?
 
 !$ACC LOOP SEQ 
       DO IK=1, NK
@@ -638,9 +629,6 @@
             DVISC=SWELLCOEFV
             DTURB=SWELLCOEFT*(FW*UORB+(FU+FUD*COSWIND)*USTP)
             DSTAB = DSTAB + PTURB*DTURB +  PVISC*DVISC
-! GPUNotes Only update D(:) at the end of the time step, partially removes 
-! loop dependency. 
-
           END IF
 ! Sums up the wave-supported stress
 !
@@ -648,15 +636,10 @@
           ! therefore there is a PLUS sign for the stress
           !TEMP2=CONST2*DSTAB(ISTAB,IS)*A(IS)
           TEMP2=CONST2*DSTAB*A(IR)
-          !IF (DSTAB(ISTAB,IS).LT.0) THEN
           IF (DSTAB.LT.0) THEN
-            !STRESSSTABN(ISTAB,1)=STRESSSTABN(ISTAB,1)+TEMP2*ECOS(IS)
-            !STRESSSTABN(ISTAB,2)=STRESSSTABN(ISTAB,2)+TEMP2*ESIN(IS)
             STRESSSTABN1=STRESSSTABN1+TEMP2*ECOS(IR)
             STRESSSTABN2=STRESSSTABN2+TEMP2*ESIN(IR)
           ELSE
-            !STRESSSTAB(ISTAB,1)=STRESSSTAB(ISTAB,1)+TEMP2*ECOS(IS)
-            !STRESSSTAB(ISTAB,2)=STRESSSTAB(ISTAB,2)+TEMP2*ESIN(IS)
             STRESSSTAB1=STRESSSTAB1+TEMP2*ECOS(IR)
             STRESSSTAB2=STRESSSTAB2+TEMP2*ESIN(IR)
           END IF
@@ -681,11 +664,11 @@
       ! ChrisB: Need to repeat code from lines 548 - 554 here
       ! as COSU and SINU need to be the last calculated 
       ! values from the IK loop
-!      TAUPX=TAUX-ABS(TTAUWSHELTER)*STRESSSTAB1
-!      TAUPY=TAUY-ABS(TTAUWSHELTER)*STRESSSTAB2
-!      USDIRP=ATAN2(TAUPY,TAUPX)
-!      COSU   = COS(USDIRP) ! CB - these lines are problematic as the LAST 
-!      SINU   = SIN(USDIRP) ! CB - value is used later outside the loop
+      !      TAUPX=TAUX-ABS(TTAUWSHELTER)*STRESSSTAB1
+      !      TAUPY=TAUY-ABS(TTAUWSHELTER)*STRESSSTAB2
+      !      USDIRP=ATAN2(TAUPY,TAUPX)
+      !      COSU   = COS(USDIRP) ! CB - these lines are problematic as the LAST 
+      !      SINU   = SIN(USDIRP) ! CB - value is used later outside the loop
       !------------
 
       S(:) = D(:) * A(:)
@@ -1887,13 +1870,11 @@
             NSMOOTH(IK)=1
           END DO
 !GPUNotes: loops over full spectrum - assume need to be sequential
-!CODENotes: Internalise as much code as possible for collapsable loops
-!original indentation has been left for code taken from outer loops
 !$ACC LOOP INDEPENDENT COLLAPSE(2)
           DO IK=1, SSDSBRFDF
             DO ITH=1,NTH
-            BTH0S(1+SSDSBRFDF)=BTH0S(1+SSDSBRFDF)+BTH0(IK)
-            NSMOOTH(1+SSDSBRFDF)=NSMOOTH(1+SSDSBRFDF)+1
+              BTH0S(1+SSDSBRFDF)=BTH0S(1+SSDSBRFDF)+BTH0(IK)
+              NSMOOTH(1+SSDSBRFDF)=NSMOOTH(1+SSDSBRFDF)+1
               IS=ITH+(IK-1)*NTH
               BTHS(ITH+SSDSBRFDF*NTH)=BTHS(ITH+SSDSBRFDF*NTH)+BTH(IS)
             END DO
@@ -1901,8 +1882,8 @@
 !$ACC LOOP INDEPENDENT COLLAPSE(2)
           DO IK=IK1+1+SSDSBRFDF,1+2*SSDSBRFDF
             DO ITH=1,NTH
-            BTH0S(1+SSDSBRFDF)=BTH0S(1+SSDSBRFDF)+BTH0(IK)
-            NSMOOTH(1+SSDSBRFDF)=NSMOOTH(1+SSDSBRFDF)+1
+              BTH0S(1+SSDSBRFDF)=BTH0S(1+SSDSBRFDF)+BTH0(IK)
+              NSMOOTH(1+SSDSBRFDF)=NSMOOTH(1+SSDSBRFDF)+1
               IS=ITH+(IK-1)*NTH
               BTHS(ITH+SSDSBRFDF*NTH)=BTHS(ITH+SSDSBRFDF*NTH)+BTH(IS)
             END DO
@@ -1910,8 +1891,8 @@
 !$ACC LOOP INDEPENDENT COLLAPSE(2)
           DO IK=SSDSBRFDF,IK1,-1
             DO ITH=1,NTH
-            BTH0S(IK)=BTH0S(IK+1)-BTH0(IK+SSDSBRFDF+1)
-            NSMOOTH(IK)=NSMOOTH(IK+1)-1
+              BTH0S(IK)=BTH0S(IK+1)-BTH0(IK+SSDSBRFDF+1)
+              NSMOOTH(IK)=NSMOOTH(IK+1)-1
               IS=ITH+(IK-1)*NTH
               BTHS(IS)=BTHS(IS+NTH)-BTH(IS+(SSDSBRFDF+1)*NTH)
             END DO
@@ -1919,8 +1900,8 @@
 !$ACC LOOP INDEPENDENT COLLAPSE(2)  
           DO IK=IK1+1+SSDSBRFDF,NK-SSDSBRFDF
             DO ITH=1,NTH
-            BTH0S(IK)=BTH0S(IK-1)-BTH0(IK-SSDSBRFDF-1)+BTH0(IK+SSDSBRFDF)
-            NSMOOTH(IK)=NSMOOTH(IK-1)
+              BTH0S(IK)=BTH0S(IK-1)-BTH0(IK-SSDSBRFDF-1)+BTH0(IK+SSDSBRFDF)
+              NSMOOTH(IK)=NSMOOTH(IK-1)
               IS=ITH+(IK-1)*NTH
               BTHS(IS)=BTHS(IS-NTH)-BTH(IS-(SSDSBRFDF+1)*NTH)+BTH(IS+(SSDSBRFDF)*NTH)
             END DO
@@ -1928,8 +1909,8 @@
 !$ACC LOOP INDEPENDENT COLLAPSE(2)
           DO IK=NK-SSDSBRFDF+1,NK
             DO ITH=1,NTH
-            BTH0S(IK)=BTH0S(IK-1)-BTH0(IK-SSDSBRFDF)
-            NSMOOTH(IK)=NSMOOTH(IK-1)-1
+              BTH0S(IK)=BTH0S(IK-1)-BTH0(IK-SSDSBRFDF)
+              NSMOOTH(IK)=NSMOOTH(IK-1)-1
               IS=ITH+(IK-1)*NTH
               BTHS(IS)=BTHS(IS-NTH)-BTH(IS-(SSDSBRFDF+1)*NTH)
             END DO
@@ -2280,9 +2261,6 @@
 ! precomputes integration of Lambda over direction
 ! times wavelength times a (a=5 in Reul&Chapron JGR 2003) times dk
 !
-!CODENotes: It for all cases in the miniapp the following is not used
-!this means that GPU optimisation has no affect for speed or validation.
-!GPUNotes loops over frequencies
 !$ACC LOOP INDEPENDENT
       DO IK=1,NK
         COEF4(IK) = SUM(BRLAMBDA((IK-1)*NTH+1:IK*NTH) * DTH) *(2*PI/K(IK)) *  &
@@ -2290,8 +2268,6 @@
 !                   NB: SSDSC(7) is WHITECAPWIDTH
       END DO
 !/
-!CODENotes: If for all cases in the miniapp the following is not used
-!then any GPU optimisation will have no affect for speed or validation.
       IF ( FLOGRD(5,7) ) THEN
 !
 ! Computes the Total WhiteCap Coverage (a=5. ; Reul and Chapron, 2003)
@@ -2303,12 +2279,10 @@
         END DO
       END IF
 !/
-!CODENotes: If for all cases in the miniapp the following is not used
-!then any GPU optimisation will have no affect for speed or validation.
-      IF ( FLOGRD(5,8) ) THEN
 !
 ! Calculates the Mean Foam Thickness for component K(IK) => Fig.3, Reul and Chapron, 2003
 !
+      IF ( FLOGRD(5,8) ) THEN
 !GPUNotes loops over frequencies and iterations
 !$ACC LOOP INDEPENDENT
         DO IK=IK1,NK
@@ -2338,10 +2312,6 @@
 !
 ! End of output computing
 1000  CONTINUE
-
-
-
-
 
       RETURN
 !

@@ -1158,6 +1158,11 @@
             SPR4TOT=0.
             SIN4TOT=0.
             SDS4TOT=0.
+
+!CODENotes: Specifying the correct bounds for input variables here, and 
+! on the declaration inside the fuction are critical to avoid confusing 
+! validation errors.
+
                 CALL W3SRCE(srce_direct, IT, IMOD, &
                             VAoldDummy, VA(:,:),                     &
                             VSioDummy, VDioDummy, SHAVETOTioDummy,      &

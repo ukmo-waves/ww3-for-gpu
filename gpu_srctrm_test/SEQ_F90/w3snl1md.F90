@@ -75,18 +75,6 @@
               DA1C(1-NTH:NSPECX), DA1P(1-NTH:NSPECX),                 &
               DA1M(1-NTH:NSPECX), DA2C(1-NTH:NSPECX),                 &
               DA2P(1-NTH:NSPECX), DA2M(1-NTH:NSPECX), CON(NSPEC))
-      !!$ACC KERNELS
-!      UE(:) = 0. 
-!      SA1(:) = 0. 
-!      SA2(:) = 0. 
-!      DA1C(:) = 0. 
-!      DA1P(:) = 0. 
-!      DA1M(:) = 0. 
-!      DA2C(:) = 0. 
-!      DA2P(:) = 0. 
-!      DA2M(:) = 0. 
-!      CON(:) = 0.
-      !!$ACC END KERNELS
       END SUBROUTINE
 !/ ------------------------------------------------------------------- /
       SUBROUTINE W3SNL1 (A, CG, KDMEAN, S, D)
@@ -260,7 +248,6 @@
                     DAL1, DAL2, DAL3, AF11,                           &
                     AWG1, AWG2, AWG3, AWG4, AWG5, AWG6, AWG7, AWG8,   &
                     SWG1, SWG2, SWG3, SWG4, SWG5, SWG6, SWG7, SWG8
-!!/DEBUGSRC      USE W3ODATMD, only : IAPROC
 !
       IMPLICIT NONE
 !/
@@ -276,32 +263,15 @@
       INTEGER             :: ITH, IFR, ISP
       REAL                :: X, X2, CONS, CONX, FACTOR, E00, EP1, EM1,&
                              EP2, EM2, SA1A, SA1B, SA2A, SA2B
-!      REAL,ALLOCATABLE    ::  UE(:), SA1(:), SA2(:), DA1C(:), DA1P(:),&
-!                             DA1M(:), DA2C(:), DA2P(:), DA2M(:), CON(:)
 !/
 !/ ------------------------------------------------------------------- /
 !/
-! initialisations
 
-!      ALLOCATE(UE(1-NTH:NSPECY), SA1(1-NTH:NSPECX), SA2(1-NTH:NSPECX), &
-!              DA1C(1-NTH:NSPECX), DA1P(1-NTH:NSPECX),                 &
-!              DA1M(1-NTH:NSPECX), DA2C(1-NTH:NSPECX),                 &
-!              DA2P(1-NTH:NSPECX), DA2M(1-NTH:NSPECX), CON(NSPEC))
-!
-!!$ACC DATA CREATE(UE(:),SA1(:),SA2(:),DA1C(:),DA1P(:),DA1M(:),DA2C(:))&
-!!$ACC      CREATE(DA2P(:),DA2M(:),CON(:))
-
-!GPUNotes To make whole routine run effectively on kernels I so have
-!GPUNotes to run the serial section below in a separate kernel to
-!GPUNotes the other parallel parts. This prevents last two loop sections
-!GPUNotes becoming serial... Not sure why. 
-!!$ACC KERNELS
 ! 1.  Calculate prop. constant --------------------------------------- *
 !
       X      = MAX ( KDCON*KDMEAN , KDMN )
       X2     = MAX ( -1.E15, SNLS3*X)
       CONS   = SNLC1 * ( 1. + SNLS1/X * (1.-SNLS2*X) * EXP(X2) )
-!$ACC WAIT
 ! 2.  Prepare auxiliary spectrum and arrays -------------------------- *
 !
 !GPUNotes loop over full spectrum
@@ -315,16 +285,6 @@
         END DO
       END DO
 !
-!!GPUNotes loop over subset of frequencies and all directions
-!!GPUNotes the commented code below uses the original code
-!!GPUNotes which could only parallelise over the inner loop
-!      DO IFR=NFR+1, NFRHGH
-!!$ACC LOOP INDEPENDENT
-!        DO ITH=1, NTH
-!          ISP      = ITH + (IFR-1)*NTH
-!          UE(ISP) = UE(ISP-NTH) * FACHFE
-!        END DO
-!      END DO
 !GPUNotes loop over subset of frequencies and all directions
 !GPUNotes refactored code
 !$ACC LOOP INDEPENDENT COLLAPSE(2)
@@ -390,9 +350,6 @@
 !
 ! 4.  Put source and diagonal term together -------------------------- *
 !
-!!/DEBUGSRC     WRITE(740+IAPROC,*)  'W3SNL1 : sum(SA1)=', sum(SA1)
-!!/DEBUGSRC     WRITE(740+IAPROC,*)  'W3SNL1 : sum(SA2)=', sum(SA2)
-!!/DEBUGSRC     FLUSH(740+IAPROC)
 !GPUNotes loops over full spectrum
 !$ACC LOOP INDEPENDENT
       DO ISP=1, NSPEC
@@ -418,11 +375,6 @@
                 + SWG8 * ( DA1M(IC81(ISP)) + DA2M(IC82(ISP)) )
 !
       END DO
-!!$ACC END KERNELS
-!!$ACC END DATA
-!!/DEBUGSRC     WRITE(740+IAPROC,*)  'W3SNL1 : sum(S)=', sum(S)
-!!/DEBUGSRC     WRITE(740+IAPROC,*)  'W3SNL1 : sum(D)=', sum(D)
-!!/DEBUGSRC     FLUSH(740+IAPROC)
 !
 ! ... Test output :
 !

@@ -160,11 +160,6 @@
 !/
 !
 !GPUNotes now running entire subroutine on GPU
-!!$ACC DATA COPYIN (ECOS,ESIN,K,SIG)        &
-!!$ACC      COPYIN (FSPM,FSHF,SLNC1,NTH,NK) &
-!!$ACC      CREATE (DIRF,WNF)               & 
-!!$ACC      COPY   (S)
-!!$ACC KERNELS
 ! 1.  Set up factors ------------------------------------------------- *
 !
       COSU   = COS(USDIR)
@@ -176,20 +171,18 @@
       FFILT  = MIN ( MAX(FF1,FF2) , 2.*SIG(NK) )
 !
 !GPUNotes loop over directions
-!!$ACC LOOP GANG VECTOR(128)
+!$ACC LOOP INDEPENDENT
       DO ITH=1, NTH
         DIRF(ITH) = MAX ( 0. , (ECOS(ITH)*COSU+ESIN(ITH)*SINU) )**4
       END DO
 !
-!GPUNotes Moved below from original location below to top of code 
-!GPUNotes This avoids jumping in/out of kernels with serial code
 !      FAC    = SLNC1 * USTAR**4
 !      FF1    = FSPM * GRAV/(28.*USTAR)
 !      FF2    = FSHF * MIN(SIG(NK),FHIGH)
 !      FFILT  = MIN ( MAX(FF1,FF2) , 2.*SIG(NK) )
 !
 !GPUNotes loop over frequencies no dependence on above
-!!$ACC LOOP GANG VECTOR(128)
+!$ACC LOOP INDEPENDENT
       DO IK=1, NK
         RFR    = SIG(IK) / FFILT
         IF ( RFR .LT. 0.5 ) THEN
@@ -201,20 +194,16 @@
 !
 ! 2.  Compose source term -------------------------------------------- *
 !
-!GPUNotes loop over frequencies fills array using arrays from prior 2 loops
-!!$ACC LOOP GANG VECTOR(128) COLLAPSE(2)
-      DO IK=1, NK
-!GPUNotes replaced array format below with loop in order to use ACC LOOP
+!GPUNotes loop over frequencies
+!GPUNotes replaced array format with loop in order to use ACC LOOP
 !statement
-!        S(:,IK) = WNF(IK) * DIRF(:)
+
+!$ACC LOOP INDEPENDENT COLLAPSE(2)
+      DO IK=1, NK
         DO ITH=1, NTH
           S(ITH,IK) = WNF(IK) * DIRF(ITH)
         END DO
       END DO
-!      WRITE(0,*)'S(NTH,NK)',S(NTH,NK)
-!!$ACC END KERNELS
-!!$ACC END DATA
-!
       RETURN
 !
 ! Formats

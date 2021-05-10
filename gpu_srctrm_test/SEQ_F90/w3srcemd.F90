@@ -48,13 +48,13 @@
       REAL, PARAMETER, PRIVATE:: OFFSET = 1.
 !/
 ! Scratch variables for GPU
-      REAL,ALLOCATABLE        :: WN_R(:),CG_ICE(:),ALPHA_LIU(:),R(:),  &
-                                 SPECINIT(:), SPEC2(:)
-      REAL,ALLOCATABLE        :: DAM (:), WN2 (:),         &
-                                 VSLN(:), VSIN(:), VDIN(:), VSNL(:),   &
-                                 VDNL(:), VSDS(:), VDDS(:), VSBT(:),   &
-                                 VDBT(:), VS(:), VD(:), EB(:), COSI(:)
-      LOGICAL,ALLOCATABLE     :: LLWS(:)
+      REAL,ALLOCATABLE        ::WN_R(:,:),CG_ICE(:,:),ALPHA_LIU(:,:),R(:,:),  &
+                                SPECINIT(:,:), SPEC2(:,:)
+      REAL,ALLOCATABLE        :: DAM (:,:), WN2 (:,:),         &
+                             VSLN(:,:), VSIN(:,:), VDIN(:,:),VSNL(:,:), &
+                             VDNL(:,:), VSDS(:,:), VDDS(:,:), VSBT(:,:),&
+                          VDBT(:,:), VS(:,:), VD(:,:), EB(:),COSI(:,:)
+      LOGICAL,ALLOCATABLE     :: LLWS(:,:)
       REAL,ALLOCATABLE        :: FOUT(:,:), SOUT(:,:), DOUT(:,:)
       INTEGER :: I,JJ
       CONTAINS
@@ -68,12 +68,6 @@
 ! Allocate scratch variables for GPU.
   
       WRITE(0,*) "W3SRCE_INIT: NK/NTH/NSPEC: " ,NK,NTH,NSPEC
-      ALLOCATE(DAM(NSPEC), WN2(NSPEC), VSLN(NSPEC), SPECINIT(NSPEC),   &
-      SPEC2(NSPEC), VSIN(NSPEC), VDIN(NSPEC), VSNL(NSPEC), VDNL(NSPEC),&
-      VSDS(NSPEC), VDDS(NSPEC), VSBT(NSPEC), VDBT(NSPEC), VS(NSPEC),   &
-      VD(NSPEC), EB(NK),  FOUT(NK,NTH), SOUT(NK,NTH),  &
-      DOUT(NK,NTH), WN_R(NK), CG_ICE(NK), ALPHA_LIU(NK), R(NK),        &
-      COSI(2), LLWS(NSPEC))
 
       END SUBROUTINE W3SRCE_INIT
 
@@ -414,26 +408,30 @@
 !/ ------------------------------------------------------------------- /
 !/ Parameter list
 !/
+!CODENotes: Specifying the correct bounds for input variables here, and 
+! on the call to the fuction are critical to avoid confusing validation
+! errors.
+
       INTEGER, INTENT(IN)     :: srce_call, IT, IMOD
-      REAL, intent(in)        :: SPECOLD(NSPEC)
-      REAL, INTENT(OUT)       :: VSIO(NSPEC), VDIO(NSPEC)
+      REAL, intent(in)        :: SPECOLD(1:NSPEC)
+      REAL, INTENT(OUT)       :: VSIO(1:NSPEC), VDIO(1:NSPEC)
       LOGICAL, INTENT(OUT)    :: SHAVEIO
-      REAL, INTENT(IN)        :: D_INP(0:), U10ABS(:), U10DIR(:),      &
-                                 AS(0:), CX(0:), CY(0:), DTG, D50,     &
-                                 PSIC, ICE(0:), ICEH(0:)
+      REAL, INTENT(IN)        :: D_INP(1:), U10ABS(1:NSEAL),U10DIR(1:NSEAL),      &
+                                 AS(1:), CX(1:), CY(1:), DTG, D50,     &
+                                 PSIC, ICE(1:), ICEH(1:)
       INTEGER, INTENT(IN)     :: REFLED(6)
       REAL, INTENT(IN)        :: REFLEC(4), TRNX(:,:), TRNY(:,:),      &
                                  BERG(:), ICEDMAX(:)
       REAL, INTENT(INOUT)     :: WN1(1:NK,1:NSEAL), CG1(1:NK,1:NSEAL), &
-                                 SPEC(1:NSPEC,0:NSEAL), ALPHA(:,:),    &
-                                 USTAR(0:NSEAL),USTDIR(0:NSEAL),FPI(:),&
-                                 TAUOX(:), TAUOY(:), TAUWX(:), TAUWY(:)&
-                                 , PHIAW(:), PHIOC(:), PHICE(:),       &
-                                 CHARN(:), TWS(:), BEDFORMS(1:NSEAL,1:3),      &
-                                 PHIBBL(:), TAUBBL(1:NSEAL,1:2), TAUICE(1:NSEAL,1:2),  &
-                                 WHITECAP(1:NSEAL,1:4), TAUWIX(:), TAUWIY(:),  &
-                                 TAUWNX(:), TAUWNY(:), ICEF(0:NSEAL)
-      REAL, INTENT(OUT)       :: DTDYN(:), FCUT(:)
+                                 SPEC(1:NSPEC,1:NSEAL), ALPHA(:,:),    &
+                                 USTAR(1:NSEAL),USTDIR(1:NSEAL),FPI(:),&
+                                 TAUOX(1:NSEAL), TAUOY(1:NSEAL), TAUWX(1:NSEAL), TAUWY(1:NSEAL)&
+                                 , PHIAW(1:NSEAL), PHIOC(1:NSEAL), PHICE(1:NSEAL),       &
+                                 CHARN(1:NSEAL), TWS(1:NSEAL), BEDFORMS(1:NSEAL,1:3),      &
+                                 PHIBBL(1:NSEAL), TAUBBL(1:NSEAL,1:2), TAUICE(1:NSEAL,1:2),  &
+                                 WHITECAP(1:NSEAL,1:4), TAUWIX(1:NSEAL), TAUWIY(1:NSEAL),  &
+                                 TAUWNX(1:NSEAL), TAUWNY(1:NSEAL),ICEF(1:NSEAL)
+      REAL, INTENT(OUT)       :: DTDYN(1:NSEAL), FCUT(1:NSEAL)
       REAL, INTENT(IN)        :: COEF(:)
 !/
 !/ ------------------------------------------------------------------- /
@@ -514,10 +512,18 @@
 
 !/
 !/
+      ALLOCATE(DAM(NSPEC,NSEAL), WN2(NSPEC,NSEAL), VSLN(NSPEC,NSEAL), SPECINIT(NSPEC,NSEAL),   &
+      SPEC2(NSPEC,NSEAL), VSIN(NSPEC,NSEAL), VDIN(NSPEC,NSEAL), VSNL(NSPEC,NSEAL), VDNL(NSPEC,NSEAL),&
+      VSDS(NSPEC,NSEAL), VDDS(NSPEC,NSEAL), VSBT(NSPEC,NSEAL), VDBT(NSPEC,NSEAL), VS(NSPEC,NSEAL),   &
+      VD(NSPEC,NSEAL), EB(NK),  FOUT(NK,NTH), SOUT(NK,NTH),  &
+      DOUT(NK,NTH), WN_R(NK,NSEAL), CG_ICE(NK,NSEAL), ALPHA_LIU(NK,NSEAL), R(NK,NSEAL),        &
+      COSI(2,NSEAL), LLWS(NSPEC,NSEAL))
       ALLOCATE(DTTOT(NSEAL),NSTEPS(NSEAL),PHINL(NSEAL),TAUWAX(NSEAL), &
       TAUWAY(NSEAL),TAUSCX(NSEAL),TAUSCY(NSEAL),BRLAMBDA(NSPEC,NSEAL),&
       TMP1(4,NSEAL),TMP2(3,NSEAL), DEPTH(NSEAL), ICESCALELN(NSEAL),    &
       ICESCALEIN(NSEAL), ICESCALENL(NSEAL), ICESCALEDS(NSEAL))
+#ifdef MM
+#else
 !$ACC DATA COPYIN (SPECOLD, D_INP, U10ABS, U10DIR, AS, CX, CY, ICEH)&
 !$ACC      COPY   (WN1, CG1, SPEC, USTAR, USTDIR, FPI, TAUOX    )&
 !$ACC      COPY   (TAUOY, TAUWX, TAUWY, PHIAW, PHIOC, PHICE, CHARN,TWS )&
@@ -540,7 +546,7 @@
 !$ACC      copy(dtmin, dmin,facti1,facp,nseal,xrel,xflt,dtmax,icescales(1:4))&
 !$ACC      copy(tmp2(:,:))&
 !$ACC      copy(mapsta(:,:))
-!$ACC PARALLEL 
+#endif
 !The following lines were previously used inside the sea loop, but is no
 !longer required.
       
@@ -576,16 +582,19 @@
           BRLAMBDA(:,:)=0.
 
 !GPUNotes Outer seapoint loop for source term calculations
-!LINE FROM W3WAVE
-!$ACC LOOP GANG VECTOR PRIVATE(VSIN(:), VDIN(:), VSBT(:), VDBT(:), DAM(:)    )&
-!$ACC          PRIVATE(WN2(:), VSNL(:), VDNL(:), VSDS(:), VDDS(:)    )&
-!$ACC          PRIVATE(VS(:), VD(:), LLWS(:),SPEC2(:)     )&
-!$ACC          PRIVATE(SPECINIT(:), VSLN(:), R(:), WN_R(:), CG_ICE(:))&
-!$ACC          PRIVATE(COSI(:))
+!GPUNotes We needed to use PARALLEL instead of KERNEL for this section
+!of the code. Presumeably due to treatment of the IF condition.
+!$ACC PARALLEL 
+!$ACC LOOP GANG VECTOR 
 
+! This private statement is not working as expected currently. 
+!PRIVATE(VSIN(:,:), VDIN(:,:), VSBT(:), VDBT(:), DAM(:,:))&
+!!$ACC          PRIVATE(WN2(:), VSNL(:), VDNL(:), VSDS(:), VDDS(:))&
+!!$ACC          PRIVATE(VS(:), VD(:), LLWS(:),SPEC2(:)     )&
+!!$ACC          PRIVATE(SPECINIT(:), VSLN(:), R(:), WN_R(:), CG_ICE(:))&
+!!$ACC          PRIVATE(COSI(:))
       DO JSEA=1, NSEAL
         CALL INIT_GET_ISEA(ISEA, JSEA)
-!        ISEA=JSEA
         IX     = MAPSF(ISEA,1)
         IY     = MAPSF(ISEA,2)
         IF ( MAPSTA(IY,IX) .EQ. 1 .AND. FLAGST(JSEA)) THEN
@@ -619,9 +628,6 @@
 !          TMP4(1:2,ISEA)   = TAUICE(ISEA,1:2)
 
 
-!GPUNotes We needed to use PARALLEL instead of KERNEL for this section
-!of the code. Presumeably due to treatment of the IF condition.
-!!$ACC PARALLEL
           DEPTH(ISEA)  = MAX ( DMIN , D_INP(ISEA) )
           ICESCALELN(ISEA) = MAX(0.,MIN(1.,1.-ICE(ISEA)*ICESCALES(1)))
           ICESCALEIN(ISEA) = MAX(0.,MIN(1.,1.-ICE(ISEA)*ICESCALES(2)))
@@ -629,17 +635,17 @@
           ICESCALEDS(ISEA) = MAX(0.,MIN(1.,1.-ICE(ISEA)*ICESCALES(4)))
           IS1=(IKS1-1)*NTH+1
 !
-!$ACC LOOP SEQ
+!$ACC LOOP 
           DO ISPEC=1,NSPEC
-            VSIN(ISPEC) = 0.
-            VDIN(ISPEC) = 0.
-            VDNL(ISPEC) = 0.
-            VSDS(ISPEC) = 0.
-            VDDS(ISPEC) = 0.
-            VSLN(ISPEC) = 0.
-            VSNL(ISPEC) = 0.
-            VSBT(ISPEC) = 0.
-            VDBT(ISPEC) = 0.
+            VSIN(ISPEC,ISEA) = 0.
+            VDIN(ISPEC,ISEA) = 0.
+            VDNL(ISPEC,ISEA) = 0.
+            VSDS(ISPEC,ISEA) = 0.
+            VDDS(ISPEC,ISEA) = 0.
+            VSLN(ISPEC,ISEA) = 0.
+            VSNL(ISPEC,ISEA) = 0.
+            VSBT(ISPEC,ISEA) = 0.
+            VDBT(ISPEC,ISEA) = 0.
           END DO
 !
   
@@ -652,19 +658,19 @@
 !FACP   = XP / PI * 0.62E-3 * TPI**4 / GRAV**2
   
 !GPUNotes loop over frequencies
-!$ACC LOOP SEQ
+!$ACC LOOP 
           DO IK=1, NK
-            DAM(1+(IK-1)*NTH) = FACP / ( SIG(IK) * WN1(IK,ISEA)**3 )
-            WN2(1+(IK-1)*NTH) = WN1(IK,ISEA)
+            DAM(1+(IK-1)*NTH,ISEA) = FACP / ( SIG(IK) * WN1(IK,ISEA)**3 )
+            WN2(1+(IK-1)*NTH,ISEA) = WN1(IK,ISEA)
           END DO
   
 !GPUNotes loop over full spectrum
-!$ACC LOOP SEQ COLLAPSE(2)
+!$ACC LOOP COLLAPSE(2)
           DO IK=1, NK
             DO ITH=2, NTH
               IS0    = (IK-1)*NTH
-              DAM(ITH+IS0) = DAM(1+IS0)
-              WN2(ITH+IS0) = WN2(1+IS0)
+              DAM(ITH+IS0,ISEA) = DAM(1+IS0,ISEA)
+              WN2(ITH+IS0,ISEA) = WN2(1+IS0,ISEA)
             END DO
           END DO
 !
@@ -678,7 +684,7 @@
 !GPUNotes the sequencing is important (although maybe excessive?)
   
           IF (IT .eq. 0) THEN
-             LLWS(:) = .TRUE.
+             LLWS(:,ISEA) = .TRUE.
              USTAR(ISEA)=0.
              USTDIR(ISEA)=0.
           ELSE
@@ -686,19 +692,19 @@
                          FMEAN, FMEAN1, WNMEAN, AMAX, U10ABS(ISEA),    &
                          U10DIR(ISEA), USTAR(ISEA), USTDIR(ISEA),      &
                          TAUWX(ISEA), TAUWY(ISEA), CD, Z0, CHARN(ISEA),&
-                         LLWS(:), FMEANWS)
+                         LLWS(:,ISEA), FMEANWS)
   
-             CALL W3SIN4(SPEC(:,ISEA), CG1(:,ISEA), WN2(:), U10ABS(ISEA), &
+             CALL W3SIN4(SPEC(:,ISEA), CG1(:,ISEA), WN2(:,ISEA), U10ABS(ISEA), &
                          USTAR(ISEA), DRAT, AS(ISEA), U10DIR(ISEA), Z0,&
                          CD, TAUWX(ISEA), TAUWY(ISEA), TAUWAX(ISEA), TAUWAY(ISEA), &
-                         VSIN(:), VDIN(:), LLWS(:), IX, IY, &
+                         VSIN(:,ISEA), VDIN(:,ISEA), LLWS(:,ISEA), IX, IY, &
                          BRLAMBDA(:,ISEA))
           END IF
 !GPUNotes call below will contain source term specific spectral loops
 !      CALL CPU_TIME(sTime1)
             CALL W3SPR4 (SPEC(:,ISEA), CG1(:,ISEA), WN1(:,ISEA), EMEAN, FMEAN, FMEAN1, WNMEAN, &
                          AMAX, U10ABS(ISEA), U10DIR(ISEA), USTAR(ISEA), USTDIR(ISEA),      &
-                         TAUWX(ISEA), TAUWY(ISEA), CD, Z0, CHARN(ISEA), LLWS(:), FMEANWS)
+                         TAUWX(ISEA), TAUWY(ISEA), CD, Z0, CHARN(ISEA), LLWS(:,ISEA), FMEANWS)
 !      CALL CPU_TIME(eTime1)
 !      SPR4T = SPR4T + eTime1 - sTime1
             TWS(ISEA) = 1./FMEANWS
@@ -706,9 +712,9 @@
 ! 1.c2 Stores the initial data
 !
           
-!$ACC LOOP SEQ
+!$ACC LOOP
           DO ISPEC=1,NSPEC
-             SPECINIT(ISPEC) = SPEC(ISPEC,ISEA)
+             SPECINIT(ISPEC,ISEA) = SPEC(ISPEC,ISEA)
           END DO
 ! 1.d Stresses
 !
@@ -735,18 +741,18 @@
 ! 2.a Input.
 !
 
-            CALL W3SLN1 (WN1(:,ISEA), FHIGH, USTAR(ISEA), U10DIR(ISEA), VSLN(:) )
+            CALL W3SLN1 (WN1(:,ISEA), FHIGH, USTAR(ISEA), U10DIR(ISEA), VSLN(:,ISEA) )
             NKH    = MIN ( NK , INT(FACTI2+FACTI1*LOG(MAX(1.E-7,FHIGH))) )
             NKH1   = MIN ( NK , NKH+1 )
             NSPECH = NKH1*NTH
             DT     = MIN ( DTG-DTTOT(ISEA) , DTMAX )
-            AFILT  = MAX ( DAM(NSPEC) , XFLT*AMAX )
+            AFILT  = MAX ( DAM(NSPEC,ISEA) , XFLT*AMAX )
   
 !        CALL CPU_TIME(sTime2) 
-            CALL W3SIN4 (SPEC(:,ISEA), CG1(:,ISEA), WN2(:), U10ABS(ISEA), &
+            CALL W3SIN4 (SPEC(:,ISEA), CG1(:,ISEA), WN2(:,ISEA), U10ABS(ISEA), &
                          USTAR(ISEA), DRAT, AS(ISEA), U10DIR(ISEA), Z0,&
                          CD, TAUWX(ISEA), TAUWY(ISEA), TAUWAX(ISEA), TAUWAY(ISEA), &
-                         VSIN(:), VDIN(:), LLWS(:), IX, IY, BRLAMBDA(:,ISEA))
+                         VSIN(:,ISEA), VDIN(:,ISEA), LLWS(:,ISEA), IX, IY, BRLAMBDA(:,ISEA))
 !        CALL CPU_TIME(eTime2)
 !        SIN4T = SIN4T + eTime2 - sTime2
 !
@@ -754,7 +760,7 @@
   
 !GPUnotes subruoutine will contain source term specific spectral loops
   
-            CALL W3SNL1 (SPEC(:,ISEA), CG1(:,ISEA), DEPTH(ISEA)*WNMEAN, VSNL(:), VDNL(:) )
+            CALL W3SNL1 (SPEC(:,ISEA), CG1(:,ISEA), DEPTH(ISEA)*WNMEAN, VSNL(:,ISEA), VDNL(:,ISEA) )
   
 ! 2.c Dissipation... except for ST4
 ! 2.c1   as in source term package
@@ -763,8 +769,8 @@
   
 !        CALL CPU_TIME(sTime3)
             CALL W3SDS4(SPEC(:,ISEA), WN1(:,ISEA), CG1(:,ISEA),        &
-                      USTAR(ISEA), USTDIR(ISEA), DEPTH(ISEA), VSDS(:), &
-                      VDDS(:), IX, IY, BRLAMBDA(:,ISEA),TMP1(1:4,ISEA) )
+                      USTAR(ISEA), USTDIR(ISEA), DEPTH(ISEA), VSDS(:,ISEA), &
+                      VDDS(:,ISEA), IX, IY, BRLAMBDA(:,ISEA),TMP1(1:4,ISEA) )
           
 !        CALL CPU_TIME(eTime3)
 !        SDS4T = SDS4T + eTime3 - sTime3
@@ -796,36 +802,31 @@
 !GPUNotes The different between using the ACC WAIT and kernels is the
 !knockon affect of gang and vector sizes since they must be consistant
 !between kernel blocks.
-  
-!!$ACC WAIT
-!!$ACC END KERNELS
-!!$ACC UPDATE HOST(NKH1, NSPECH, DT, AFILT, SPEC(:,ISEA))
-!!$ACC KERNELS 
             IF ( INFLAGS2(4) ) THEN
-              VSNL(1:NSPECH) = ICESCALENL(ISEA) * VSNL(1:NSPECH)
-              VDNL(1:NSPECH) = ICESCALENL(ISEA) * VDNL(1:NSPECH)
-              VSLN(1:NSPECH) = ICESCALELN(ISEA) * VSLN(1:NSPECH)
-              VSIN(1:NSPECH) = ICESCALEIN(ISEA) * VSIN(1:NSPECH)
-              VDIN(1:NSPECH) = ICESCALEIN(ISEA) * VDIN(1:NSPECH)
-              VSDS(1:NSPECH) = ICESCALEDS(ISEA) * VSDS(1:NSPECH)
-              VDDS(1:NSPECH) = ICESCALEDS(ISEA) * VDDS(1:NSPECH)
+              VSNL(1:NSPECH,ISEA) = ICESCALENL(ISEA) * VSNL(1:NSPECH,ISEA)
+              VDNL(1:NSPECH,ISEA) = ICESCALENL(ISEA) * VDNL(1:NSPECH,ISEA)
+              VSLN(1:NSPECH,ISEA) = ICESCALELN(ISEA) * VSLN(1:NSPECH,ISEA)
+              VSIN(1:NSPECH,ISEA) = ICESCALEIN(ISEA) * VSIN(1:NSPECH,ISEA)
+              VDIN(1:NSPECH,ISEA) = ICESCALEIN(ISEA) * VDIN(1:NSPECH,ISEA)
+              VSDS(1:NSPECH,ISEA) = ICESCALEDS(ISEA) * VSDS(1:NSPECH,ISEA)
+              VDDS(1:NSPECH,ISEA) = ICESCALEDS(ISEA) * VDDS(1:NSPECH,ISEA)
             END IF
             !WRITE(0,*)'TEST VSNL,VSLN,VSIN,VSDS',VSNL(NSPEC),VSLN(NSPEC),VSIN(NSPEC),VSDS(NSPEC)
             NKI    = MAX ( 2 , MIN ( NKH1 ,                           &
                      INT ( FACTI2 + FACTI1*LOG(MAX(1.E-7,FFXFI* FMEAN1)) ) ) )
 !GPUNotes spectral loop up to frequency cut off
-            VS(:) = 0.
-            VD(:) = 0.
-!$ACC LOOP SEQ
+            VS(:,ISEA) = 0.
+            VD(:,ISEA) = 0.
+!$ACC LOOP 
             DO IS=IS1, NSPECH
-              VS(IS) = VSLN(IS) + VSIN(IS) + VSNL(IS)  &
-                     + VSDS(IS) + VSBT(IS)
-              VD(IS) =  VDIN(IS) + VDNL(IS)  &
-                     + VDDS(IS) + VDBT(IS)
-              DAMAX  = MIN ( DAM(IS) , MAX ( XREL*SPECINIT(IS) , AFILT ) )
-              AFAC   = 1. / MAX( 1.E-10 , ABS(VS(IS)/DAMAX) )
+              VS(IS,ISEA) = VSLN(IS,ISEA) + VSIN(IS,ISEA) + VSNL(IS,ISEA)  &
+                     + VSDS(IS,ISEA) + VSBT(IS,ISEA)
+              VD(IS,ISEA) =  VDIN(IS,ISEA) + VDNL(IS,ISEA)  &
+                     + VDDS(IS,ISEA) + VDBT(IS,ISEA)
+              DAMAX  = MIN ( DAM(IS,ISEA) , MAX ( XREL*SPECINIT(IS,ISEA) , AFILT ) )
+              AFAC   = 1. / MAX( 1.E-10 , ABS(VS(IS,ISEA)/DAMAX) )
               DT     = MIN ( DT , AFAC / ( MAX ( 1.E-10,                  &
-                             1. + OFFSET*AFAC*MIN(0.,VD(IS)) ) ) )
+                             1. + OFFSET*AFAC*MIN(0.,VD(IS,ISEA)) ) ) )
             END DO! end of loop on IS
 !            WRITE(*,*) 'NODE_NUMBER', IX
             !WRITE(0,*)'TEST VS/VD',VS(NSPEC),VD(NSPEC)
@@ -868,19 +869,19 @@
 !GPUNotes Running sequentially due to the recursive use of eIncX, adding
 !loop independent does not force the loop to be parallel as it should.
   
-!$ACC LOOP SEQ
+!$ACC LOOP 
                 DO IS=IS1, NSPECH
-                  eInc1 = VS(IS) * DT / MAX ( 1. , (1.-HDT*VD(IS)))
-                  eInc2 = SIGN ( MIN (DAM(IS),ABS(eInc1)) , eInc1 )
+                  eInc1 = VS(IS,ISEA) * DT / MAX ( 1. , (1.-HDT*VD(IS,ISEA)))
+                  eInc2 = SIGN ( MIN (DAM(IS,ISEA),ABS(eInc1)) , eInc1 )
                   SPEC(IS,ISEA) = MAX ( 0. , SPEC(IS,ISEA)+eInc2 )
                 END DO
               ELSE
 !
 !GPUNotes Running sequentially due to the recursive use of eIncX, adding
 !loop independent does not force the loop to be parallel as it should.
-!$ACC LOOP SEQ
+!$ACC LOOP
                 DO IS=IS1, NSPECH
-                  eInc1 = VS(IS) * DT / MAX ( 1. , (1.-HDT*VD(IS)))
+                  eInc1 = VS(IS,ISEA) * DT / MAX ( 1. , (1.-HDT*VD(IS,ISEA)))
                   SPEC(IS,ISEA) = MAX ( 0. , SPEC(IS,ISEA)+eInc1 )
                 END DO
               END IF
@@ -898,8 +899,7 @@
 !GPUNotes Loop has been refactored for ACC applications to allow the
 !loops to be closely nested and collapsable.
   
-!$ACC LOOP SEQ COLLAPSE(2)
-!INDEPENDENT COLLAPSE(2)
+!$ACC LOOP COLLAPSE(2)
             DO IK=IKS1, NK
               DO ITH=1, NTH
                 FACTOR = DDEN(IK)/CG1(IK,ISEA)                  !Jacobian to get energy in band
@@ -908,15 +908,15 @@
             ! Wave direction is "direction to"
             ! therefore there is a PLUS sign for the stress
                 IS   = (IK-1)*NTH + ITH
-                COSI(1)=ECOS(IS)
-                COSI(2)=ESIN(IS)
-                PHIAW(ISEA) = PHIAW(ISEA) + (VSIN(IS))* DT * FACTOR        &
-                  / MAX ( 1. , (1.-HDT*VDIN(IS))) ! semi-implict integration scheme
-                PHIBBL(ISEA)= PHIBBL(ISEA)- (VSBT(IS))* DT * FACTOR                    &
-                 / MAX ( 1. , (1.-HDT*VDBT(IS))) ! semi-implict integration scheme
-                PHINL(ISEA) = PHINL(ISEA) + VSNL(IS)* DT * FACTOR                      &
-                 / MAX ( 1. , (1.-HDT*VDNL(IS))) ! semi-implict integration scheme
-                IF (VSIN(IS).GT.0.) TMP1(3,ISEA) = TMP1(3,ISEA) + SPEC(IS,ISEA)  * FACTOR
+                COSI(1,ISEA)=ECOS(IS)
+                COSI(2,ISEA)=ESIN(IS)
+                PHIAW(ISEA) = PHIAW(ISEA) + (VSIN(IS,ISEA))* DT * FACTOR        &
+                  / MAX ( 1. , (1.-HDT*VDIN(IS,ISEA))) ! semi-implict integration scheme
+                PHIBBL(ISEA)= PHIBBL(ISEA)- (VSBT(IS,ISEA))* DT * FACTOR                    &
+                 / MAX ( 1. , (1.-HDT*VDBT(IS,ISEA))) ! semi-implict integration scheme
+                PHINL(ISEA) = PHINL(ISEA) + VSNL(IS,ISEA)* DT * FACTOR                      &
+                 / MAX ( 1. , (1.-HDT*VDNL(IS,ISEA))) ! semi-implict integration scheme
+                IF (VSIN(IS,ISEA).GT.0.) TMP1(3,ISEA) = TMP1(3,ISEA) + SPEC(IS,ISEA)  * FACTOR
                 HSTOT = HSTOT + SPEC(IS,ISEA) * FACTOR
               END DO
             END DO
@@ -931,12 +931,10 @@
 !   a Mean parameters
 !
 !GPUNotes source term specific loops over spectrum in this call
-!!$ACC END PARALLEL
 !        CALL CPU_TIME(sTime1)
-!!$ACC KERNELS
             CALL W3SPR4 (SPEC(:,ISEA), CG1(:,ISEA), WN1(:,ISEA), EMEAN, FMEAN, FMEAN1, WNMEAN, &
                        AMAX, U10ABS(ISEA), U10DIR(ISEA), USTAR(ISEA), USTDIR(ISEA),            &
-                       TAUWX(ISEA), TAUWY(ISEA), CD, Z0, CHARN(ISEA), LLWS(:), FMEANWS)
+                       TAUWX(ISEA), TAUWY(ISEA), CD, Z0, CHARN(ISEA), LLWS(:,ISEA), FMEANWS)
 !        CALL CPU_TIME(eTime1)
 !        SPR4T = SPR4T + eTime1 - sTime1
 !
@@ -964,7 +962,7 @@
 !GPUNotes Smaller spectral loop to add energy to tail
 !GPUNotes Independence is acceptable for inner loop, outer loop
 !dependence on IK within SPEC limits any collapsable option.
-!$ACC LOOP SEQ
+!$ACC LOOP 
             DO IK=NKH+1, NK
               DO ITH=1, NTH
                 SPEC(ITH+(IK-1)*NTH,ISEA) = SPEC(ITH+(IK-2)*NTH,ISEA) * FACHFA         
@@ -974,16 +972,13 @@
 ! 6.e  Update wave-supported stress----------------------------------- *
 !
 !        CALL CPU_TIME(sTime2) 
-            CALL W3SIN4 ( SPEC(:,ISEA), CG1(:,ISEA), WN2(:), U10ABS(ISEA), USTAR(ISEA), DRAT, AS(ISEA), &
+            CALL W3SIN4 ( SPEC(:,ISEA), CG1(:,ISEA), WN2(:,ISEA), U10ABS(ISEA), USTAR(ISEA), DRAT, AS(ISEA), &
                      U10DIR(ISEA), Z0, CD, TAUWX(ISEA), TAUWY(ISEA), TAUWAX(ISEA), TAUWAY(ISEA),       &
-                     VSIN(:), VDIN(:), LLWS(:), IX, IY, BRLAMBDA(:,ISEA) )
+                     VSIN(:,ISEA), VDIN(:,ISEA), LLWS(:,ISEA), IX, IY, BRLAMBDA(:,ISEA) )
 !        CALL CPU_TIME(eTime2)
 !        SIN4T = SIN4T + eTime2 - sTime2
 ! 7.  Check if integration complete ---------------------------------- *
 !
-!!$ACC END PARALLEL
-!!$ACC END DATA
-!!$ACC UPDATE HOST(DTTOT(ISEA))
             IF (srce_call .eq. srce_imp_post) THEN
               EXIT
             ENDIF
@@ -992,12 +987,10 @@
               EXIT
             ENDIF
           END DO ! INTEGRATION LOOP
-!!$ACC END PARALLEL
 !
 ! ... End point dynamic integration - - - - - - - - - - - - - - - - - -
 !
 ! 8.  Save integration data ------------------------------------------ *
-!!$ACC PARALLEL
           DTDYN(ISEA)  = DTDYN(ISEA) / REAL(MAX(1,NSTEPS(ISEA)))
           FCUT(ISEA)   = FHIGH * TPIINV
 !
@@ -1017,14 +1010,14 @@
           EFINISH  = 0.
           MWXFINISH  = 0.
           MWYFINISH  = 0.
-!$ACC LOOP SEQ
+!$ACC LOOP SEQ REDUCTION(MWYFINISH, MWXFINISH, EFINISH)
           DO IK=1, NK
             EBAND = 0.
             A1BAND = 0.
             B1BAND = 0.
-!$ACC LOOP SEQ
+!$ACC LOOP SEQ REDUCTION(a1band, b1band, eband)
             DO ITH=1, NTH
-              DIFF = SPECINIT(ITH+(IK-1)*NTH)-SPEC(ITH+(IK-1)*NTH,ISEA)
+              DIFF = SPECINIT(ITH+(IK-1)*NTH,ISEA)-SPEC(ITH+(IK-1)*NTH,ISEA)
               EBAND = EBAND + DIFF
               A1BAND = A1BAND + DIFF*ECOS(ITH)
               B1BAND = B1BAND + DIFF*ESIN(ITH)
@@ -1071,16 +1064,16 @@
               IF (IICESMOOTH) THEN
               END IF
             ELSE
-!$ACC LOOP SEQ 
+!$ACC LOOP 
               DO IK=1,NK
-                WN_R(IK)=WN1(IK,ISEA)
-                CG_ICE(IK)=CG1(IK,ISEA)
+                WN_R(IK,ISEA)=WN1(IK,ISEA)
+                CG_ICE(IK,ISEA)=CG1(IK,ISEA)
               END DO
             END IF
 !
-            R(:)=1 ! In case IC2 is defined but not IS2
+            R(:,ISEA)=1 ! In case IC2 is defined but not IS2
   
-            SPEC2(:) = SPEC(:,ISEA)
+            SPEC2(:,ISEA) = SPEC(:,ISEA)
 !
            
             TAUICE(:,ISEA) = 0.
@@ -1092,7 +1085,7 @@
 ! First part of ice term integration: dissipation part
 !
             ATT=1.
-            SPEC(1+(IK-1)*NTH:NTH+(IK-1)*NTH,ISEA) = ATT*SPEC2(1+(IK-1)*NTH:NTH+(IK-1)*NTH)
+            SPEC(1+(IK-1)*NTH:NTH+(IK-1)*NTH,ISEA) = ATT*SPEC2(1+(IK-1)*NTH:NTH+(IK-1)*NTH,ISEA)
 !
   
 !GPUNotes These spectral loops are for ice effects?
@@ -1105,25 +1098,21 @@
 !
 !GPUNotes Moved FACTOR and FACTOR2 inside lopp for collapse.
 !$ACC LOOP SEQ COLLAPSE(2)
-!GANG INDEPENDENT COLLAPSE(2)
             DO IK=1,NK
               DO ITH = 1,NTH
               FACTOR = DDEN(IK)/CG1(IK,ISEA)                  !Jacobian to get energy in band
               FACTOR2= FACTOR*GRAV*WN1(IK,ISEA)/SIG(IK)       ! coefficient to get momentum
                 IS = ITH+(IK-1)*NTH
-                PHICE(ISEA) = PHICE(ISEA) + (SPEC(IS,ISEA)-SPEC2(IS)) * FACTOR
-                COSI(1)=ECOS(IS)
-                COSI(2)=ESIN(IS)
-                TAUICE(:,ISEA) = TAUICE(:,ISEA) - (SPEC(IS,ISEA)-SPEC2(IS))*FACTOR2*COSI(:)
+                PHICE(ISEA) = PHICE(ISEA) + (SPEC(IS,ISEA)-SPEC2(IS,ISEA)) * FACTOR
+                COSI(1,ISEA)=ECOS(IS)
+                COSI(2,ISEA)=ESIN(IS)
+                TAUICE(:,ISEA) = TAUICE(:,ISEA) - (SPEC(IS,ISEA)-SPEC2(IS,ISEA))*FACTOR2*COSI(:,ISEA)
               END DO
             END DO
             PHICE(ISEA) =-1.*DWAT*GRAV*PHICE(ISEA) /DTG
             TAUICE(:,ISEA)=TAUICE(:,ISEA)/DTG
           ELSE
           END IF
-!GPUNotes Forcing a SYNC, this is required for correct output, stops
-!the code from running too far without correct values.
-!!$ACC WAIT
   
 ! - - - - - - - - - - - - - - - - - - - - - -
 ! 11. Sea state dependent stress routine calls
@@ -1142,11 +1131,9 @@
    
           FIRST  = .FALSE.
    
-          IF (IT.EQ.0) SPEC(:,ISEA) = SPECINIT(:)
+          IF (IT.EQ.0) SPEC(:,ISEA) = SPECINIT(:,ISEA)
           SPEC(:,ISEA) = MAX(0., SPEC(:,ISEA))
   
-!!$ACC END PARALLEL
-!!$ACC END DATA
 !LINE FROM W3WAVE
 !          SIN4TOT = SIN4TOT + SIN4T
 !          SPR4TOT = SPR4TOT + SPR4T
@@ -1166,7 +1153,13 @@
       END DO
 
 !$ACC END PARALLEL
+#ifdef MM
+#else
 !$ACC END DATA
+#endif
+      DEALLOCATE(DAM, WN2, VSLN, SPECINIT, SPEC2, VSIN, VDIN, VSNL, VDNL,&
+      VSDS, VDDS, VSBT, VDBT, VS, VD, EB,  FOUT, SOUT, DOUT, WN_R, &
+      CG_ICE, ALPHA_LIU, R,   COSI, LLWS)
       DEALLOCATE(DTTOT, NSTEPS, PHINL, TAUWAX, TAUWAY, TAUSCX, TAUSCY, &
                  BRLAMBDA,TMP1,TMP2)
       RETURN
