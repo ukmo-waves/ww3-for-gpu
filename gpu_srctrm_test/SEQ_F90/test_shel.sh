@@ -23,11 +23,11 @@ set -e
 # Make sure to run the test with -c if changing the compiler flags.
 
 # Mananged memory
-FFLAGS="-module mod -O2 -acc -DMM -ta=tesla,managed,cuda10.2 -Minfo=acc"
+#FFLAGS="-module mod -O2 -acc -DMM -ta=tesla,managed,cuda10.2 -Minfo=acc"
 # Explicit transfers
-#FFLAGS="-module mod -O2 -acc -ta=tesla,cuda10.2 -Minfo=acc"
+FFLAGS="-module mod -O2 -acc -ta=tesla,cuda10.2 -Minfo=acc"
 # CPU Sequential
-#FFLAGS="-module mod -O2 -Mbounds"
+#FFLAGS="-module mod -O2 "
 
 export FFLAGS=$FFLAGS
 
@@ -39,10 +39,12 @@ if [ -z "$1" ]; then
 	fi
 fi
 
+CLEAN=false
+
 while [ -n "$1" ]; do
     case "$1" in
         -a) make;;
-        -c) make clean; make;;
+        -c) make clean; CLEAN=.true.; make;;
     esac
     shift
 done
@@ -50,6 +52,9 @@ done
 # Load the nameslist and input files for the executables. 
 cd ../RUN/ 
 
+if $CLEAN; then
+	rm -rf ST4TABUHF2.bin 
+fi
 ln -sf inp/ww3_grid.nml .
 ln -sf inp/ww3_shel.inp .
 ln -sf inp/ww3_outp.inp .
@@ -58,7 +63,9 @@ ln -sf inp/ww3_outp.inp .
 ../SEQ_F90/ww3_grid
 
 # Run wave model
+#NV_ACC_NOTIFY=3 
 nvprof ../SEQ_F90/ww3_shel 2> shel_profile
+#nsys profile --force-overwrite true -o profile --stats=true ../SEQ_F90/ww3_shel 2> metrics
 
 # Run point output
 ../SEQ_F90/ww3_outp

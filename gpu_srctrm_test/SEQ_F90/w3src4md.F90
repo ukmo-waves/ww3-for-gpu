@@ -81,59 +81,68 @@
       REAL,    PARAMETER      ::KDMAX=200000.
 !/
       ! Scratch variables for GPU
-      INTEGER,ALLOCATABLE     :: NSMOOTH(:),IKSUP(:),IMSSMAX(:)
-      REAL,ALLOCATABLE        :: S1(:), E1(:), COEF4(:)
-      INTEGER,ALLOCATABLE     :: NTIMES(:)
-      REAL,ALLOCATABLE        :: DK(:), HS(:), KBAR(:), DCK(:)
-      REAL,ALLOCATABLE        :: EFDF(:)     ! Energy integrated over a spectral band
-      REAL,ALLOCATABLE        :: BTH0(:)     !saturation spectrum
-      REAL,ALLOCATABLE        :: BTH(:)   !saturation spectrum
-      REAL,ALLOCATABLE        :: BTH0S(:)    !smoothed saturation spectrum
-      REAL,ALLOCATABLE        :: BTHS(:)  !smoothed saturation spectrum
-      REAL,ALLOCATABLE        :: SBK(:)
-      REAL,ALLOCATABLE        :: SBKT(:), MSSSUM(:,:), WTHSUM(:)
-      REAL,ALLOCATABLE        :: MSSSUM2(:,:)
-      REAL,ALLOCATABLE        :: MSSLONG(:,:)
-      REAL,ALLOCATABLE        :: QB(:), S2(:)
-      REAL,ALLOCATABLE        :: PB(:),PB2(:)
-      REAL, DIMENSION(:,:)   , ALLOCATABLE :: SIGTAB
-      REAL, DIMENSION(:,:)   , ALLOCATABLE :: K1, K2
-      REAL,ALLOCATABLE        :: EB(:), EB2(:), ALFA(:)
+      INTEGER,ALLOCATABLE     :: NSMOOTH(:,:),IKSUP(:,:),IMSSMAX(:,:)
+      REAL,ALLOCATABLE        :: S1(:,:), E1(:,:), COEF4(:,:)
+      INTEGER,ALLOCATABLE     :: NTIMES(:,:)
+      REAL,ALLOCATABLE        :: DK(:,:), HS(:,:), KBAR(:,:), DCK(:,:)
+      REAL,ALLOCATABLE        :: EFDF(:,:)     ! Energy integrated over a spectral band
+      REAL,ALLOCATABLE        :: BTH0(:,:)     !saturation spectrum
+      REAL,ALLOCATABLE        :: BTH(:,:)   !saturation spectrum
+      REAL,ALLOCATABLE        :: BTH0S(:,:)    !smoothed saturation spectrum
+      REAL,ALLOCATABLE        :: BTHS(:,:)  !smoothed saturation spectrum
+      REAL,ALLOCATABLE        :: SBK(:,:)
+      REAL,ALLOCATABLE        :: SBKT(:,:), MSSSUM(:,:,:), WTHSUM(:,:)
+      REAL,ALLOCATABLE        :: MSSSUM2(:,:,:)
+      REAL,ALLOCATABLE        :: MSSLONG(:,:,:)
+      REAL,ALLOCATABLE        :: QB(:,:), S2(:,:)
+      REAL,ALLOCATABLE        :: PB(:,:),PB2(:,:)
+      REAL, ALLOCATABLE       :: EB(:,:), EB2(:,:), ALFA(:,:)
+!      REAL, DIMENSION(:,:)   , ALLOCATABLE :: SIGTAB
+!      REAL, DIMENSION(:,:)   , ALLOCATABLE :: K1, K2
 !/
 
 ! Declare global allocatable arrays for use in ACC ROUTINE subroutines.
 
-!$ACC DECLARE COPYIN(TAUT(:,:), TAUHFT(:,:), TAUHFT2(:,:,:), ALFA(:))&
-!$ACC         COPYIN(DELU,DELTAUW,DELTAIL,DELALP,DELUST,EB,EB2,DIKCUMUL)&
-!$ACC         COPYIN(NSMOOTH(:),IKSUP(:),S1(:),E1(:),COEF4(:),NTIMES(:))&
-!$ACC         COPYIN(DK(:),HS(:),KBAR(:),DCK(:),EFDF(:),BTH0(:),QB(:)  )&
-!$ACC         COPYIN(S2(:),BTH(:),BTH0S(:),BTHS(:),SBK(:),IMSSMAX(:)   )&
-!$ACC         COPYIN(SBKT(:),MSSSUM(:,:),WTHSUM(:),PB(:), MSSSUM2(:,:) )&
-!$ACC         COPYIN(MSSLONG(:,:), PB2(:),K1(:,:), K2(:,:))&
-!$ACC         COPYIN(SIGTAB(:,:))
+!$ACC DECLARE CREATE(TAUT(:,:), TAUHFT(:,:), TAUHFT2(:,:,:)         )&
+!$ACC         CREATE(DELU, DELTAUW, DELTAIL,DELALP, DELUST, DIKCUMUL)&
+!$ACC         CREATE(NSMOOTH(:,:), IKSUP(:,:), S1(:,:), E1(:,:)     )&
+!$ACC         CREATE(COEF4(:,:), NTIMES(:,:), DK(:,:), HS(:,:)      )&
+!$ACC         CREATE(KBAR(:,:),DCK(:,:),EFDF(:,:),BTH0(:,:),QB(:,:) )&
+!$ACC         CREATE(S2(:,:),BTH(:,:),BTH0S(:,:),BTHS(:,:),SBK(:,:) )&
+!$ACC         CREATE(IMSSMAX(:,:), SBKT(:,:), MSSSUM(:,:,:)         )&
+!$ACC         CREATE(WTHSUM(:,:), PB(:,:), MSSSUM2(:,:,:)           )&
+!$ACC         CREATE(MSSLONG(:,:,:), PB2(:,:), EB(:,:), EB2(:,:)    )&
+!$ACC         CREATE(ALFA(:,:))
+!!$ACC         CREATE(K1(:,:), K2(:,:), SIGTAB(:,:))
       CONTAINS
 
 !/ ------------------------------------------------------------------- /
       SUBROUTINE W3SRC4_INIT()
 
-      USE W3GDATMD, ONLY: NK, NTH, NSPEC, NKHS, NKD, NDTAB
+      USE W3GDATMD, ONLY: NK, NTH, NSPEC, NKHS, NKD, NDTAB, NSEAL
       IMPLICIT NONE
 
       WRITE(0,*) "W3SRC4_INIT: NK/NTH/NSPEC: ", NK, NTH, NSPEC
       ! allocate scratch variables for GPU (to avoid Syncing)
-      ALLOCATE(NSMOOTH(NK),IKSUP(NK),S1(NK),E1(NK),COEF4(NK),NTIMES(NK)&
-               ,DK(NK),HS(NK),KBAR(NK),DCK(NK),EFDF(NK),BTH0(NK),QB(NK)&
-               ,S2(NK),BTH(NSPEC),BTH0S(NK),BTHS(NSPEC),SBK(NSPEC),    &
-               IMSSMAX(NK),SBKT(NK),MSSSUM(NK,5),WTHSUM(NTH),PB(NSPEC),&
-               MSSSUM2(NK,NTH),MSSLONG(NK,NTH),PB2(NSPEC),  EB(NK) ,   &
-               K1(NK,NDTAB),K2(NK,NDTAB),  EB2(NK), ALFA(NK)  ,        &
-               SIGTAB(NK,NDTAB))
-
+      ALLOCATE(EB(NK,NSEAL), EB2(NK,NSEAL), ALFA(NK,NSEAL))
+      ALLOCATE(NSMOOTH(NK,NSEAL),IKSUP(NK,NSEAL),S1(NK,NSEAL),         &
+               E1(NK,NSEAL),COEF4(NK,NSEAL),NTIMES(NK,NSEAL),          &
+               DK(NK,NSEAL),HS(NK,NSEAL),KBAR(NK,NSEAL),DCK(NK,NSEAL), &
+               EFDF(NK,NSEAL),BTH0(NK,NSEAL),QB(NK,NSEAL),S2(NK,NSEAL),&
+               BTH(NSPEC,NSEAL),BTH0S(NK,NSEAL),BTHS(NSPEC,NSEAL),     &
+               SBK(NSPEC,NSEAL),IMSSMAX(NK,NSEAL),SBKT(NK,NSEAL),      &
+               MSSSUM(NK,5,NSEAL),WTHSUM(NTH,NSEAL),PB(NSPEC,NSEAL),   &
+               MSSSUM2(NK,NTH,NSEAL),MSSLONG(NK,NTH,NSEAL),            &
+               PB2(NSPEC,NSEAL))
+!!$ACC ENTER DATA COPYIN(EB, EB2, ALFA, NSMOOTH, IKSUP, S1, E1, COEF4)&
+!!$ACC            COPYIN(NTIMES, DK, HS, KBAR, DCK, EFDF, BTH0, QB   )&
+!!$ACC            COPYIN(S2, BTH, BTH0S, BTHS, SBK, IMSSMAX, SBKT    )&
+!!$ACC            COPYIN(MSSSUM, WTHSUM, PB, MSSSUM2, MSSLONG, PB2)       
       END SUBROUTINE W3SRC4_INIT
 !/ ------------------------------------------------------------------- /
       SUBROUTINE W3SPR4 (A, CG, WN, EMEAN, FMEAN, FMEAN1, WNMEAN,     &
                     AMAX, U, UDIR, USTAR, USDIR, TAUWX, TAUWY, CD, Z0,&
-                    CHARN, LLWS, FMEANWS)
+                    CHARN, LLWS, FMEANWS, ISEA)
 
 !$ACC ROUTINE SEQ 
 !/
@@ -224,6 +233,7 @@
       REAL, INTENT(INOUT)     :: USTAR, USDIR
       REAL, INTENT(OUT)       :: EMEAN, FMEAN, FMEAN1, WNMEAN, AMAX,  &
                                  CD, Z0, CHARN, FMEANWS
+      INTEGER, INTENT(IN), OPTIONAL     :: ISEA
 !/
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
@@ -236,60 +246,59 @@
       UNZ    = MAX ( 0.01 , U )
       USTAR  = MAX ( 0.0001 , USTAR )
 !
-      EMEAN  = 0.
-      EMEANWS= 0.
-      FMEANWS= 0.
-      FMEAN  = 0.
-      FMEAN1 = 0.
-      WNMEAN = 0.
-      AMAX   = 0.
+      EMEAN  = 0.0
+      EMEANWS= 0.0
+      FMEANWS= 0.0
+      FMEAN  = 0.0
+      FMEAN1 = 0.0
+      WNMEAN = 0.0
+      AMAX   = 0.0
 !
+      EB(:,ISEA)=0.0
+      EB2(:,ISEA)=0.0
 ! 1.  Integral over directions and maximum --------------------------- *
 !
 !GPUNotes spectral loop
-!$ACC LOOP INDEPENDENT
-      DO IK=1,NK
-        EB(IK)  = 0.
-        EB2(IK) = 0.
-      END DO
-!$ACC LOOP INDEPENDENT
+!$ACC LOOP SEQ COLLAPSE(2)
       DO IK=1, NK
         DO ITH=1, NTH
           IS=ITH+(IK-1)*NTH
-          EB(IK) = EB(IK) + A(IS)
-          IF (LLWS(IS)) EB2(IK) = EB2(IK) + A(IS)
+          EB(IK,ISEA) = EB(IK,ISEA) + A(IS)
+          IF (LLWS(IS)) EB2(IK,ISEA) = EB2(IK,ISEA) + A(IS)
           AMAX   = MAX (AMAX, A(IS))
         END DO
       END DO
+
 ! 2.  Integrate over directions -------------------------------------- *
 !
 !GPUNotes directions loop only
-!$ACC LOOP INDEPENDENT
+!$ACC LOOP SEQ
       DO IK=1, NK
-        ALFA(IK) = 2. * DTH * SIG(IK) * EB(IK) * WN(IK)**3
-        EB(IK)   = EB(IK) * DDEN(IK) / CG(IK)
-        EB2(IK)   = EB2(IK) * DDEN(IK) / CG(IK)
-        EMEAN    = EMEAN  + EB(IK)
-        FMEAN    = FMEAN  + EB(IK) /SIG(IK)
-        FMEAN1   = FMEAN1 + EB(IK) *(SIG(IK)**(2.*WWNMEANPTAIL))
-        WNMEAN   = WNMEAN + EB(IK) *(WN(IK)**WWNMEANP)
-        EMEANWS  = EMEANWS+ EB2(IK)
-        FMEANWS  = FMEANWS+ EB2(IK)*(SIG(IK)**(2.*WWNMEANPTAIL))
+        ALFA(IK,ISEA) = 2. * DTH * SIG(IK) * EB(IK,ISEA) * WN(IK)**3
+        EB(IK,ISEA)   = EB(IK,ISEA) * DDEN(IK) / CG(IK)
+        EB2(IK,ISEA)  = EB2(IK,ISEA) * DDEN(IK) / CG(IK)
+        EMEAN    = EMEAN  + EB(IK,ISEA)
+        FMEAN    = FMEAN  + EB(IK,ISEA) /SIG(IK)
+        FMEAN1   = FMEAN1 + EB(IK,ISEA) *(SIG(IK)**(2.*WWNMEANPTAIL))
+        WNMEAN   = WNMEAN + EB(IK,ISEA) *(WN(IK)**WWNMEANP)
+        EMEANWS  = EMEANWS+ EB2(IK,ISEA)
+        FMEANWS  = FMEANWS+ EB2(IK,ISEA)*(SIG(IK)**(2.*WWNMEANPTAIL))
       END DO
 !
 ! 3.  Add tail beyond discrete spectrum and get mean pars ------------ *
 !     ( DTH * SIG absorbed in FTxx )
 !
 
-      EBAND  = EB(NK) / DDEN(NK)
+      EBAND  = EB(NK,ISEA) / DDEN(NK)
       EMEAN  = EMEAN  + EBAND * FTE
       FMEAN  = FMEAN  + EBAND * FTF
       FMEAN1 = FMEAN1 + EBAND * SSTXFTFTAIL
       WNMEAN = WNMEAN + EBAND * SSTXFTWN
-      EBAND  = EB2(NK) / DDEN(NK)
+      EBAND  = EB2(NK,ISEA) / DDEN(NK)
       EMEANWS = EMEANWS + EBAND * FTE
       FMEANWS = FMEANWS + EBAND * SSTXFTFTAIL
 !
+
 ! 4.  Final processing
 !
       FMEAN  = TPIINV * EMEAN / MAX ( 1.E-7 , FMEAN )
@@ -299,7 +308,7 @@
         FMEAN1  = TPIINV *( MAX ( 1.E-7 , FMEAN1 )                       &
                      / MAX ( 1.E-7 , EMEAN ))**(1/(2.*WWNMEANPTAIL))
       ENDIF
-      WNMEAN = ( MAX ( 1.E-7 , WNMEAN )                              &
+      WNMEAN = ( MAX ( 1.E-7 , WNMEAN )  &
                 / MAX ( 1.E-7 , EMEAN ) )**(1/WWNMEANP)
       IF (FMEANWS.LT.1.E-7.OR.EMEANWS.LT.1.E-7) THEN
         FMEANWS=TPIINV * SIG(NK)
@@ -491,7 +500,7 @@
       UORB=0.
       AORB=0.
  
-!$ACC LOOP INDEPENDENT COLLAPSE(2)
+!$ACC LOOP SEQ COLLAPSE(2)
       DO IK=1, NK
         DO ITH=1, NTH
            IS=ITH+(IK-1)*NTH
@@ -579,8 +588,8 @@
         USDIRP=ATAN2(TAUPY,TAUPX)
         COSU   = COS(USDIRP) ! CB - these lines are problematic as the LAST 
         SINU   = SIN(USDIRP) ! CB - value is used later outside the loop
-!$ACC LOOP INDEPENDENT & 
-!$ACC      REDUCTION(+:STRESSSTABN1,STRESSSTABN2,STRESSSTAB1,STRESSSTAB2)
+!$ACC LOOP SEQ
+!!$ACC      REDUCTION(+:STRESSSTABN1,STRESSSTABN2,STRESSSTAB1,STRESSSTAB2)
         DO ITH=1,NTH
           IS=1+(IK-1)*NTH
           CM=K(IS)/SIG2(IS) !inverse of phase speed
@@ -594,7 +603,6 @@
           SWELLCOEFT=-DRAT*SSWELLF(1)*16*SIG2(IS)**2/GRAV
 
           IR=ITH+(IK-1)*NTH
-          !WRITE(0,*)'IR: ', IR
           COSWIND=(ECOS(IR)*COSU+ESIN(IR)*SINU)
           IF (COSWIND.GT.0.01) THEN
             X=COSWIND*UCN
@@ -682,7 +690,7 @@
          *TPI*SIG(NK) / CG(NK)  !conversion WAM (E(f,theta) to WW3 A(k,theta)
       TEMP=0.
 !GPUNotes loop over directions
-!$ACC LOOP INDEPENDENT
+!$ACC LOOP SEQ 
       DO ITH=1,NTH
         IS=ITH+(NK-1)*NTH
         COSWIND=(ECOS(IS)*COSU+ESIN(IS)*SINU)
@@ -820,12 +828,12 @@
       REAL     DIFF1, DIFF2, BINF, BSUP, CGG, PROF
       REAL     KIK, DHS, KD, KHS, KH, XT, GAM, DKH, PR, W, EPS
       REAL     DKD
-!      ! Now declared in W3SRC4_INIT
-!      REAL, DIMENSION(:,:)   , ALLOCATABLE :: SIGTAB
-!      REAL, DIMENSION(:,:)   , ALLOCATABLE :: K1, K2
-!        ALLOCATE(K1(NK,NDTAB))
-!        ALLOCATE(K2(NK,NDTAB))
-!        ALLOCATE(SIGTAB(NK,NDTAB))
+      ! Now declared in W3SRC4_INIT
+      REAL, DIMENSION(:,:)   , ALLOCATABLE :: SIGTAB
+      REAL, DIMENSION(:,:)   , ALLOCATABLE :: K1, K2
+        ALLOCATE(K1(NK,NDTAB))
+        ALLOCATE(K2(NK,NDTAB))
+        ALLOCATE(SIGTAB(NK,NDTAB))
 !/
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
@@ -1532,15 +1540,17 @@
 !-----------------------------------------------------------------------------!
       USE CONSTANTS, ONLY: GRAV, KAPPA
       USE W3GDATMD,  ONLY: AALPHA, ZZWND
+
       IMPLICIT NONE
       REAL, intent(in) :: WINDSPEED,TAUW
       REAL, intent(out) :: USTAR, Z0, CHARN
+
       ! local variables
       REAL SQRTCDM1
       REAL XI,DELI1,DELI2,XJ,DELJ1,DELJ2
       REAL TAUW_LOCAL
-
       INTEGER IND,J
+
       TAUW_LOCAL=MAX(MIN(TAUW,TAUWMAX),0.)
       XI      = SQRT(TAUW_LOCAL)/DELTAUW
       IND     = MIN ( ITAUMAX-1, INT(XI)) ! index for stress table
@@ -1567,7 +1577,7 @@
       END SUBROUTINE CALC_USTAR
 !/ ------------------------------------------------------------------- /
       SUBROUTINE W3SDS4 (A, K, CG, USTAR, USDIR, DEPTH, SRHS,      &
-                         DDIAG, IX, IY, BRLAMBDA, WHITECAP )
+                         DDIAG, IX, IY, BRLAMBDA, WHITECAP, ISEA )
 !$ACC ROUTINE SEQ
 !/ 
 !/                  +-----------------------------------+
@@ -1654,11 +1664,11 @@
 !/ ------------------------------------------------------------------- /
 !/ Parameter list
 !/
-      INTEGER, OPTIONAL, INTENT(IN) :: IX, IY
-      REAL, INTENT(INOUT)     :: A(NSPEC), K(NK), CG(NK)
-      REAL, INTENT(IN)        :: DEPTH, USTAR, USDIR
-      REAL, INTENT(OUT)       :: SRHS(NSPEC), DDIAG(NSPEC), BRLAMBDA(NSPEC)
-      REAL, INTENT(OUT)       :: WHITECAP(1:4)
+      REAL, INTENT(INOUT)           :: A(NSPEC), K(NK), CG(NK)
+      REAL, INTENT(IN)              :: DEPTH, USTAR, USDIR
+      REAL, INTENT(OUT)             :: SRHS(NSPEC), DDIAG(NSPEC)
+      REAL, INTENT(OUT)             :: WHITECAP(1:4), BRLAMBDA(NSPEC)
+      INTEGER, INTENT(IN), OPTIONAL :: ISEA, IX, IY
 !/
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
@@ -1677,7 +1687,7 @@
       REAL                    :: MICHE, X, FACHF
       REAL                    :: TSTR, TMAX, DT, T, MFT
 
-!      ! Now declared in W3SRC4_INIT
+      ! Now declared in W3SRC4_INIT
 !      INTEGER,ALLOCATABLE     :: NSMOOTH(:),IKSUP(:),IMSSMAX(:)
 !      REAL,ALLOCATABLE        :: S1(:), E1(:), COEF4(:)
 !      INTEGER,ALLOCATABLE     :: NTIMES(:)
@@ -1696,14 +1706,11 @@
 !/
 !/ ------------------------------------------------------------------- /
 !/
-!      ! Now allocated in W3SRC4_INIT
 !      ALLOCATE(NSMOOTH(NK),IKSUP(NK),S1(NK),E1(NK),COEF4(NK),NTIMES(NK)&
 !               ,DK(NK),HS(NK),KBAR(NK),DCK(NK),EFDF(NK),BTH0(NK),QB(NK)&
 !               ,S2(NK),BTH(NSPEC),BTH0S(NK),BTHS(NSPEC),SBK(NSPEC),    &
-!               !IMSSMAX(NK),SBKT(NK),MSSSUM(NK,5),WTHSUM(NTH),PB(NSPEC),&
-!               IMSSMAX(NK),SBKT(NK),MSSSUM(NK,5),PB(NSPEC),&
+!               IMSSMAX(NK),SBKT(NK),MSSSUM(NK,5),WTHSUM(NTH),PB(NSPEC),&
 !               MSSSUM2(NK,NTH),MSSLONG(NK,NTH),PB2(NSPEC))
-
 !
 !----------------------------------------------------------------------
 !
@@ -1724,17 +1731,14 @@
       !IF (IX == DEBUG_NODE) WRITE(*,'(A20,4F20.10)') 'ST4 DISSIP ANFANG', SUM(SRHS), SUM(DDIAG)
       NTHSUM=MIN(FLOOR(SSDSC(10)+0.5),NTH-1)  ! number of angular bins for enhanced modulation
       IF (NTHSUM.GT.0) THEN
-        WTHSUM(1:NTHSUM)=1
-        WTHSUM(NTHSUM+1)=SSDSC(10)+0.5-NTHSUM
+        WTHSUM(1:NTHSUM,ISEA)=1
+        WTHSUM(NTHSUM+1,ISEA)=SSDSC(10)+0.5-NTHSUM
       ELSE
-        WTHSUM(1)=2*SSDSC(10)
+        WTHSUM(1,ISEA)=2*SSDSC(10)
       END IF
 !
 ! 2.   Estimation of spontaneous breaking
-!GPUNotes Attempted to use ACC wait but the code continues to break
-!using this, requires further research as to why. 
 
-!
       IF ( (SSDSBCK-SSDSC(1)).LE.0 ) THEN
 !
 ! 2.a  Case of a direction-dependent breaking term (TEST441)
@@ -1744,34 +1748,23 @@
 ! 2.a.1 Computes saturation
 !
         SDSNTH = MIN(NINT(SSDSDTH/(DTH*RADE)),NTH/2-1)
-        !MSSLONG(:,:) = 0.
-        MSSSUM2(:,:) = 0.
-        MSSSUM(:,:) = 0.
-        !BTH(:) = 0.
-!$ACC LOOP INDEPENDENT
-        DO IK=1,NK
-          DO ITH=1,NTH
-            MSSLONG(IK,ITH) = 0.
-!            MSSSUM2(IK,ITH) = 0.
-!            MSSSUM(IK,ITH) = 0. 
-!       SSDSDIK is the integer difference in frequency bands
-!       between the "large breakers" and short "wiped-out waves"
-          END DO
-          BTH(IK) = 0.
-        END DO
+        MSSLONG(:,:,ISEA) = 0.
+        MSSSUM2(:,:,ISEA) = 0.
+        MSSSUM(:,:,ISEA) = 0.
+        BTH(:,ISEA) = 0.
 
 !GPUNotes: Loops over full spectrum
-!$ACC LOOP INDEPENDENT
+!$ACC LOOP 
         DO  IK=IK1, NK
  
           FACSAT=SIG(IK)*K(IK)**3*DTH
           IS0=(IK-1)*NTH
-          BTH(IS0+1)=0.
+          BTH(IS0+1,ISEA)=0.
           ASUM = SUM(A(IS0+1:IS0+NTH))
-          BTH0(IK)=ASUM*FACSAT
+          BTH0(IK,ISEA)=ASUM*FACSAT
  
           IF (SSDSDTH.GE.180) THEN  ! integrates around full circle
-            BTH(IS0+1:IS0+NTH)=BTH0(IK)
+            BTH(IS0+1:IS0+NTH,ISEA)=BTH0(IK,ISEA)
           ELSE
 !
 ! straining effect: first finds the mean direction of mss, then applies cos^2
@@ -1779,7 +1772,7 @@
 !
             IF (SSDSC(8).GT.0.OR.SSDSC(11).GT.0) THEN
               IKC = MAX(1,IK-DIKCUMUL)
-              IMSSMAX (IK) = 1
+              IMSSMAX (IK,ISEA) = 1
               MSSP   = 0.
               MSSPC2 = 0.
               MSSPS2 = 0.
@@ -1789,42 +1782,46 @@
 !
 !GPUNotes: loops over directions and sum iteration within IK loop above
 !CODENotes: Internalise as much code as possible for collapsable loops
-!$ACC LOOP INDEPENDENT COLLAPSE(2)
+!$ACC LOOP COLLAPSE(2)
               DO ITH=1,NTH
                 DO JTH=-NTHSUM,NTHSUM
-                IS=ITH+(IK-1)*NTH
-                MSSLONG(IK,ITH) = K(IK)**2 * A(IS) * DDEN(IK) / CG(IK) ! contribution to MSS
+                   IS=ITH+(IK-1)*NTH
+                   MSSLONG(IK,ITH,ISEA) = K(IK)**2 * A(IS) * DDEN(IK) /&
+                   CG(IK) ! Contribution to MSS
                    ITH2 = 1+MOD(ITH-1+JTH+NTH,NTH)
-                   MSSSUM2(IK:NK,ITH2) = MSSSUM2(IK:NK,ITH2)+MSSLONG(IK,ITH)*WTHSUM(ABS(JTH)+1)
+                   MSSSUM2(IK:NK,ITH2,ISEA) = MSSSUM2(IK:NK,ITH2,ISEA)+&
+                            MSSLONG(IK,ITH,ISEA)*WTHSUM(ABS(JTH)+1,ISEA)
                 END DO
-                MSSPC2 = MSSPC2 +MSSLONG(IK,ITH)*EC2(ITH)
-                MSSPS2 = MSSPS2 +MSSLONG(IK,ITH)*ES2(ITH)
-                MSSPCS = MSSPCS +MSSLONG(IK,ITH)*ESC(ITH)
-                MSSP   = MSSP +MSSLONG(IK,ITH)
+                MSSPC2 = MSSPC2 + MSSLONG(IK,ITH,ISEA)*EC2(ITH)
+                MSSPS2 = MSSPS2 + MSSLONG(IK,ITH,ISEA)*ES2(ITH)
+                MSSPCS = MSSPCS + MSSLONG(IK,ITH,ISEA)*ESC(ITH)
+                MSSP   = MSSP + MSSLONG(IK,ITH,ISEA)
               END DO
 !
 ! Now sums over IK
 !
-              MSSSUM  (IK:NK,1) = MSSSUM (IK:NK,1) +MSSP
-              MSSSUM  (IK:NK,3) = MSSSUM (IK:NK,3) +MSSPC2
-              MSSSUM  (IK:NK,4) = MSSSUM (IK:NK,4) +MSSPS2
-              MSSSUM  (IK:NK,5) = MSSSUM (IK:NK,5) +MSSPCS
+              MSSSUM  (IK:NK,1,ISEA) = MSSSUM(IK:NK,1,ISEA) + MSSP
+              MSSSUM  (IK:NK,3,ISEA) = MSSSUM(IK:NK,3,ISEA) + MSSPC2
+              MSSSUM  (IK:NK,4,ISEA) = MSSSUM(IK:NK,4,ISEA) + MSSPS2
+              MSSSUM  (IK:NK,5,ISEA) = MSSSUM(IK:NK,5,ISEA) + MSSPCS
 !
 ! Direction of long wave mss summed up to IK
 !
-              MSSD=0.5*(ATAN2(2*MSSSUM(IK,5),MSSSUM(IK,3)-MSSSUM(IK,4)))
+              MSSD = 0.5*(ATAN2(2*MSSSUM(IK,5,ISEA),MSSSUM(IK,3,ISEA) & 
+                     - MSSSUM(IK,4,ISEA)))
               IF (MSSD.LT.0) MSSD = MSSD + PI
-              IMSSMAX (IK)=1+NINT(MSSD *NTH/TPI)
+              IMSSMAX (IK,ISEA)=1+NINT(MSSD *NTH/TPI)
 !
 ! mss along perpendicular direction
 !
-              MSSSUM  (IK,2)  = MAX(0.,MSSSUM(IK,4)*COS(MSSD)**2   &
-                       -2*MSSSUM(IK,5)*SIN(MSSD)*COS(MSSD)+MSSSUM(IK,3)*SIN(MSSD)**2)
+              MSSSUM  (IK,2,ISEA)  = MAX(0.,MSSSUM(IK,4,ISEA) *        &
+              COS(MSSD)**2-2*MSSSUM(IK,5,ISEA)*SIN(MSSD)*COS(MSSD)  +  &
+              MSSSUM(IK,3,ISEA)*SIN(MSSD)**2)
  
             END IF ! SSDSC(8).GT.0) THEN
  
 !GPUNotes: loop over directions
-!$ACC LOOP INDEPENDENT PRIVATE(BTH)
+!!$ACC LOOP PRIVATE(BTH)
             DO ITH=1,NTH            ! partial integration
               IS=ITH+(IK-1)*NTH
 !
@@ -1838,23 +1835,23 @@
 !
               IF (SSDSC(8).GT.0) THEN
 !
-                MSSTH=(MSSSUM(IKC,1)-MSSSUM(IKC,2))*EC2(1+ABS(ITH-IMSSMAX (IKC))) &
-                        +MSSSUM(IKC,2)*ES2(1+ABS(ITH-IMSSMAX (IKC)))
+                MSSTH=(MSSSUM(IKC,1,ISEA)-MSSSUM(IKC,2,ISEA))*EC2(1+   &
+                ABS(ITH-IMSSMAX(IKC,ISEA)))+MSSSUM(IKC,2,ISEA)*ES2(1+  &
+                ABS(ITH-IMSSMAX (IKC,ISEA)))
 !
-                FACSTRAIN=1+SSDSC(8)*SQRT(MSSTH)+SSDSC(11)*SQRT(MSSSUM2(IKC,ITH))
+                FACSTRAIN=1+SSDSC(8)*SQRT(MSSTH)+SSDSC(11)*SQRT(       &
+                MSSSUM2(IKC,ITH,ISEA))
                 FACSAT=SIG(IK)*K(IK)**3*DTH*FACSTRAIN
               END IF
  
-              BTH(IS)=DOT_PRODUCT(SATWEIGHTS(:,ITH),         &
+              BTH(IS,ISEA)=DOT_PRODUCT(SATWEIGHTS(:,ITH),         &
                        A(IS0+SATINDICES(:,ITH)) )*FACSAT
-!              BTH(IS)=SUM(  SATWEIGHTS(:,ITH)*         &
-!                     A(IS0+SATINDICES(:,ITH)) )*FACSAT
             END DO
  
             IF (SSDSISO.EQ.1) THEN
-              BTH0(IK)=SUM(A(IS0+1:IS0+NTH))*FACSAT
+              BTH0(IK,ISEA)=SUM(A(IS0+1:IS0+NTH))*FACSAT
             ELSE
-              BTH0(IK)=MAXVAL(BTH(IS0+1:IS0+NTH))
+              BTH0(IK,ISEA)=MAXVAL(BTH(IS0+1:IS0+NTH,ISEA))
             END IF
           END IF
  
@@ -1863,78 +1860,83 @@
 !   Optional smoothing of B and B0 over frequencies
 !
         IF (SSDSBRFDF.GT.0.AND.SSDSBRFDF.LT.NK/2) THEN
-!$ACC LOOP INDEPENDENT
+!$ACC LOOP 
           DO IK=1,NK
-            BTH0S(IK)=BTH0(IK)
-            BTHS(IK)=BTH(IK)
-            NSMOOTH(IK)=1
+            BTH0S(IK,ISEA)=BTH0(IK,ISEA)
+            BTHS(IK,ISEA)=BTH(IK,ISEA)
+            NSMOOTH(IK,ISEA)=1
           END DO
 !GPUNotes: loops over full spectrum - assume need to be sequential
-!$ACC LOOP INDEPENDENT COLLAPSE(2)
+!$ACC LOOP COLLAPSE(2)
           DO IK=1, SSDSBRFDF
             DO ITH=1,NTH
-              BTH0S(1+SSDSBRFDF)=BTH0S(1+SSDSBRFDF)+BTH0(IK)
-              NSMOOTH(1+SSDSBRFDF)=NSMOOTH(1+SSDSBRFDF)+1
+              BTH0S(1+SSDSBRFDF,ISEA)=BTH0S(1+SSDSBRFDF,ISEA)+         &
+              BTH0(IK,ISEA)
+              NSMOOTH(1+SSDSBRFDF,ISEA)=NSMOOTH(1+SSDSBRFDF,ISEA)+1
               IS=ITH+(IK-1)*NTH
-              BTHS(ITH+SSDSBRFDF*NTH)=BTHS(ITH+SSDSBRFDF*NTH)+BTH(IS)
+              BTHS(ITH+SSDSBRFDF*NTH,ISEA)=BTHS(ITH+SSDSBRFDF*NTH,ISEA)&
+                                           +BTH(IS,ISEA)
             END DO
           END DO
-!$ACC LOOP INDEPENDENT COLLAPSE(2)
+!$ACC LOOP COLLAPSE(2)
           DO IK=IK1+1+SSDSBRFDF,1+2*SSDSBRFDF
             DO ITH=1,NTH
-              BTH0S(1+SSDSBRFDF)=BTH0S(1+SSDSBRFDF)+BTH0(IK)
-              NSMOOTH(1+SSDSBRFDF)=NSMOOTH(1+SSDSBRFDF)+1
+              BTH0S(1+SSDSBRFDF,ISEA)=BTH0S(1+SSDSBRFDF,ISEA) +        &
+              BTH0(IK,ISEA)
+              NSMOOTH(1+SSDSBRFDF,ISEA)=NSMOOTH(1+SSDSBRFDF,ISEA)+1
               IS=ITH+(IK-1)*NTH
-              BTHS(ITH+SSDSBRFDF*NTH)=BTHS(ITH+SSDSBRFDF*NTH)+BTH(IS)
+              BTHS(ITH+SSDSBRFDF*NTH,ISEA)=BTHS(ITH+SSDSBRFDF*NTH,ISEA)&
+                                           +BTH(IS,ISEA)
             END DO
           END DO
-!$ACC LOOP INDEPENDENT COLLAPSE(2)
+!$ACC LOOP COLLAPSE(2)
           DO IK=SSDSBRFDF,IK1,-1
             DO ITH=1,NTH
-              BTH0S(IK)=BTH0S(IK+1)-BTH0(IK+SSDSBRFDF+1)
-              NSMOOTH(IK)=NSMOOTH(IK+1)-1
+              BTH0S(IK,ISEA)=BTH0S(IK+1,ISEA)-BTH0(IK+SSDSBRFDF+1,ISEA)
+              NSMOOTH(IK,ISEA)=NSMOOTH(IK+1,ISEA)-1
               IS=ITH+(IK-1)*NTH
-              BTHS(IS)=BTHS(IS+NTH)-BTH(IS+(SSDSBRFDF+1)*NTH)
+              BTHS(IS,ISEA)=BTHS(IS+NTH,ISEA)- &
+                            BTH(IS+(SSDSBRFDF+1)*NTH,ISEA)
             END DO
           END DO
-!$ACC LOOP INDEPENDENT COLLAPSE(2)  
+!$ACC LOOP COLLAPSE(2)  
           DO IK=IK1+1+SSDSBRFDF,NK-SSDSBRFDF
             DO ITH=1,NTH
-              BTH0S(IK)=BTH0S(IK-1)-BTH0(IK-SSDSBRFDF-1)+BTH0(IK+SSDSBRFDF)
-              NSMOOTH(IK)=NSMOOTH(IK-1)
+              BTH0S(IK,ISEA)=BTH0S(IK-1,ISEA)-BTH0(IK-SSDSBRFDF-1,ISEA)&
+                             +BTH0(IK+SSDSBRFDF,ISEA)
+              NSMOOTH(IK,ISEA)=NSMOOTH(IK-1,ISEA)
               IS=ITH+(IK-1)*NTH
-              BTHS(IS)=BTHS(IS-NTH)-BTH(IS-(SSDSBRFDF+1)*NTH)+BTH(IS+(SSDSBRFDF)*NTH)
+              BTHS(IS,ISEA)=BTHS(IS-NTH,ISEA)-BTH(IS-(SSDSBRFDF+1)*NTH,&
+                            ISEA)+BTH(IS+(SSDSBRFDF)*NTH,ISEA)
             END DO
           END DO
-!$ACC LOOP INDEPENDENT COLLAPSE(2)
+!$ACC LOOP COLLAPSE(2)
           DO IK=NK-SSDSBRFDF+1,NK
             DO ITH=1,NTH
-              BTH0S(IK)=BTH0S(IK-1)-BTH0(IK-SSDSBRFDF)
-              NSMOOTH(IK)=NSMOOTH(IK-1)-1
+              BTH0S(IK,ISEA)=BTH0S(IK-1,ISEA)-BTH0(IK-SSDSBRFDF,ISEA)
+              NSMOOTH(IK,ISEA)=NSMOOTH(IK-1,ISEA)-1
               IS=ITH+(IK-1)*NTH
-              BTHS(IS)=BTHS(IS-NTH)-BTH(IS-(SSDSBRFDF+1)*NTH)
+              BTHS(IS,ISEA)=BTHS(IS-NTH,ISEA)-                         &
+                            BTH(IS-(SSDSBRFDF+1)*NTH,ISEA)
             END DO
           END DO
 !
 !    final division by NSMOOTH
 !
-!GPUNotes created loop instead of array syntax.
-!$ACC LOOP INDEPENDENT
-          DO IK=1,NK
-            BTH0(IK)=MAX(0.,BTH0S(IK)/NSMOOTH(IK))
-          END DO
+          BTH0(:,ISEA)=MAX(0.,BTH0S(:,ISEA)/NSMOOTH(:,ISEA))
 
-!$ACC LOOP INDEPENDENT
+!$ACC LOOP 
           DO IK=IK1,NK
             IS0=(IK-1)*NTH
-            BTH(IS0+1:IS0+NTH)=MAX(0.,BTHS(IS0+1:IS0+NTH)/NSMOOTH(IK))
+            BTH(IS0+1:IS0+NTH,ISEA)=MAX(0.,BTHS(IS0+1:IS0+NTH,ISEA)/ &
+            NSMOOTH(IK,ISEA))
           END DO
         END IF
 !
 !  2.a.2  Computes spontaneous breaking dissipation rate
 !
 !GPUNotes Loop over ferquencies
-!$ACC LOOP INDEPENDENT
+!$ACC LOOP 
         DO  IK=IK1, NK
 !
 !  Correction of saturation level for shallow-water kinematics
@@ -1943,20 +1945,22 @@
             MICHE=1.
           ELSE
             X=TANH(MIN(K(IK)*DEPTH,10.))
-            MICHE=(X*(SSDSBM(1)+X*(SSDSBM(2)+X*(SSDSBM(3)+X*SSDSBM(4)))))**2 ! Correction of saturation level for shallow-water kine
+            MICHE=(X*(SSDSBM(1)+X*(SSDSBM(2)+X*(SSDSBM(3)+X*SSDSBM(4)))&
+            ))**2 ! Correction of saturation level for shallow-water kine
           END IF
           COEF1=(SSDSBR*MICHE)
 !
 !  Computes isotropic part
 !
-          SDIAGISO = SSDSC(2) * SIG(IK)*SSDSC(6)*(MAX(0.,BTH0(IK)/COEF1-1.))**2
+          SDIAGISO = SSDSC(2) * SIG(IK)*SSDSC(6)*(MAX(0.,BTH0(IK,ISEA)/&
+                     COEF1-1.))**2
 !
 !  Computes anisotropic part and sums isotropic part
 !
           COEF2=SSDSC(2) * SIG(IK)*(1-SSDSC(6))/(COEF1*COEF1)
           COEF3=-2.*SIG(IK)*K(IK)*FACTURB
-          DDIAG((IK-1)*NTH+1:IK*NTH) = SDIAGISO + &
-                                   COEF2*((MAX(0.,BTH((IK-1)*NTH+1:IK*NTH)-COEF1))**SSDSP)
+          DDIAG((IK-1)*NTH+1:IK*NTH) = SDIAGISO + COEF2*((MAX(0.,      &
+                           BTH((IK-1)*NTH+1:IK*NTH,ISEA)-COEF1))**SSDSP)
 !            IF (IX == DEBUG_NODE) THEN
 !              WRITE(*,'(A10,I10,10F15.6)') 'ST4 D3',IK,BTH0(IK),SUM(BTH((IK-1)*NTH+1:IK*NTH)),COEF1,COEF2,COEF3,SSDSP,SDIAGISO
 !            ENDIF
@@ -1968,16 +1972,16 @@
 ! Computes Breaking probability
 !
 !GPUNotes created loop instead of array syntax.
-!$ACC LOOP INDEPENDENT
+!$ACC LOOP 
         DO ISPEC=1,NSPEC
-          PB(ISPEC) = (MAX(SQRT(BTH(ISPEC))-EPSR,0.))**2
+          PB(ISPEC,ISEA) = (MAX(SQRT(BTH(ISPEC,ISEA))-EPSR,0.))**2
 !
 ! Multiplies by 28.16 = 22.0 * 1.6² * 1/2 with
 !  22.0 (Banner & al. 2000, figure 6)
 !  1.6  the coefficient that transforms  SQRT(B) to Banner et al. (2000)'s epsilon
 !  1/2  factor to correct overestimation of Banner et al. (2000)'s breaking probability due to zero-crossing analysis
 !
-          PB(ISPEC) = PB(ISPEC) * 28.16
+          PB(ISPEC,ISEA) = PB(ISPEC,ISEA) * 28.16
         END DO
 !/
       END IF ! End of test for (Ardhuin et al. 2010)'s spontaneous dissipation source term
@@ -1996,14 +2000,14 @@
 ! Computes Wavenumber spectrum E1 integrated over direction and computes dk
 !
 !GPUNotes loops over full spectrum
-        E1(:)=0.
-!$ACC LOOP INDEPENDENT COLLAPSE(2)
+        E1(:,ISEA)=0.
+!$ACC LOOP COLLAPSE(2)
         DO IK=IK1, NK
           DO ITH=1,NTH
             IS=ITH+(IK-1)*NTH
-            E1(IK)=E1(IK)+(A(IS)*SIG(IK))*DTH
+            E1(IK,ISEA)=E1(IK,ISEA)+(A(IS)*SIG(IK))*DTH
           END DO
-          DK(IK)=DDEN(IK)/(DTH*SIG(IK)*CG(IK))
+          DK(IK,ISEA)=DDEN(IK)/(DTH*SIG(IK)*CG(IK))
         END DO
 !
 ! Gets windows indices of IKTAB
@@ -2022,37 +2026,40 @@
         KBAR=0.
         EFDF=0.
         NKL=0. !number of windows
-!$ACC LOOP INDEPENDENT
+!$ACC LOOP 
         DO IKL=1,NK
-          IKSUP(IKL)=IKTAB(IKL,ID)
-          IF (IKSUP(IKL) .LE. NK) THEN
-            EFDF(IKL) = DOT_PRODUCT(E1(IKL:IKSUP(IKL)-1),DK(IKL:IKSUP(IKL)-1))
-            IF (EFDF(IKL) .NE. 0) THEN
-              KBAR(IKL) = DOT_PRODUCT(K(IKL:IKSUP(IKL)-1)*E1(IKL:IKSUP(IKL)-1), &
-                                      DK(IKL:IKSUP(IKL)-1)) / EFDF(IKL)
+          IKSUP(IKL,ISEA)=IKTAB(IKL,ID)
+          IF (IKSUP(IKL,ISEA) .LE. NK) THEN
+            EFDF(IKL,ISEA) = DOT_PRODUCT(E1(IKL:IKSUP(IKL,ISEA)-1,ISEA)&
+                             ,DK(IKL:IKSUP(IKL,ISEA)-1,ISEA))
+            IF (EFDF(IKL,ISEA) .NE. 0) THEN
+              KBAR(IKL,ISEA) = DOT_PRODUCT(K(IKL:IKSUP(IKL,ISEA)-1)*   &
+              E1(IKL:IKSUP(IKL,ISEA)-1,ISEA), DK(IKL:IKSUP(IKL,ISEA)-1,&
+              ISEA)) / EFDF(IKL,ISEA)
             ELSE
-              KBAR(IKL)=0.
+              KBAR(IKL,ISEA)=0.
             END IF
 ! estimation of Significant wave height of a given scale
-            HS(IKL) = 4*SQRT(EFDF(IKL))
+            HS(IKL,ISEA) = 4*SQRT(EFDF(IKL,ISEA))
             NKL = NKL+1
           END IF
         END DO
 !
 ! Computes Dissipation and breaking probability in each scale
 !
-        DCK=0.
-        QB =0.
+! Make sure initialisations for global arrays dont reset all sea points.
+        DCK(:,ISEA)=0.
+        QB(:,ISEA) =0.
         DKHS = KHSMAX/NKHS
 !GPUNotes loop over ferquencies
-!$ACC LOOP INDEPENDENT
+!$ACC LOOP 
         DO IKL=1, NKL
-          IF (HS(IKL) .NE. 0. .AND. KBAR(IKL) .NE. 0.)  THEN
+          IF (HS(IKL,ISEA) .NE. 0. .AND. KBAR(IKL,ISEA) .NE. 0.)  THEN
 !
 ! gets indices for tabulated dissipation DCKI and breaking probability QBI
 !
-            IKD = FAC_KD2+ANINT(LOG(KBAR(IKL)*DEPTH)/LOG(FAC_KD1))
-            IKHS= 1+ANINT(KBAR(IKL)*HS(IKL)/DKHS)
+            IKD = FAC_KD2+ANINT(LOG(KBAR(IKL,ISEA)*DEPTH)/LOG(FAC_KD1))
+            IKHS= 1+ANINT(KBAR(IKL,ISEA)*HS(IKL,ISEA)/DKHS)
             IF (IKD > NKD) THEN    ! Deep water
               IKD = NKD
             ELSE IF (IKD < 1) THEN ! Shallow water
@@ -2063,7 +2070,7 @@
             ELSE IF (IKHS < 1) THEN
               IKHS = 1
             END IF
-            XT = TANH(KBAR(IKL)*DEPTH)
+            XT = TANH(KBAR(IKL,ISEA)*DEPTH)
 !
 !  Gamma corrected for water depth
 !
@@ -2072,84 +2079,78 @@
 ! Computes the energy dissipated for the scale IKL
 ! using DCKI which is tabulated in INSIN4
 !
-            DCK(IKL)=((KBAR(IKL)**(-2.5))*(KBAR(IKL)/(2*PI)))*DCKI(IKHS,IKD)
+            DCK(IKL,ISEA)=((KBAR(IKL,ISEA)**(-2.5))*(KBAR(IKL,ISEA)/   &
+            (2*PI)))*DCKI(IKHS,IKD)
 !
 ! Get the breaking probability for the scale IKL
 !
-            QB(IKL) = QBI(IKHS,IKD) ! QBI is tabulated in INSIN4
+            QB(IKL,ISEA) = QBI(IKHS,IKD) ! QBI is tabulated in INSIN4
           ELSE
-            DCK(IKL)=0.
-            QB(IKL) =0.
+            DCK(IKL,ISEA)=0.
+            QB(IKL,ISEA) =0.
           END IF
         END DO
 !
 ! Distributes scale dissipation over the frequency spectrum
-!
-!$ACC LOOP INDEPENDENT
-        DO IK=1,NK
-          S1(IK) = 0.
-          S2(IK) = 0.
-          NTIMES(IK) = 0
-        END DO
+
+        S1(:,ISEA) = 0.
+        S2(:,ISEA) = 0.
+        NTIMES(:,ISEA) = 0
+        
 !GPUNotes loop over freqeuncies
-!$ACC LOOP INDEPENDENT
+!$ACC LOOP 
         DO IKL=1, NKL
-          IF (EFDF(IKL) .GT. 0.) THEN
-            S1(IKL:IKSUP(IKL))    = S1(IKL:IKSUP(IKL)) + &
-                                     DCK(IKL)*E1(IKL:IKSUP(IKL)) / EFDF(IKL)
-            S2(IKL:IKSUP(IKL))    = S2(IKL:IKSUP(IKL)) + &
-                                     QB(IKL) *E1(IKL:IKSUP(IKL)) / EFDF(IKL)
-            NTIMES(IKL:IKSUP(IKL)) = NTIMES(IKL:IKSUP(IKL)) + 1
+          IF (EFDF(IKL,ISEA) .GT. 0.) THEN
+            S1(IKL:IKSUP(IKL,ISEA),ISEA) = S1(IKL:IKSUP(IKL,ISEA),ISEA)&
+            + DCK(IKL,ISEA)*E1(IKL:IKSUP(IKL,ISEA),ISEA)/EFDF(IKL,ISEA)
+            
+            S2(IKL:IKSUP(IKL,ISEA),ISEA) = S2(IKL:IKSUP(IKL,ISEA),ISEA)&
+            + QB(IKL,ISEA) *E1(IKL:IKSUP(IKL,ISEA),ISEA)/EFDF(IKL,ISEA)
+
+           NTIMES(IKL:IKSUP(IKL,ISEA),ISEA)=NTIMES(IKL:IKSUP(IKL,ISEA),&
+                                            ISEA) + 1
           END IF
         END DO
 !
 ! Finish the average
 !
-!$ACC LOOP INDEPENDENT
+!$ACC LOOP 
         DO IK=1,NK
-          IF (NTIMES(IK) .GT. 0) THEN
-            S1(IK) = S1(IK) / NTIMES(IK)
-            S2(IK) = S2(IK) / NTIMES(IK)
+          IF (NTIMES(IK,ISEA) .GT. 0) THEN
+            S1(IK,ISEA) = S1(IK,ISEA) / NTIMES(IK,ISEA)
+            S2(IK,ISEA) = S2(IK,ISEA) / NTIMES(IK,ISEA)
           ELSE
-            S1(IK) = 0.
-            S2(IK) = 0.
+            S1(IK,ISEA) = 0.
+            S2(IK,ISEA) = 0.
           END IF
         END DO
 ! goes back to action for dissipation source term
 
-!GPUNotes created loop instead of array syntax division.
-!$ACC LOOP INDEPENDENT
-        DO IK=1,NK
-          S1(IK) = S1(IK) / SIG(IK)
-        END DO
+        S1(:,ISEA) = S1(:,ISEA) / SIG(IK)
 !
 ! Makes Isotropic distribution
 !
         ASUM = 0.
 !GPUNotes loop over frequencies
-!$ACC LOOP INDEPENDENT
+!$ACC LOOP 
         DO IK = 1, NK
           ASUM = (SUM(A(((IK-1)*NTH+1):(IK*NTH)))*DTH)
           IF (ASUM.GT.1.E-8) THEN
-            FORALL (IS=1+(IK-1)*NTH:IK*NTH) DDIAG(IS)  = S1(IK)/ASUM
-            FORALL (IS=1+(IK-1)*NTH:IK*NTH) PB2(IS) = S2(IK)/ASUM
+            FORALL (IS=1+(IK-1)*NTH:IK*NTH)DDIAG(IS)=S1(IK,ISEA)/ASUM
+            FORALL (IS=1+(IK-1)*NTH:IK*NTH)PB2(IS,ISEA)=S2(IK,ISEA)/ASUM
           ELSE
             FORALL (IS=1+(IK-1)*NTH:IK*NTH) DDIAG(IS)  = 0.
-            FORALL (IS=1+(IK-1)*NTH:IK*NTH) PB2(IS) = 0.
+            FORALL (IS=1+(IK-1)*NTH:IK*NTH) PB2(IS,ISEA) = 0.
           END IF
-          IF (PB2(1+(IK-1)*NTH).GT.0.001) THEN
-            BTH0(IK) = 2.*SSDSBR
+          IF (PB2(1+(IK-1)*NTH,ISEA).GT.0.001) THEN
+            BTH0(IK,ISEA) = 2.*SSDSBR
           ELSE
-            BTH0(IK) = 0.
+            BTH0(IK,ISEA) = 0.
           END IF
         END DO
 !
-!GPUNotes created loop instead of array syntax.
-!$ACC LOOP INDEPENDENT
-        DO ISPEC=1,NSPEC
-          PB(ISPEC) = (1-SSDSC(1))*PB2(ISPEC)*A(ISPEC) + &
-                      SSDSC(1)*PB(ISPEC)
-        END DO
+        PB(:,ISEA) = (1-SSDSC(1))*PB2(:,ISEA)*A(ISPEC) + &
+                      SSDSC(1)*PB(:,ISEA)
 !
       END IF   ! END OF TEST ON SSDSBCK
 !
@@ -2159,9 +2160,9 @@
 ! with l(k,th)=1/(2*pi²)= the breaking crest density
 !
 !GPUNotes created loop instead of array syntax.
-!$ACC LOOP INDEPENDENT
+!$ACC LOOP 
       DO ISPEC=1,NSPEC
-        BRLAMBDA(ISPEC) = PB(ISPEC) / (2.*PI**2.)
+        BRLAMBDA(ISPEC) = PB(ISPEC,ISEA) / (2.*PI**2.)
       END DO
 !     
 !/ ------------------------------------------------------------------- /
@@ -2172,9 +2173,9 @@
 
 !
 !GPUNotes Loops over the full spectrum
-      SBKT(:)=0.
-      SBK(:)=0.
-!$ACC LOOP INDEPENDENT COLLAPSE(2)
+      SBKT(:,ISEA)=0.
+      SBK(:,ISEA)=0.
+!$ACC LOOP COLLAPSE(2)
       DO  IK=IK1, NK
         DO ITH=1,NTH
           IS=ITH+(IK-1)*NTH
@@ -2184,11 +2185,12 @@
           RENEWALFREQ = 0.
           IF (SSDSC(3).NE.0 .AND. IK.GT.DIKCUMUL) THEN
 !GPUNotes loop over frequencies
-!$ACC LOOP SEQ
+!$ACC LOOP 
             DO IK2=IK1,IK-DIKCUMUL
-              IF (BTH0(IK2).GT.SSDSBR) THEN
+              IF (BTH0(IK2,ISEA).GT.SSDSBR) THEN
                 IS2=(IK2-1)*NTH
-                RENEWALFREQ=RENEWALFREQ+DOT_PRODUCT(CUMULW(IS2+1:IS2+NTH,IS),BRLAMBDA(IS2+1:IS2+NTH))
+                RENEWALFREQ=RENEWALFREQ+DOT_PRODUCT(CUMULW(IS2+1:IS2+ & 
+                                        NTH,IS),BRLAMBDA(IS2+1:IS2+NTH))
               END IF
             END DO
           END IF
@@ -2200,8 +2202,8 @@
 !
 ! Add effects
 !
-          SBK(IS)   = DDIAG(IS)*A(IS)
-          SBKT(IK)  = SBKT(IK) + SBK(IS)
+          SBK(IS,ISEA)   = DDIAG(IS)*A(IS)
+          SBKT(IK,ISEA)  = SBKT(IK,ISEA) + SBK(IS,ISEA)
           DDIAG(IS) = DDIAG(IS) + (SSDSC(3)*RENEWALFREQ+DTURB)
         END DO
       END DO
@@ -2209,7 +2211,7 @@
 ! COMPUTES SOURCES TERM from diagonal term
 !
 !GPUNotes created loop instead of array syntax.
-!$ACC LOOP INDEPENDENT COLLAPSE(2)
+!$ACC LOOP COLLAPSE(2)
       DO  IK=IK1, NK
         DO ITH=1,NTH
           IS=ITH+(IK-1)*NTH
@@ -2222,13 +2224,13 @@
 !
       IF (SSDSC(1).GT.0) THEN
 !GPUNotes loops over partial spectrum
-!$ACC LOOP INDEPENDENT COLLAPSE(3)
+!$ACC LOOP COLLAPSE(3)
         DO IK2 = IK1+DIKCUMUL, NK
           DO IK = IK2-DIKCUMUL, IK2-1
             DO ITH=1,NTH
               IS2=ITH+(IK2-1)*NTH
               IS=ITH+(IK-1)*NTH
-              SRHS(IS) = SRHS(IS) + SSDSC(1)*ABS(SBK(IS2))/DIKCUMUL
+              SRHS(IS) = SRHS(IS) + SSDSC(1)*ABS(SBK(IS2,ISEA))/DIKCUMUL
             END DO
           END DO
         END DO
@@ -2236,14 +2238,15 @@
 !
       IF (SSDSC(9).GT.0) THEN
 !GPUNotes loops over frequencies x2
-!$ACC LOOP INDEPENDENT PRIVATE(SRHS)
+!$ACC LOOP PRIVATE(SRHS)
         DO IK2 = IK1, NK-DIKCUMUL
           IKM= MIN(NK,IK2+2*DIKCUMUL)
           NKM=IKM-(IK2+DIKCUMUL)+1
           FACHF=SSDSC(9)/FLOAT(NKM*NTH)
-!$ACC LOOP INDEPENDENT
+!$ACC LOOP 
           DO IK = IK2+DIKCUMUL, IKM
-            SRHS((IK-1)*NTH+1:IK*NTH) = SRHS((IK-1)*NTH+1:IK*NTH) + ABS(SBKT(IK2))*FACHF
+            SRHS((IK-1)*NTH+1:IK*NTH) = SRHS((IK-1)*NTH+1:IK*NTH) + & 
+                                        ABS(SBKT(IK2,ISEA))*FACHF
           END DO
         END DO
       END IF
@@ -2261,9 +2264,10 @@
 ! precomputes integration of Lambda over direction
 ! times wavelength times a (a=5 in Reul&Chapron JGR 2003) times dk
 !
-!$ACC LOOP INDEPENDENT
+!$ACC LOOP SEQ 
       DO IK=1,NK
-        COEF4(IK) = SUM(BRLAMBDA((IK-1)*NTH+1:IK*NTH) * DTH) *(2*PI/K(IK)) *  &
+        COEF4(IK,ISEA) = SUM(BRLAMBDA((IK-1)*NTH+1:IK*NTH) * DTH)      &
+                         * (2*PI/K(IK)) *  &
                     SSDSC(7) * DDEN(IK)/(DTH*SIG(IK)*CG(IK))
 !                   NB: SSDSC(7) is WHITECAPWIDTH
       END DO
@@ -2273,9 +2277,9 @@
 ! Computes the Total WhiteCap Coverage (a=5. ; Reul and Chapron, 2003)
 !
 !GPUNotes loops over frequencies
-!$ACC LOOP INDEPENDENT
+!$ACC LOOP SEQ 
         DO IK=IK1,NK
-          WHITECAP(1) = WHITECAP(1) + COEF4(IK) * (1-WHITECAP(1))
+          WHITECAP(1) = WHITECAP(1) + COEF4(IK,ISEA) * (1-WHITECAP(1))
         END DO
       END IF
 !/
@@ -2284,7 +2288,7 @@
 !
       IF ( FLOGRD(5,8) ) THEN
 !GPUNotes loops over frequencies and iterations
-!$ACC LOOP INDEPENDENT
+!$ACC LOOP SEQ 
         DO IK=IK1,NK
 !    Duration of active breaking (TAU*)
           TSTR = 0.8 * 2*PI/SIG(IK)
@@ -2306,7 +2310,7 @@
 !
 ! Computes foam-layer thickness (Reul and Chapron, 2003)
 !
-          WHITECAP(2) = WHITECAP(2) + COEF4(IK) * MFT
+          WHITECAP(2) = WHITECAP(2) + COEF4(IK,ISEA) * MFT
         END DO
       END IF
 !

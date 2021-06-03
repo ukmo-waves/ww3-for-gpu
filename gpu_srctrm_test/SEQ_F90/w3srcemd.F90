@@ -47,16 +47,6 @@
 !/
       REAL, PARAMETER, PRIVATE:: OFFSET = 1.
 !/
-! Scratch variables for GPU
-      REAL,ALLOCATABLE        ::WN_R(:,:),CG_ICE(:,:),ALPHA_LIU(:,:),R(:,:),  &
-                                SPECINIT(:,:), SPEC2(:,:)
-      REAL,ALLOCATABLE        :: DAM (:,:), WN2 (:,:),         &
-                             VSLN(:,:), VSIN(:,:), VDIN(:,:),VSNL(:,:), &
-                             VDNL(:,:), VSDS(:,:), VDDS(:,:), VSBT(:,:),&
-                          VDBT(:,:), VS(:,:), VD(:,:), EB(:),COSI(:,:)
-      LOGICAL,ALLOCATABLE     :: LLWS(:,:)
-      REAL,ALLOCATABLE        :: FOUT(:,:), SOUT(:,:), DOUT(:,:)
-      INTEGER :: I,JJ
       CONTAINS
 !/ ------------------------------------------------------------------- /
       SUBROUTINE W3SRCE_INIT()
@@ -391,7 +381,7 @@
                           XFC, XFLT, XREL, XFT, FXFM, FXPM, DDEN,      &
                           FTE, FTF, FHMAX, ECOS, ESIN, IICEDISP,       &
                           ICESCALES, IICESMOOTH, MAPSF, MAPSTA, FACP,  &
-                          FLAGST
+                          FLAGST, NK2
       USE W3GDATMD, ONLY: FSSOURCE, optionCall
       USE W3GDATMD, ONLY: B_JGS_NLEVEL, B_JGS_SOURCE_NONLINEAR
       USE W3WDATMD, ONLY: TIME
@@ -412,27 +402,32 @@
 ! on the call to the fuction are critical to avoid confusing validation
 ! errors.
 
-      INTEGER, INTENT(IN)     :: srce_call, IT, IMOD
-      REAL, intent(in)        :: SPECOLD(1:NSPEC)
-      REAL, INTENT(OUT)       :: VSIO(1:NSPEC), VDIO(1:NSPEC)
-      LOGICAL, INTENT(OUT)    :: SHAVEIO
-      REAL, INTENT(IN)        :: D_INP(1:), U10ABS(1:NSEAL),U10DIR(1:NSEAL),      &
-                                 AS(1:), CX(1:), CY(1:), DTG, D50,     &
-                                 PSIC, ICE(1:), ICEH(1:)
-      INTEGER, INTENT(IN)     :: REFLED(6)
-      REAL, INTENT(IN)        :: REFLEC(4), TRNX(:,:), TRNY(:,:),      &
-                                 BERG(:), ICEDMAX(:)
-      REAL, INTENT(INOUT)     :: WN1(1:NK,1:NSEAL), CG1(1:NK,1:NSEAL), &
-                                 SPEC(1:NSPEC,1:NSEAL), ALPHA(:,:),    &
-                                 USTAR(1:NSEAL),USTDIR(1:NSEAL),FPI(:),&
-                                 TAUOX(1:NSEAL), TAUOY(1:NSEAL), TAUWX(1:NSEAL), TAUWY(1:NSEAL)&
-                                 , PHIAW(1:NSEAL), PHIOC(1:NSEAL), PHICE(1:NSEAL),       &
-                                 CHARN(1:NSEAL), TWS(1:NSEAL), BEDFORMS(1:NSEAL,1:3),      &
-                                 PHIBBL(1:NSEAL), TAUBBL(1:NSEAL,1:2), TAUICE(1:NSEAL,1:2),  &
-                                 WHITECAP(1:NSEAL,1:4), TAUWIX(1:NSEAL), TAUWIY(1:NSEAL),  &
-                                 TAUWNX(1:NSEAL), TAUWNY(1:NSEAL),ICEF(1:NSEAL)
-      REAL, INTENT(OUT)       :: DTDYN(1:NSEAL), FCUT(1:NSEAL)
-      REAL, INTENT(IN)        :: COEF(:)
+      INTEGER, INTENT(IN)    :: srce_call, IT, IMOD
+      REAL, intent(in)       :: SPECOLD(1:NSPEC)
+      REAL, INTENT(OUT)      :: VSIO(1:NSPEC), VDIO(1:NSPEC)
+      LOGICAL, INTENT(OUT)   :: SHAVEIO
+      REAL, INTENT(IN)       :: D_INP(1:), U10ABS(1:NSEAL),            &
+                                U10DIR(1:NSEAL), AS(1:), CX(1:),       &
+                                CY(1:), DTG, D50, PSIC, ICE(1:),       &
+                                ICEH(1:)
+      INTEGER, INTENT(IN)    :: REFLED(6)
+      REAL, INTENT(IN)       :: REFLEC(4), TRNX(:,:), TRNY(:,:),       &
+                                BERG(:), ICEDMAX(:)
+      REAL, INTENT(INOUT)    :: WN1(1:NK,1:NSEAL), CG1(1:NK,1:NSEAL),  &
+                                SPEC(1:NSPEC,1:NSEAL), ALPHA(:,:),     &
+                                USTAR(1:NSEAL),USTDIR(1:NSEAL),FPI(:), &
+                                TAUOX(1:NSEAL), TAUOY(1:NSEAL),        &
+                                TAUWX(1:NSEAL), TAUWY(1:NSEAL),        &
+                                PHIAW(1:NSEAL), PHIOC(1:NSEAL),        &
+                                PHICE(1:NSEAL), CHARN(1:NSEAL),        &
+                                TWS(1:NSEAL), BEDFORMS(1:NSEAL,1:3),   &
+                                PHIBBL(1:NSEAL), TAUBBL(1:NSEAL,1:2),  &
+                                TAUICE(1:NSEAL,1:2),                   &
+                                WHITECAP(1:NSEAL,1:4), TAUWIX(1:NSEAL),&
+                                TAUWIY(1:NSEAL), TAUWNX(1:NSEAL),    &
+                                TAUWNY(1:NSEAL),ICEF(1:NSEAL)
+      REAL, INTENT(OUT)      :: DTDYN(1:NSEAL), FCUT(1:NSEAL)
+      REAL, INTENT(IN)       :: COEF(:)
 !/
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
@@ -440,63 +435,58 @@
 !CODENotes: Changes to local variables to allow managed memory to work
 !properly, requires POINTERS to be defined as ALLOCATABLES and then
 !allocated. 
-      INTEGER                 :: IK, ITH, IS, IS0, NKH, NKH1, &
-                                 IKS1, IS1, NSPECH, IDT, IERR, NKI, NKD&
-                                 , ISPEC, JSEA, ISEA, IX, IY
-      REAL                    :: FHIGH, DT, AFILT, DAMAX, AFAC, &
-                                 HDT, ZWND, FP, &
-                                 FHIGI, KDMEAN
+      INTEGER                :: IK, ITH, IS, IS0, NKH, NKH1,           &
+                                IKS1, IS1, NSPECH, IDT, IERR, NKI, NKD,&
+                                ISPEC, JSEA, ISEA, IX, IY
+      REAL                   :: FHIGH, DT, AFILT, DAMAX, AFAC,         &
+                                 HDT, ZWND, FP, FHIGI, KDMEAN
 ! Scaling factor for SIN, SDS, SNL
-      REAL,ALLOCATABLE       :: ICESCALELN(:), ICESCALEIN(:), ICESCALENL(:),   &
-                                 ICESCALEDS(:),DEPTH(:)
-      REAL                    :: EMEAN, FMEAN, WNMEAN, AMAX, CD, Z0,   &
+      REAL,ALLOCATABLE       :: ICESCALELN(:), ICESCALEIN(:),          &
+                                ICESCALENL(:), ICESCALEDS(:),DEPTH(:)
+      REAL                   :: EMEAN, FMEAN, WNMEAN, AMAX, CD, Z0,    &
                                  SCAT, SMOOTH_ICEDISP,ICECOEF2
-!      REAL,ALLOCATABLE        :: WN_R(:),CG_ICE(:),ALPHA_LIU(:),R(:)
-!      REAL,ALLOCATABLE        :: SPECINIT(:), SPEC2(:)
-!      REAL,ALLOCATABLE        :: DAM (:), WN2 (:), BRLAMBDA(:),        &
-!                                 VSLN(:), VSIN(:), VDIN(:), VSNL(:),   &
-!                                 VDNL(:), VSDS(:), VDDS(:), VSBT(:),   &
-!                                 VDBT(:), VS(:), VD(:), EB(:), COSI(:)
-!      LOGICAL,ALLOCATABLE     :: LLWS(:)
-!      REAL,ALLOCATABLE        :: FOUT(:,:), SOUT(:,:), DOUT(:,:)
-      DOUBLE PRECISION        :: ATT, ISO
-      REAL                    :: FMEANS, FH1, FH2, FAGE
-      REAL                    :: QCERR  = 0.   !/XNL2 and !/NNT
-      REAL                    :: EBAND, DIFF, EFINISH, HSTOT,   &
-                                 FMEAN1, FMEANWS, MWXINIT, MWYINIT,    &
-                                 FACTOR, FACTOR2, DRAT, &
-                                 MWXFINISH, MWYFINISH, A1BAND, B1BAND
-      LOGICAL, SAVE           :: FLTEST = .FALSE., FLAGNN = .TRUE.
-      LOGICAL                 :: SHAVE
-      LOGICAL                 :: LBREAK
-      LOGICAL, SAVE           :: FIRST = .TRUE.
-      LOGICAL                 :: PrintDeltaSmDA
-      REAL                    :: eInc1, eInc2
-      REAL                    :: DELX, DELY, DELA
-!      REAL                    :: DeltaSRC(NSPEC), MAXDAC(NSPEC)
+      REAL,ALLOCATABLE       :: WN_R(:,:),CG_ICE(:,:),ALPHA_LIU(:,:),  &
+                                R(:,:), SPECINIT(:,:), SPEC2(:,:)
+      REAL,ALLOCATABLE       :: DAM (:,:), WN2 (:,:), VSLN(:,:),       &
+                                VSIN(:,:), VDIN(:,:),VSNL(:,:),        &
+                                VDNL(:,:), VSDS(:,:), VDDS(:,:),       &
+                                VSBT(:,:), VDBT(:,:), VS(:,:),         &
+                                VD(:,:),COSI(:,:)
+      LOGICAL,ALLOCATABLE    :: LLWS(:,:)
+      REAL,ALLOCATABLE       :: FOUT(:,:), SOUT(:,:), DOUT(:,:)
+      INTEGER                :: I,JJ
+      DOUBLE PRECISION       :: ATT, ISO
+      REAL                   :: FMEANS, FH1, FH2, FAGE
+      REAL                   :: QCERR  = 0.   !/XNL2 and !/NNT
+      REAL                   :: EBAND, DIFF, EFINISH, HSTOT,           &
+                                FMEAN1, FMEANWS, MWXINIT, MWYINIT,     &
+                                FACTOR, FACTOR2, DRAT, MWXFINISH,      &
+                                MWYFINISH, A1BAND, B1BAND
+      LOGICAL, SAVE          :: FLTEST = .FALSE., FLAGNN = .TRUE.
+      LOGICAL                :: SHAVE
+      LOGICAL                :: LBREAK
+      LOGICAL, SAVE          :: FIRST = .TRUE.
+      LOGICAL                :: PrintDeltaSmDA
+      REAL                   :: eInc1, eInc2
+      REAL                   :: DELX, DELY, DELA
+!      REAL                   :: DeltaSRC(NSPEC), MAXDAC(NSPEC)
  
 !!
 !!LS  Newly added time varibles
-      REAL(8)                 :: sTime1, eTime1, sTime2, eTime2,       &
-                                 sTime3, eTime3
-      REAL(8), INTENT(OUT)    :: SIN4T, SPR4T, SDS4T
+      REAL(8)                :: sTime1, eTime1, sTime2, eTime2,        &
+                                sTime3, eTime3
+      REAL(8), INTENT(OUT)   :: SIN4T, SPR4T, SDS4T
      
-      REAL,ALLOCATABLE        :: TMP1(:,:), TMP2(:,:)
-!, TMP3(:,:), TMP4(:,:)
+      REAL,ALLOCATABLE       :: TMP1(:,:), TMP2(:,:), TMP3(:,:),       &
+                                TMP4(:,:)
       INTEGER, ALLOCATABLE   :: NSTEPS(:) 
-      REAL,ALLOCATABLE       :: DTTOT(:), PHINL(:), TAUWAX(:),       &
-                                 TAUWAY(:), TAUSCX(:), TAUSCY(:),      &
-                                 BRLAMBDA(:,:)
+      REAL,ALLOCATABLE       :: DTTOT(:), PHINL(:), TAUWAX(:),         &
+                                TAUWAY(:), TAUSCX(:), TAUSCY(:),       &
+                                BRLAMBDA(:,:)
 !/
 !/ ------------------------------------------------------------------- /
 !/
   
-!      ALLOCATE(DAM(NSPEC), WN2(NSPEC), VSLN(NSPEC), SPECINIT(NSPEC),   &
-!      SPEC2(NSPEC), VSIN(NSPEC), VDIN(NSPEC), VSNL(NSPEC), VDNL(NSPEC),&
-!      VSDS(NSPEC), VDDS(NSPEC), VSBT(NSPEC), VDBT(NSPEC), VS(NSPEC),   &
-!      VD(NSPEC), EB(NK), BRLAMBDA(NSPEC), FOUT(NK,NTH), SOUT(NK,NTH),  &
-!      DOUT(NK,NTH), WN_R(NK), CG_ICE(NK), ALPHA_LIU(NK), R(NK),        &
-!      COSI(2), LLWS(NSPEC))
 
 !GPUNotes SIN4 requires these values from constants.f90, however it does
 !not automatically transfer the data even if they are declared with
@@ -512,122 +502,84 @@
 
 !/
 !/
-      ALLOCATE(DAM(NSPEC,NSEAL), WN2(NSPEC,NSEAL), VSLN(NSPEC,NSEAL), SPECINIT(NSPEC,NSEAL),   &
-      SPEC2(NSPEC,NSEAL), VSIN(NSPEC,NSEAL), VDIN(NSPEC,NSEAL), VSNL(NSPEC,NSEAL), VDNL(NSPEC,NSEAL),&
-      VSDS(NSPEC,NSEAL), VDDS(NSPEC,NSEAL), VSBT(NSPEC,NSEAL), VDBT(NSPEC,NSEAL), VS(NSPEC,NSEAL),   &
-      VD(NSPEC,NSEAL), EB(NK),  FOUT(NK,NTH), SOUT(NK,NTH),  &
-      DOUT(NK,NTH), WN_R(NK,NSEAL), CG_ICE(NK,NSEAL), ALPHA_LIU(NK,NSEAL), R(NK,NSEAL),        &
+      ALLOCATE(DAM(NSPEC,NSEAL), WN2(NSPEC,NSEAL), VSLN(NSPEC,NSEAL),  &
+      SPECINIT(NSPEC,NSEAL), SPEC2(NSPEC,NSEAL), VSIN(NSPEC,NSEAL),    &
+      VDIN(NSPEC,NSEAL), VSNL(NSPEC,NSEAL), VDNL(NSPEC,NSEAL),         &
+      VSDS(NSPEC,NSEAL), VDDS(NSPEC,NSEAL), VSBT(NSPEC,NSEAL),         &
+      VDBT(NSPEC,NSEAL), VS(NSPEC,NSEAL), VD(NSPEC,NSEAL),             &
+      FOUT(NK,NTH), SOUT(NK,NTH), DOUT(NK,NTH), WN_R(NK,NSEAL),        &
+      CG_ICE(NK,NSEAL), ALPHA_LIU(NK,NSEAL), R(NK,NSEAL),              &
       COSI(2,NSEAL), LLWS(NSPEC,NSEAL))
-      ALLOCATE(DTTOT(NSEAL),NSTEPS(NSEAL),PHINL(NSEAL),TAUWAX(NSEAL), &
-      TAUWAY(NSEAL),TAUSCX(NSEAL),TAUSCY(NSEAL),BRLAMBDA(NSPEC,NSEAL),&
+      ALLOCATE(DTTOT(NSEAL),NSTEPS(NSEAL),PHINL(NSEAL),TAUWAX(NSEAL),  &
+      TAUWAY(NSEAL),TAUSCX(NSEAL),TAUSCY(NSEAL),BRLAMBDA(NSPEC,NSEAL), &
       TMP1(4,NSEAL),TMP2(3,NSEAL), DEPTH(NSEAL), ICESCALELN(NSEAL),    &
-      ICESCALEIN(NSEAL), ICESCALENL(NSEAL), ICESCALEDS(NSEAL))
+      ICESCALEIN(NSEAL), ICESCALENL(NSEAL), ICESCALEDS(NSEAL),         &
+      TMP3(2,NSEAL), TMP4(2,NSEAL))
 #ifdef MM
 #else
-!$ACC DATA COPYIN (SPECOLD, D_INP, U10ABS, U10DIR, AS, CX, CY, ICEH)&
-!$ACC      COPY   (WN1, CG1, SPEC, USTAR, USTDIR, FPI, TAUOX    )&
-!$ACC      COPY   (TAUOY, TAUWX, TAUWY, PHIAW, PHIOC, PHICE, CHARN,TWS )&
-!$ACC      COPY   (BEDFORMS, PHIBBL, TAUBBL, TAUICE, WHITECAP, TAUWIX )&
-!$ACC      COPY   (TAUWIY, TAUWNX, TAUWNY, ICEF)&
-!$ACC      COPYOUT(VSIO, VDIO, DTDYN, FCUT)&
-!$ACC      copy(ffxfa,ffxfm)&
-!$ACC      copy(tmp2(1:3,:))&
-!$ACC      copy(tauwax(:),phinl(:),tauway(:))&
-!$ACC      copy(ffxpm,inflags2(4),mapsf(:,1:2))&
-!$ACC      copy(depth(:),brlambda(:,:),icescalenl(:))&
-!$ACC      copy(flagst(:)) &
-!$ACC      copy(icescalein(:),icescaleds(:),icescaleln(:)) & 
-!$ACC      copyin(ice(:),fachfa)& 
-!$ACC      copy(dttot(:))& 
-!$ACC      copyin(facti2) &
-!$ACC      copy(nsteps(:))& 
-!$ACC      copy(iicedisp) &
-!$ACC      copy(tmp1(:,:)) &
-!$ACC      copy(dtmin, dmin,facti1,facp,nseal,xrel,xflt,dtmax,icescales(1:4))&
-!$ACC      copy(tmp2(:,:))&
-!$ACC      copy(mapsta(:,:))
+! The remaining data requirements can be copied in implicitly corretly.
+! The use of IX, IY in MAPSTA stop this from working implicitly. 
+!$ACC DATA  copyin(mapsta(:,:))
+
+! Data is required in multiple places and not updated so is simple
+! placed on the GPU and not moved. 
+!$ACC ENTER DATA COPYIN(NK,NK2, NTH, NSPEC, NSEAL)
 #endif
-!The following lines were previously used inside the sea loop, but is no
-!longer required.
-      
-          ZWND   = ZZWND
-!          WRITE(0,*)'LBOUND,UBOUND,[SPEC,1]',LBOUND(SPEC,2),UBOUND(SPEC,2)
-!          WRITE(0,*)'NSEAL,NSPEC',NSEAL,NSPEC
-          DRAT  = DAIR / DWAT
-          IKS1 = 1
 
-          DTDYN(:)  = 0.
-          PHIAW(:)  = 0.
-          CHARN(:)  = 0.
-          TWS(:)    = 0.
-          PHIBBL(:) = 0.
-          TAUWIX(:) = 0.
-          TAUWIY(:) = 0.
-          TAUWNX(:) = 0.
-          TAUWNY(:) = 0.
-          PHICE(:) = 0.
-          TAUWX(:)=0.
-          TAUWY(:)=0.
-!The following lines were previously used inside the sea loop, but is no
-!longer required. Instead they have had additional dimensionality added.
-          DTTOT(:)  = 0.
-          NSTEPS(:) = 0.
-          PHINL(:)  = 0.
-          TAUWAX(:) = 0.
-          TAUWAY(:) = 0.
-          TAUSCX(:) = 0.
-          TAUSCY(:) = 0.
-         ! TMP3(:,:) = 0.
-         ! TMP4(:,:) = 0.
-          BRLAMBDA(:,:)=0.
+!$ACC KERNELS 
+      PHIAW(:)  = 0.
+      DTDYN(:)  = 0.
+      CHARN(:)  = 0.
+      TWS(:)    = 0.
+      PHIBBL(:) = 0.
+      TAUWIX(:) = 0.
+      TAUWIY(:) = 0.
+      TAUWNX(:) = 0.
+      TAUWNY(:) = 0.
+      PHICE(:) = 0.
+      TAUWX(:)=0.
+      TAUWY(:)=0.
 
+      DTTOT(:)  = 0.
+      NSTEPS(:) = 0.
+      PHINL(:)  = 0.
+      TAUWAX(:) = 0.
+      TAUWAY(:) = 0.
+      TAUSCX(:) = 0.
+      TAUSCY(:) = 0.
+      TMP3(:,:) = 0.
+      TMP4(:,:) = 0.
+      BRLAMBDA(:,:)=0.
+
+      VSIN(:,:) = 0.
+      VDIN(:,:) = 0.
+      VDNL(:,:) = 0.
+      VSDS(:,:) = 0.
+      VDDS(:,:) = 0.
+      VSLN(:,:) = 0.
+      VSNL(:,:) = 0.
+      VSBT(:,:) = 0.
+      VDBT(:,:) = 0.
+      ZWND   = ZZWND
+      DRAT  = DAIR / DWAT
+      IKS1 = 1
 !GPUNotes Outer seapoint loop for source term calculations
 !GPUNotes We needed to use PARALLEL instead of KERNEL for this section
 !of the code. Presumeably due to treatment of the IF condition.
-!$ACC PARALLEL 
-!$ACC LOOP GANG VECTOR 
-
-! This private statement is not working as expected currently. 
-!PRIVATE(VSIN(:,:), VDIN(:,:), VSBT(:), VDBT(:), DAM(:,:))&
-!!$ACC          PRIVATE(WN2(:), VSNL(:), VDNL(:), VSDS(:), VDDS(:))&
-!!$ACC          PRIVATE(VS(:), VD(:), LLWS(:),SPEC2(:)     )&
-!!$ACC          PRIVATE(SPECINIT(:), VSLN(:), R(:), WN_R(:), CG_ICE(:))&
-!!$ACC          PRIVATE(COSI(:))
-      DO JSEA=1, NSEAL
-        CALL INIT_GET_ISEA(ISEA, JSEA)
+!$ACC LOOP GANG VECTOR INDEPENDENT PRIVATE(EMEAN, FMEAN, FMEAN1, WNMEAN, AMAX, CD)&
+!$ACC                 PRIVATE(Z0, FMEANWS, IX, IY) 
+      DO ISEA=1, NSEAL
+!GPUNotes removed INIT_GET_ISEA as its functions is simple but its
+!application affected the parallelism of the kernel. 
+!        CALL INIT_GET_ISEA(ISEA, JSEA)
         IX     = MAPSF(ISEA,1)
         IY     = MAPSF(ISEA,2)
-        IF ( MAPSTA(IY,IX) .EQ. 1 .AND. FLAGST(JSEA)) THEN
-! Not used in this routine.
-!          DELA=1.
-!          DELX=1.
-!          DELY=1.
-#ifdef MM
-#else
-!!$ACC DATA COPYIN (INFLAGS2(:), DEPTH, U10DIR(ISEA), U10ABS(ISEA), AS(ISEA), IX, IY   )&
-!!$ACC      COPYIN (DRAT, XFLT, XREL, FACTI1, FACTI2, PHIAW(ISEA), FFXPM   )&
-!!$ACC      COPYIN (DTMAX, DTMIN, DMIN                               )&
-!!$ACC      COPY   (SPEC(:,ISEA), SPEC2(:), WN1(:,ISEA), WN2(:), WN_R(:), R(:) )&
-!!$ACC      COPY   (BRLAMBDA(:,ISEA), VSLN(:), VSIN(:), VDIN(:), LLWS(:)  )&
-!!$ACC      COPY   (VS(:), VD(:), VSNL(:), VDNL(:), VSBT(:), VDBT(:) )&
-!!$ACC      COPY   (ICESCALES(:), SPECINIT(:), CG1(:,ISEA), CG_ICE(:)     )&
-!!$ACC      COPY   (TAUBBL(ISEA,:), TAUICE(ISEA,:), COSI(:), DAM(:)            )&
-!!$ACC      COPY   (FFXFA, FFXFM, FAGE, PHIBBL(ISEA), TAUWX(ISEA), TAUWY(ISEA), FACHFA )&
-!!$ACC      COPY   (WNMEAN, FHIGH, FHIGI, NKH, NKH1, EMEAN, FMEAN    )&
-!!$ACC      COPY   (AMAX, CHARN(ISEA), FACP, SIG, FMEANWS, AFILT, NSPECH   )&
-!!$ACC      COPY   (FMEAN1, DT, CD, Z0, USTAR(ISEA), USTDIR(ISEA)      )&
-!!$ACC      COPYOUT(VSDS(:), VDDS(:))&
-!!$ACC      copy(fcut(isea),phice(:),DTDYN(isea),tauwny(isea),tauoy(isea),phioc(:),tauwix(isea),tauox(isea),tauwiy(isea),tauwnx(isea))&
-!!$ACC      COPYOUT(FH1, FH2)&
-!!$ACC      COPY( TAUWAX(ISEA),TAUWAY(ISEA),DTTOT(ISEA),NSTEPS(ISEA),PHINL(ISEA),TAUSCX(ISEA),TAUSCY(ISEA))
-#endif
-          TMP1(1:4,ISEA)   = WHITECAP(ISEA,1:4)
-          TMP2(1:3,ISEA)   = BEDFORMS(ISEA,1:3)
-! No longer required since we are not using thread private arrays.
-!          TMP3(1:2,ISEA)   = TAUBBL(ISEA,1:2)
-!          TMP4(1:2,ISEA)   = TAUICE(ISEA,1:2)
+        IF ( MAPSTA(IY,IX) .EQ. 1 .AND. FLAGST(ISEA)) THEN
+          TMP1(:,ISEA)   = WHITECAP(ISEA,:)
+          TMP2(:,ISEA)   = BEDFORMS(ISEA,:)
 
-
+          TMP3(:,ISEA)   = TAUBBL(ISEA,:)
+          TMP4(:,ISEA)   = TAUICE(ISEA,:)
           DEPTH(ISEA)  = MAX ( DMIN , D_INP(ISEA) )
           ICESCALELN(ISEA) = MAX(0.,MIN(1.,1.-ICE(ISEA)*ICESCALES(1)))
           ICESCALEIN(ISEA) = MAX(0.,MIN(1.,1.-ICE(ISEA)*ICESCALES(2)))
@@ -635,20 +587,6 @@
           ICESCALEDS(ISEA) = MAX(0.,MIN(1.,1.-ICE(ISEA)*ICESCALES(4)))
           IS1=(IKS1-1)*NTH+1
 !
-!$ACC LOOP 
-          DO ISPEC=1,NSPEC
-            VSIN(ISPEC,ISEA) = 0.
-            VDIN(ISPEC,ISEA) = 0.
-            VDNL(ISPEC,ISEA) = 0.
-            VSDS(ISPEC,ISEA) = 0.
-            VDDS(ISPEC,ISEA) = 0.
-            VSLN(ISPEC,ISEA) = 0.
-            VSNL(ISPEC,ISEA) = 0.
-            VSBT(ISPEC,ISEA) = 0.
-            VDBT(ISPEC,ISEA) = 0.
-          END DO
-!
-  
 !
 ! 1.  Preparations --------------------------------------------------- *
 !
@@ -660,7 +598,7 @@
 !GPUNotes loop over frequencies
 !$ACC LOOP 
           DO IK=1, NK
-            DAM(1+(IK-1)*NTH,ISEA) = FACP / ( SIG(IK) * WN1(IK,ISEA)**3 )
+            DAM(1+(IK-1)*NTH,ISEA) = FACP / ( SIG(IK) * WN1(IK,ISEA)**3)
             WN2(1+(IK-1)*NTH,ISEA) = WN1(IK,ISEA)
           END DO
   
@@ -692,30 +630,29 @@
                          FMEAN, FMEAN1, WNMEAN, AMAX, U10ABS(ISEA),    &
                          U10DIR(ISEA), USTAR(ISEA), USTDIR(ISEA),      &
                          TAUWX(ISEA), TAUWY(ISEA), CD, Z0, CHARN(ISEA),&
-                         LLWS(:,ISEA), FMEANWS)
+                         LLWS(:,ISEA), FMEANWS,ISEA)
   
-             CALL W3SIN4(SPEC(:,ISEA), CG1(:,ISEA), WN2(:,ISEA), U10ABS(ISEA), &
-                         USTAR(ISEA), DRAT, AS(ISEA), U10DIR(ISEA), Z0,&
-                         CD, TAUWX(ISEA), TAUWY(ISEA), TAUWAX(ISEA), TAUWAY(ISEA), &
-                         VSIN(:,ISEA), VDIN(:,ISEA), LLWS(:,ISEA), IX, IY, &
-                         BRLAMBDA(:,ISEA))
+             CALL W3SIN4(SPEC(:,ISEA), CG1(:,ISEA), WN2(:,ISEA),       &
+                         U10ABS(ISEA), USTAR(ISEA), DRAT, AS(ISEA),    &
+                         U10DIR(ISEA), Z0, CD, TAUWX(ISEA),            &
+                         TAUWY(ISEA), TAUWAX(ISEA), TAUWAY(ISEA),      &
+                         VSIN(:,ISEA), VDIN(:,ISEA), LLWS(:,ISEA), IX, &
+                         IY, BRLAMBDA(:,ISEA))
           END IF
 !GPUNotes call below will contain source term specific spectral loops
 !      CALL CPU_TIME(sTime1)
-            CALL W3SPR4 (SPEC(:,ISEA), CG1(:,ISEA), WN1(:,ISEA), EMEAN, FMEAN, FMEAN1, WNMEAN, &
-                         AMAX, U10ABS(ISEA), U10DIR(ISEA), USTAR(ISEA), USTDIR(ISEA),      &
-                         TAUWX(ISEA), TAUWY(ISEA), CD, Z0, CHARN(ISEA), LLWS(:,ISEA), FMEANWS)
+          CALL W3SPR4 (SPEC(:,ISEA), CG1(:,ISEA), WN1(:,ISEA), EMEAN,&
+                         FMEAN, FMEAN1, WNMEAN, AMAX, U10ABS(ISEA),    &
+                         U10DIR(ISEA), USTAR(ISEA), USTDIR(ISEA),      &
+                         TAUWX(ISEA), TAUWY(ISEA), CD, Z0, CHARN(ISEA),&
+                         LLWS(:,ISEA), FMEANWS,ISEA)
 !      CALL CPU_TIME(eTime1)
 !      SPR4T = SPR4T + eTime1 - sTime1
-            TWS(ISEA) = 1./FMEANWS
+          TWS(ISEA) = 1./FMEANWS
 !
 ! 1.c2 Stores the initial data
 !
-          
-!$ACC LOOP
-          DO ISPEC=1,NSPEC
-             SPECINIT(ISPEC,ISEA) = SPEC(ISPEC,ISEA)
-          END DO
+          SPECINIT(:,ISEA) = SPEC(:,ISEA)
 ! 1.d Stresses
 !
 ! 1.e Prepare cut-off beyond which the tail is imposed with a power law
@@ -723,10 +660,10 @@
 ! Introduces a Long & Resio (JGR2007) type dependance on wave age
 ! !/ST4      FAGE   = FFXFA*TANH(0.3*U10ABS*FMEANWS*TPI/GRAV)
           FAGE   = 0.
-          FHIGH  = MAX( (FFXFM + FAGE ) * MAX(FMEAN1,FMEANWS), FFXPM / USTAR(ISEA))
+          FHIGH  = MAX( (FFXFM + FAGE ) * MAX(FMEAN1,FMEANWS), FFXPM &
+                   / USTAR(ISEA))
           FHIGI  = FFXFA * FMEAN1
        
-!!$ACC END PARALLEL
 !
 ! 1.f Prepare output file for !/NNT option
 !
@@ -734,25 +671,32 @@
 !GPUNotes loop for explicit time integration of source terms
 !GPUNotes this might be a pain in the proverbial for tightening
 !GPUNotes the seapoint and spectral loops
- 
-          DO
+
+!GPUNotes Bodged DO WHILE LOOP, it is required to be sequential but the
+!compiler panics. Setting it to loop over a larger extent and leaving
+!the EXIT statements in gives us the output we require.
+
+!$ACC LOOP SEQ
+          DO I=1,120 
             NSTEPS(ISEA) = NSTEPS(ISEA) + 1
 ! 2.  Calculate source terms ----------------------------------------- *
 ! 2.a Input.
 !
-
-            CALL W3SLN1 (WN1(:,ISEA), FHIGH, USTAR(ISEA), U10DIR(ISEA), VSLN(:,ISEA) )
-            NKH    = MIN ( NK , INT(FACTI2+FACTI1*LOG(MAX(1.E-7,FHIGH))) )
-            NKH1   = MIN ( NK , NKH+1 )
+            CALL W3SLN1 (WN1(:,ISEA), FHIGH, USTAR(ISEA), &
+            U10DIR(ISEA), VSLN(:,ISEA) )
+            NKH    = MIN (NK, INT(FACTI2+FACTI1*LOG(MAX(1.E-7,FHIGH))))
+            NKH1   = MIN (NK, NKH+1 )
             NSPECH = NKH1*NTH
-            DT     = MIN ( DTG-DTTOT(ISEA) , DTMAX )
-            AFILT  = MAX ( DAM(NSPEC,ISEA) , XFLT*AMAX )
+            DT     = MIN (DTG-DTTOT(ISEA), DTMAX )
+            AFILT  = MAX (DAM(NSPEC,ISEA), XFLT*AMAX )
   
 !        CALL CPU_TIME(sTime2) 
-            CALL W3SIN4 (SPEC(:,ISEA), CG1(:,ISEA), WN2(:,ISEA), U10ABS(ISEA), &
-                         USTAR(ISEA), DRAT, AS(ISEA), U10DIR(ISEA), Z0,&
-                         CD, TAUWX(ISEA), TAUWY(ISEA), TAUWAX(ISEA), TAUWAY(ISEA), &
-                         VSIN(:,ISEA), VDIN(:,ISEA), LLWS(:,ISEA), IX, IY, BRLAMBDA(:,ISEA))
+            CALL W3SIN4(SPEC(:,ISEA), CG1(:,ISEA), WN2(:,ISEA),        &
+                        U10ABS(ISEA), USTAR(ISEA), DRAT, AS(ISEA),     &
+                        U10DIR(ISEA), Z0, CD, TAUWX(ISEA), TAUWY(ISEA),&
+                        TAUWAX(ISEA), TAUWAY(ISEA), VSIN(:,ISEA),      &
+                        VDIN(:,ISEA), LLWS(:,ISEA), IX, IY,            &
+                        BRLAMBDA(:,ISEA))
 !        CALL CPU_TIME(eTime2)
 !        SIN4T = SIN4T + eTime2 - sTime2
 !
@@ -760,7 +704,8 @@
   
 !GPUnotes subruoutine will contain source term specific spectral loops
   
-            CALL W3SNL1 (SPEC(:,ISEA), CG1(:,ISEA), DEPTH(ISEA)*WNMEAN, VSNL(:,ISEA), VDNL(:,ISEA) )
+            CALL W3SNL1 (SPEC(:,ISEA), CG1(:,ISEA), DEPTH(ISEA)*WNMEAN,&
+                         VSNL(:,ISEA), VDNL(:,ISEA), ISEA )
   
 ! 2.c Dissipation... except for ST4
 ! 2.c1   as in source term package
@@ -769,8 +714,9 @@
   
 !        CALL CPU_TIME(sTime3)
             CALL W3SDS4(SPEC(:,ISEA), WN1(:,ISEA), CG1(:,ISEA),        &
-                      USTAR(ISEA), USTDIR(ISEA), DEPTH(ISEA), VSDS(:,ISEA), &
-                      VDDS(:,ISEA), IX, IY, BRLAMBDA(:,ISEA),TMP1(1:4,ISEA) )
+                        USTAR(ISEA), USTDIR(ISEA), DEPTH(ISEA),        &
+                        VSDS(:,ISEA), VDDS(:,ISEA), IX, IY,            &
+                        BRLAMBDA(:,ISEA),TMP1(1:4,ISEA), ISEA)  
           
 !        CALL CPU_TIME(eTime3)
 !        SDS4T = SDS4T + eTime3 - sTime3
@@ -803,33 +749,32 @@
 !knockon affect of gang and vector sizes since they must be consistant
 !between kernel blocks.
             IF ( INFLAGS2(4) ) THEN
-              VSNL(1:NSPECH,ISEA) = ICESCALENL(ISEA) * VSNL(1:NSPECH,ISEA)
-              VDNL(1:NSPECH,ISEA) = ICESCALENL(ISEA) * VDNL(1:NSPECH,ISEA)
-              VSLN(1:NSPECH,ISEA) = ICESCALELN(ISEA) * VSLN(1:NSPECH,ISEA)
-              VSIN(1:NSPECH,ISEA) = ICESCALEIN(ISEA) * VSIN(1:NSPECH,ISEA)
-              VDIN(1:NSPECH,ISEA) = ICESCALEIN(ISEA) * VDIN(1:NSPECH,ISEA)
-              VSDS(1:NSPECH,ISEA) = ICESCALEDS(ISEA) * VSDS(1:NSPECH,ISEA)
-              VDDS(1:NSPECH,ISEA) = ICESCALEDS(ISEA) * VDDS(1:NSPECH,ISEA)
+              VSNL(1:NSPECH,ISEA) = ICESCALENL(ISEA)*VSNL(1:NSPECH,ISEA)
+              VDNL(1:NSPECH,ISEA) = ICESCALENL(ISEA)*VDNL(1:NSPECH,ISEA)
+              VSLN(1:NSPECH,ISEA) = ICESCALELN(ISEA)*VSLN(1:NSPECH,ISEA)
+              VSIN(1:NSPECH,ISEA) = ICESCALEIN(ISEA)*VSIN(1:NSPECH,ISEA)
+              VDIN(1:NSPECH,ISEA) = ICESCALEIN(ISEA)*VDIN(1:NSPECH,ISEA)
+              VSDS(1:NSPECH,ISEA) = ICESCALEDS(ISEA)*VSDS(1:NSPECH,ISEA)
+              VDDS(1:NSPECH,ISEA) = ICESCALEDS(ISEA)*VDDS(1:NSPECH,ISEA)
             END IF
-            !WRITE(0,*)'TEST VSNL,VSLN,VSIN,VSDS',VSNL(NSPEC),VSLN(NSPEC),VSIN(NSPEC),VSDS(NSPEC)
-            NKI    = MAX ( 2 , MIN ( NKH1 ,                           &
-                     INT ( FACTI2 + FACTI1*LOG(MAX(1.E-7,FFXFI* FMEAN1)) ) ) )
+            NKI    = MAX( 2 , MIN ( NKH1 ,                           &
+                     INT(FACTI2+FACTI1*LOG(MAX(1.E-7,FFXFI* FMEAN1)))))
 !GPUNotes spectral loop up to frequency cut off
             VS(:,ISEA) = 0.
             VD(:,ISEA) = 0.
-!$ACC LOOP 
+!$ACC LOOP
             DO IS=IS1, NSPECH
-              VS(IS,ISEA) = VSLN(IS,ISEA) + VSIN(IS,ISEA) + VSNL(IS,ISEA)  &
+              VS(IS,ISEA)=VSLN(IS,ISEA) + VSIN(IS,ISEA) + VSNL(IS,ISEA)&
                      + VSDS(IS,ISEA) + VSBT(IS,ISEA)
-              VD(IS,ISEA) =  VDIN(IS,ISEA) + VDNL(IS,ISEA)  &
-                     + VDDS(IS,ISEA) + VDBT(IS,ISEA)
-              DAMAX  = MIN ( DAM(IS,ISEA) , MAX ( XREL*SPECINIT(IS,ISEA) , AFILT ) )
-              AFAC   = 1. / MAX( 1.E-10 , ABS(VS(IS,ISEA)/DAMAX) )
-              DT     = MIN ( DT , AFAC / ( MAX ( 1.E-10,                  &
-                             1. + OFFSET*AFAC*MIN(0.,VD(IS,ISEA)) ) ) )
+              VD(IS,ISEA)=VDIN(IS,ISEA) + VDNL(IS,ISEA) + VDDS(IS,ISEA)&
+                     + VDBT(IS,ISEA)
+              DAMAX  = MIN(DAM(IS,ISEA), MAX(XREL*SPECINIT(IS,ISEA),   &
+                                             AFILT))
+              AFAC   = 1. / MAX(1.E-10 , ABS(VS(IS,ISEA)/DAMAX))
+              DT     = MIN(DT, AFAC / (MAX ( 1.E-10, 1.+OFFSET*AFAC*   &
+                                       MIN(0.,VD(IS,ISEA)) ) ) )
             END DO! end of loop on IS
 !            WRITE(*,*) 'NODE_NUMBER', IX
-            !WRITE(0,*)'TEST VS/VD',VS(NSPEC),VD(NSPEC)
 !            IF (IX == DEBUG_NODE) WRITE(*,*) 'TIMINGS 1', DT
             DT     = MAX ( 0.5, DT ) 
 ! Here we have a hardlimit, which is not too usefull, at least not as a fixed con
@@ -871,7 +816,7 @@
   
 !$ACC LOOP 
                 DO IS=IS1, NSPECH
-                  eInc1 = VS(IS,ISEA) * DT / MAX ( 1. , (1.-HDT*VD(IS,ISEA)))
+                  eInc1 = VS(IS,ISEA)*DT/MAX(1.,(1.-HDT*VD(IS,ISEA)))
                   eInc2 = SIGN ( MIN (DAM(IS,ISEA),ABS(eInc1)) , eInc1 )
                   SPEC(IS,ISEA) = MAX ( 0. , SPEC(IS,ISEA)+eInc2 )
                 END DO
@@ -879,10 +824,10 @@
 !
 !GPUNotes Running sequentially due to the recursive use of eIncX, adding
 !loop independent does not force the loop to be parallel as it should.
-!$ACC LOOP
+!$ACC LOOP 
                 DO IS=IS1, NSPECH
-                  eInc1 = VS(IS,ISEA) * DT / MAX ( 1. , (1.-HDT*VD(IS,ISEA)))
-                  SPEC(IS,ISEA) = MAX ( 0. , SPEC(IS,ISEA)+eInc1 )
+                  eInc1 = VS(IS,ISEA)*DT/MAX(1.,(1.-HDT*VD(IS,ISEA)))
+                  SPEC(IS,ISEA) = MAX( 0. , SPEC(IS,ISEA)+eInc1 )
                 END DO
               END IF
             END IF
@@ -910,13 +855,15 @@
                 IS   = (IK-1)*NTH + ITH
                 COSI(1,ISEA)=ECOS(IS)
                 COSI(2,ISEA)=ESIN(IS)
-                PHIAW(ISEA) = PHIAW(ISEA) + (VSIN(IS,ISEA))* DT * FACTOR        &
+                PHIAW(ISEA) = PHIAW(ISEA) + VSIN(IS,ISEA) * DT * FACTOR&
                   / MAX ( 1. , (1.-HDT*VDIN(IS,ISEA))) ! semi-implict integration scheme
-                PHIBBL(ISEA)= PHIBBL(ISEA)- (VSBT(IS,ISEA))* DT * FACTOR                    &
+                PHIBBL(ISEA)= PHIBBL(ISEA)- VSBT(IS,ISEA) * DT * FACTOR&
                  / MAX ( 1. , (1.-HDT*VDBT(IS,ISEA))) ! semi-implict integration scheme
-                PHINL(ISEA) = PHINL(ISEA) + VSNL(IS,ISEA)* DT * FACTOR                      &
+                PHINL(ISEA) = PHINL(ISEA) + VSNL(IS,ISEA) * DT * FACTOR&
                  / MAX ( 1. , (1.-HDT*VDNL(IS,ISEA))) ! semi-implict integration scheme
-                IF (VSIN(IS,ISEA).GT.0.) TMP1(3,ISEA) = TMP1(3,ISEA) + SPEC(IS,ISEA)  * FACTOR
+                IF (VSIN(IS,ISEA).GT.0.) THEN
+                  TMP1(3,ISEA) = TMP1(3,ISEA) + SPEC(IS,ISEA)  * FACTOR
+                END IF
                 HSTOT = HSTOT + SPEC(IS,ISEA) * FACTOR
               END DO
             END DO
@@ -932,9 +879,11 @@
 !
 !GPUNotes source term specific loops over spectrum in this call
 !        CALL CPU_TIME(sTime1)
-            CALL W3SPR4 (SPEC(:,ISEA), CG1(:,ISEA), WN1(:,ISEA), EMEAN, FMEAN, FMEAN1, WNMEAN, &
-                       AMAX, U10ABS(ISEA), U10DIR(ISEA), USTAR(ISEA), USTDIR(ISEA),            &
-                       TAUWX(ISEA), TAUWY(ISEA), CD, Z0, CHARN(ISEA), LLWS(:,ISEA), FMEANWS)
+            CALL W3SPR4 (SPEC(:,ISEA), CG1(:,ISEA), WN1(:,ISEA), EMEAN,&
+                         FMEAN, FMEAN1, WNMEAN, AMAX, U10ABS(ISEA),    &
+                         U10DIR(ISEA), USTAR(ISEA), USTDIR(ISEA),      &
+                         TAUWX(ISEA), TAUWY(ISEA), CD, Z0, CHARN(ISEA),&
+                         LLWS(:,ISEA), FMEANWS, ISEA)
 !        CALL CPU_TIME(eTime1)
 !        SPR4T = SPR4T + eTime1 - sTime1
 !
@@ -965,16 +914,20 @@
 !$ACC LOOP 
             DO IK=NKH+1, NK
               DO ITH=1, NTH
-                SPEC(ITH+(IK-1)*NTH,ISEA) = SPEC(ITH+(IK-2)*NTH,ISEA) * FACHFA         
+                SPEC(ITH+(IK-1)*NTH,ISEA) = SPEC(ITH+(IK-2)*NTH,ISEA) &
+                * FACHFA         
               END DO
             END DO
 !
 ! 6.e  Update wave-supported stress----------------------------------- *
 !
 !        CALL CPU_TIME(sTime2) 
-            CALL W3SIN4 ( SPEC(:,ISEA), CG1(:,ISEA), WN2(:,ISEA), U10ABS(ISEA), USTAR(ISEA), DRAT, AS(ISEA), &
-                     U10DIR(ISEA), Z0, CD, TAUWX(ISEA), TAUWY(ISEA), TAUWAX(ISEA), TAUWAY(ISEA),       &
-                     VSIN(:,ISEA), VDIN(:,ISEA), LLWS(:,ISEA), IX, IY, BRLAMBDA(:,ISEA) )
+            CALL W3SIN4(SPEC(:,ISEA), CG1(:,ISEA), WN2(:,ISEA),        &
+                        U10ABS(ISEA), USTAR(ISEA), DRAT, AS(ISEA),     &
+                        U10DIR(ISEA), Z0, CD, TAUWX(ISEA), TAUWY(ISEA),&
+                        TAUWAX(ISEA), TAUWAY(ISEA), VSIN(:,ISEA),      &
+                        VDIN(:,ISEA), LLWS(:,ISEA), IX, IY,            &
+                        BRLAMBDA(:,ISEA) )
 !        CALL CPU_TIME(eTime2)
 !        SIN4T = SIN4T + eTime2 - sTime2
 ! 7.  Check if integration complete ---------------------------------- *
@@ -994,7 +947,6 @@
           DTDYN(ISEA)  = DTDYN(ISEA) / REAL(MAX(1,NSTEPS(ISEA)))
           FCUT(ISEA)   = FHIGH * TPIINV
 !
-!
 ! Error escape locations
 !
 !
@@ -1010,37 +962,36 @@
           EFINISH  = 0.
           MWXFINISH  = 0.
           MWYFINISH  = 0.
-!$ACC LOOP SEQ REDUCTION(MWYFINISH, MWXFINISH, EFINISH)
+!$ACC LOOP REDUCTION(MWYFINISH, MWXFINISH, EFINISH)
           DO IK=1, NK
             EBAND = 0.
             A1BAND = 0.
             B1BAND = 0.
-!$ACC LOOP SEQ REDUCTION(a1band, b1band, eband)
+!$ACC LOOP REDUCTION(A1BAND, B1BAND, EBAND)
             DO ITH=1, NTH
-              DIFF = SPECINIT(ITH+(IK-1)*NTH,ISEA)-SPEC(ITH+(IK-1)*NTH,ISEA)
+              DIFF = SPECINIT(ITH+(IK-1)*NTH,ISEA)- &
+                     SPEC(ITH+(IK-1)*NTH,ISEA)
               EBAND = EBAND + DIFF
               A1BAND = A1BAND + DIFF*ECOS(ITH)
               B1BAND = B1BAND + DIFF*ESIN(ITH)
             END DO
             EFINISH  = EFINISH  + EBAND * DDEN(IK) / CG1(IK,ISEA)
-            MWXFINISH  = MWXFINISH  + A1BAND * DDEN(IK) / CG1(IK,ISEA)        &
-                      * WN1(IK,ISEA)/SIG(IK)
-            MWYFINISH  = MWYFINISH  + B1BAND * DDEN(IK) / CG1(IK,ISEA)        &
-                      * WN1(IK,ISEA)/SIG(IK)
+            MWXFINISH  = MWXFINISH  + A1BAND * DDEN(IK)                &
+                         / CG1(IK,ISEA) * WN1(IK,ISEA)/SIG(IK)
+            MWYFINISH  = MWYFINISH  + B1BAND * DDEN(IK)                &
+                         / CG1(IK,ISEA) * WN1(IK,ISEA)/SIG(IK)
           END DO
 !
 ! Transformation in momentum flux in m^2 / s^2
 !
-          TAUBBL(ISEA,:)=0
-          TAUOX(ISEA)=(GRAV*MWXFINISH+TAUWIX(ISEA)-TAUBBL(ISEA,1))/DTG
-          TAUOY(ISEA)=(GRAV*MWYFINISH+TAUWIY(ISEA)-TAUBBL(ISEA,2))/DTG
+          TMP3(:,ISEA)=0
+          TAUOX(ISEA)=(GRAV*MWXFINISH+TAUWIX(ISEA)-TMP3(1,ISEA))/DTG
+          TAUOY(ISEA)=(GRAV*MWYFINISH+TAUWIY(ISEA)-TMP3(2,ISEA))/DTG
           TAUWIX(ISEA)=TAUWIX(ISEA)/DTG
           TAUWIY(ISEA)=TAUWIY(ISEA)/DTG
           TAUWNX(ISEA)=TAUWNX(ISEA)/DTG
           TAUWNY(ISEA)=TAUWNY(ISEA)/DTG
-!CODENotes: TAUBBL is initialised and 0 and doesn't change so this line
-!isnt needed.
-          TAUBBL(ISEA,:)=TAUBBL(ISEA,:)/DTG
+          TMP3(:,ISEA)=TMP3(:,ISEA)/DTG
 !
 ! Transformation in wave energy flux in W/m^2=kg / s^3
 !
@@ -1055,7 +1006,6 @@
 !
    
           IF ( INFLAGS2(4).AND.ICE(ISEA).GT.0 ) THEN
-!            STOP 
             IF (IICEDISP) THEN
               ICECOEF2 = 1E-6
 !             CALL LIU_FORWARD_DISPERSION (ICEH,ICECOEF2,DEPTH, &
@@ -1063,20 +1013,14 @@
 !
               IF (IICESMOOTH) THEN
               END IF
-            ELSE
-!$ACC LOOP 
-              DO IK=1,NK
-                WN_R(IK,ISEA)=WN1(IK,ISEA)
-                CG_ICE(IK,ISEA)=CG1(IK,ISEA)
-              END DO
+              WN_R(:,ISEA)=WN1(:,ISEA)
+              CG_ICE(:,ISEA)=CG1(:,ISEA)
             END IF
 !
             R(:,ISEA)=1 ! In case IC2 is defined but not IS2
-  
             SPEC2(:,ISEA) = SPEC(:,ISEA)
 !
-           
-            TAUICE(:,ISEA) = 0.
+            TMP4(:,ISEA) = 0.
             PHICE(ISEA) = 0.
   
 !CODENotes: Previously was stored inside following IK loop, but due to
@@ -1085,7 +1029,8 @@
 ! First part of ice term integration: dissipation part
 !
             ATT=1.
-            SPEC(1+(IK-1)*NTH:NTH+(IK-1)*NTH,ISEA) = ATT*SPEC2(1+(IK-1)*NTH:NTH+(IK-1)*NTH,ISEA)
+            SPEC(1+(IK-1)*NTH:NTH+(IK-1)*NTH,ISEA) =                   &
+              ATT*SPEC2(1+(IK-1)*NTH:NTH+(IK-1)*NTH,ISEA)
 !
   
 !GPUNotes These spectral loops are for ice effects?
@@ -1097,20 +1042,22 @@
 ! 10.2  Fluxes of energy and momentum due to ice effects
 !
 !GPUNotes Moved FACTOR and FACTOR2 inside lopp for collapse.
-!$ACC LOOP SEQ COLLAPSE(2)
+!$ACC LOOP COLLAPSE(2)
             DO IK=1,NK
               DO ITH = 1,NTH
               FACTOR = DDEN(IK)/CG1(IK,ISEA)                  !Jacobian to get energy in band
               FACTOR2= FACTOR*GRAV*WN1(IK,ISEA)/SIG(IK)       ! coefficient to get momentum
                 IS = ITH+(IK-1)*NTH
-                PHICE(ISEA) = PHICE(ISEA) + (SPEC(IS,ISEA)-SPEC2(IS,ISEA)) * FACTOR
+                PHICE(ISEA) = PHICE(ISEA) + (SPEC(IS,ISEA)-SPEC2(IS,   &
+                              ISEA)) * FACTOR
                 COSI(1,ISEA)=ECOS(IS)
                 COSI(2,ISEA)=ESIN(IS)
-                TAUICE(:,ISEA) = TAUICE(:,ISEA) - (SPEC(IS,ISEA)-SPEC2(IS,ISEA))*FACTOR2*COSI(:,ISEA)
+                TMP4(:,ISEA) = TMP4(:,ISEA) -(SPEC(IS,ISEA)-SPEC2(IS,&
+                ISEA))*FACTOR2*COSI(:,ISEA)
               END DO
             END DO
             PHICE(ISEA) =-1.*DWAT*GRAV*PHICE(ISEA) /DTG
-            TAUICE(:,ISEA)=TAUICE(:,ISEA)/DTG
+            TMP4(:,ISEA)=TMP4(:,ISEA)/DTG
           ELSE
           END IF
   
@@ -1133,35 +1080,29 @@
    
           IF (IT.EQ.0) SPEC(:,ISEA) = SPECINIT(:,ISEA)
           SPEC(:,ISEA) = MAX(0., SPEC(:,ISEA))
-  
 !LINE FROM W3WAVE
 !          SIN4TOT = SIN4TOT + SIN4T
 !          SPR4TOT = SPR4TOT + SPR4T
 !          SDS4TOT = SDS4TOT + SDS4T
 
-          WHITECAP(ISEA,:) = TMP1(1:4,ISEA)
-          BEDFORMS(ISEA,:) = TMP2(1:3,ISEA)
-!          TAUBBL(ISEA,:) = TMP3(:,ISEA)
-!          TAUICE(ISEA,:) = TMP4(:,ISEA)
+          WHITECAP(ISEA,:) = TMP1(:,ISEA)
+          BEDFORMS(ISEA,:) = TMP2(:,ISEA)
+          TAUBBL(ISEA,:) = TMP3(:,ISEA)
+          TAUICE(ISEA,:) = TMP4(:,ISEA)
         ELSE
-          USTAR   (JSEA) = UNDEF
-          USTDIR(JSEA) = UNDEF
-          DTDYN (JSEA) = UNDEF
-          FCUT  (JSEA) = UNDEF
-          SPEC(:,JSEA)  = 0.
+          USTAR   (ISEA) = UNDEF
+          USTDIR(ISEA) = UNDEF
+          DTDYN (ISEA) = UNDEF
+          FCUT  (ISEA) = UNDEF
+          SPEC(:,ISEA)  = 0.
         END IF
       END DO
 
-!$ACC END PARALLEL
+!$ACC END KERNELS 
 #ifdef MM
 #else
 !$ACC END DATA
 #endif
-      DEALLOCATE(DAM, WN2, VSLN, SPECINIT, SPEC2, VSIN, VDIN, VSNL, VDNL,&
-      VSDS, VDDS, VSBT, VDBT, VS, VD, EB,  FOUT, SOUT, DOUT, WN_R, &
-      CG_ICE, ALPHA_LIU, R,   COSI, LLWS)
-      DEALLOCATE(DTTOT, NSTEPS, PHINL, TAUWAX, TAUWAY, TAUSCX, TAUSCY, &
-                 BRLAMBDA,TMP1,TMP2)
       RETURN
 
 ! Formats

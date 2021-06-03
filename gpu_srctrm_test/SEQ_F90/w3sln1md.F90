@@ -137,7 +137,7 @@
 !
 !/ ------------------------------------------------------------------- /
       USE CONSTANTS,ONLY: GRAV
-      USE W3GDATMD, ONLY: NTH, NK, ECOS, ESIN, SIG, SLNC1, FSPM, FSHF
+      USE W3GDATMD, ONLY: NTH, NK, ECOS, ESIN, SIG, SLNC1,FSPM,FSHF
       USE W3ODATMD, ONLY: NDSE, NDST
       USE W3SERVMD, ONLY: EXTCDE
 !/
@@ -147,14 +147,15 @@
 !/ Parameter list
 !/
       REAL, INTENT(IN)        :: K(NK), FHIGH, USTAR, USDIR
-      REAL, INTENT(OUT)       :: S(NTH,NK)
+      REAL, INTENT(OUT)       :: S(NTH, NK)
 !/
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
 !/
       INTEGER                 :: ITH, IK
-      REAL                    :: COSU, SINU, DIRF(NTH), FAC, FF1, FF2, &
-                                 FFILT, RFR, WNF(NK)
+      REAL                    :: COSU, SINU, FAC, FF1, FF2, &
+                                 FFILT, RFR
+      REAL                    :: DIRF(NTH), WNF(NK)
 !/
 !/ ------------------------------------------------------------------- /
 !/
@@ -171,10 +172,7 @@
       FFILT  = MIN ( MAX(FF1,FF2) , 2.*SIG(NK) )
 !
 !GPUNotes loop over directions
-!$ACC LOOP INDEPENDENT
-      DO ITH=1, NTH
-        DIRF(ITH) = MAX ( 0. , (ECOS(ITH)*COSU+ESIN(ITH)*SINU) )**4
-      END DO
+      DIRF(:) = MAX ( 0. , (ECOS(:)*COSU+ESIN(:)*SINU) )**4
 !
 !      FAC    = SLNC1 * USTAR**4
 !      FF1    = FSPM * GRAV/(28.*USTAR)
@@ -182,7 +180,7 @@
 !      FFILT  = MIN ( MAX(FF1,FF2) , 2.*SIG(NK) )
 !
 !GPUNotes loop over frequencies no dependence on above
-!$ACC LOOP INDEPENDENT
+!$ACC LOOP 
       DO IK=1, NK
         RFR    = SIG(IK) / FFILT
         IF ( RFR .LT. 0.5 ) THEN
@@ -198,7 +196,7 @@
 !GPUNotes replaced array format with loop in order to use ACC LOOP
 !statement
 
-!$ACC LOOP INDEPENDENT COLLAPSE(2)
+!$ACC LOOP COLLAPSE(2)
       DO IK=1, NK
         DO ITH=1, NTH
           S(ITH,IK) = WNF(IK) * DIRF(ITH)

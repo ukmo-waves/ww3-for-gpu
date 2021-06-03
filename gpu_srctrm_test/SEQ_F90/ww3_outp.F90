@@ -1288,7 +1288,7 @@
 !
                 CALL W3SPR4 (A, CG, WN, EMEAN, FMEAN,  FMEAN1,         &
                              WNMEAN, AMAX, UABS, UDIRR, USTAR, USTD,   &
-                             TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS)
+                             TAUWX, TAUWY, CD, Z0, CHARN, LLWS,FMEANWS)
 !
                 DO ITT=1, 3
                   IX=1
@@ -1298,7 +1298,7 @@
                                TAUWNX, TAUWNY, XIN, DIA, LLWS, IX, IY, LAMBDA )
                   CALL W3SPR4 (A, CG, WN, EMEAN, FMEAN,  FMEAN1,      &
                              WNMEAN, AMAX, UABS, UDIRR, USTAR, USTD,&
-                             TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS )
+                             TAUWX, TAUWY, CD, Z0, CHARN, LLWS,FMEANWS)
                   END DO
 !
 ! Add alternative flux calculations here as part of !/ST2 option ....
@@ -1347,12 +1347,12 @@
 !
                 CALL W3SPR4 (A, CG, WN, EMEAN, FMEAN,  FMEAN1,        &
                              WNMEAN, AMAX, UABS, UDIRR, USTAR, USTD,&
-                             TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS )
+                             TAUWX, TAUWY, CD, Z0, CHARN, LLWS,FMEANWS)
 !
                 DO ITT=1, 3
                 CALL W3SPR4 (A, CG, WN, EMEAN, FMEAN, FMEAN1,        &
                              WNMEAN, AMAX, UABS, UDIRR, USTAR, USTD,&
-                             TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS )
+                             TAUWX, TAUWY, CD, Z0, CHARN, LLWS,FMEANWS)
                   CALL W3SIN4 ( A, CG, WN2, UABS, USTAR, DAIR/DWAT,&
                                 ASO(J), UDIRR, Z0, CD,TAUWX, TAUWY, &
                                 TAUWNX, TAUWNY, XIN, DIA, LLWS, IX, IY, LAMBDA )
