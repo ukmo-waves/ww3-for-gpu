@@ -521,10 +521,11 @@
 ! The use of IX, IY in MAPSTA stop this from working implicitly. 
 !$ACC DATA  copyin(mapsta(:,:))
 
+#endif
+
 ! Data is required in multiple places and not updated so is simple
 ! placed on the GPU and not moved. 
 !$ACC ENTER DATA COPYIN(NK,NK2, NTH, NSPEC, NSEAL)
-#endif
 
 !$ACC KERNELS 
       PHIAW(:)  = 0.
