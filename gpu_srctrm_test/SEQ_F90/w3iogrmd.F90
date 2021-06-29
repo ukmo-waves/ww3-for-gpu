@@ -267,7 +267,6 @@
 !/
 !
  
- 
       MESSAGE =(/ '     MOD DEF FILE WAS GENERATED WITH A DIFFERENT    ', &
                   '     WW3 VERSION OR USING A DIFFERENT SWITCH FILE.  ', &
                   '     MAKE SURE WW3_GRID IS COMPILED WITH SAME SWITCH', &
@@ -509,8 +508,8 @@
               COUNTCON=0
               WRITE (NDSM)                                            &
                 X0, Y0, SX, SY, DXYMAX, XYB, TRIGP, TRIA,             &
-                LEN, IEN, ANGLE0, ANGLE, SI, MAXX, MAXY,   &
-                DXYMAX, INDEX_CELL, CCON, COUNTCON, IE_CELL,  &
+                LEN, IEN, ANGLE0, ANGLE, SI, MAXX, MAXY,              &
+                DXYMAX, INDEX_CELL, CCON, COUNTCON, IE_CELL,          &
                 POS_CELL, IOBP, IOBPA, IOBDP, IOBPD, IAA, JAA, POSI
             END SELECT !GTYPE
 !
@@ -681,12 +680,11 @@
           WRITE (NDSM)                                                &
                 FACP, XREL, XFLT, FXFM, FXPM, XFT, XFC, FACSD, FHMAX, &
                 FFACBERG, DELAB, FWTABLE
-        ELSE
+      ELSE
           ALLOCATE(FWTABLE(0:SIZEFWTABLE))
           READ (NDSM,END=801,ERR=802,IOSTAT=IERR)                     &
                 FACP, XREL, XFLT, FXFM, FXPM, XFT, XFC, FACSD, FHMAX, &
                 FFACBERG, DELAB, FWTABLE
-!$ACC ENTER DATA COPYIN(XREL,XFLT,XFC, XFT,FACP)
 !$ACC UPDATE DEVICE(FWTABLE,DELAB)
         END IF
 !
@@ -746,24 +744,16 @@
 !Required allocation so has different treatment. 
 !$ACC UPDATE DEVICE(TAUT, TAUHFT, TAUHFT2)
 
-!$ACC ENTER DATA COPYIN(QBI, IKTAB, DCKI, FFXFA, SSINBR, DELU   )&
-!$ACC            COPYIN(SSDSC, SSDSISO, SSDSBR,SSDSBRFDF, CUMULW)&
+!$ACC ENTER DATA COPYIN(SSINBR, SSDSC)                           &
+!$ACC            COPYIN(SSDSISO, SSDSBR,SSDSBRFDF, CUMULW)       &
 !$ACC            COPYIN(SATINDICES, SATWEIGHTS, SSDSDTH, SSDSP  )&
 !$ACC            COPYIN(ZZ0RAT, ZZALP, SSINTHP, BBETA, SSWELLF  )&
-!$ACC            COPYIN(ZZWND, AALPHA, TTAUWSHELTER, DELALP     )&
+!$ACC            COPYIN(ZZWND,AALPHA, TTAUWSHELTER)              &
 !$ACC            COPYIN(SSDSBM,SSTXFTF,  SSTXFTFTAIL, SSTXFTWN  )&
 !$ACC            COPYIN(WWNMEANP, WWNMEANPTAIL, FFXFM, FFXPM    )&
-!$ACC            COPYIN(SSDSBR2, DELTAUW, DELUST, SSDSBCK       )&
-!$ACC            COPYIN(DELTAIL, SSDSBINT)
-!$ACC UPDATE DEVICE(QBI, IKTAB, DCKI, DELALP, SSDSBINT, SSDSBCK, &
-!$ACC               SSDSC, SSDSISO, SSDSBR,SSDSBRFDF, CUMULW,    &
-!$ACC               SATINDICES, SATWEIGHTS, SSDSDTH, SSDSP,      &
-!$ACC               ZZ0RAT, ZZALP, SSINTHP, BBETA, SSWELLF,      &
-!$ACC               ZZWND, AALPHA, BBETA, TTAUWSHELTER,          &
-!$ACC               SSDSBM, SSTXFTF, SSTXFTFTAIL, SSTXFTWN,      &
-!$ACC               WWNMEANP, WWNMEANPTAIL, FFXFM, FFXPM,        &
-!$ACC               FFXFA,SSINBR, DELU,DELTAUW,DELTAIL,DELUST,   &
-!$ACC               SSDSBR2)
+!$ACC            COPYIN(SSDSBR2, SSDSBCK, SSDSBINT)
+!$ACC UPDATE DEVICE(DELALP, DELU, DELTAUW, DELTAIL, DELUST)
+
         END IF
 !
 ! ... Nonlinear interactions

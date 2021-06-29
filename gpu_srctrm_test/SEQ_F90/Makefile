@@ -4,9 +4,16 @@ OBJ=obj
 
 ## PGI Fortran:
 FC=nvfortran
-#FFLAGS= -module $(MOD) -O2 -acc -DMM -ta=tesla,managed,cuda10.2 -Minfo=acc 
-#FFLAGS= -module $(MOD) -O2 -acc -ta=tesla,cuda10.2 -Minfo=acc
-#FFLAGS= -module $(MOD) -O2 -Mbounds 
+
+ifeq ($(MODE),acc)
+FFLAGS= -module $(MOD) -O2 -acc -DMM -ta=tesla,managed
+#FFLAGS= -module $(MOD) -O2 -acc -ta=tesla
+endif
+
+ifeq ($(MODE),seq)
+FFLAGS= -module $(MOD) -O2
+endif
+
 LIBS=
 
 ## GNU Fortran
@@ -48,6 +55,7 @@ OUTP_OBJS=$(addprefix $(OBJ)/, constants.o w3servmd.o w3timemd.o w3arrymd.o \
 # By default, build both the ww3_shel, ww3_grid and ww3_outf targets below:
 all: ww3_shel ww3_grid ww3_outf ww3_outp
 
+
 ## Build and link the WW3_SHEL executable:
 ww3_shel: objdir moddir $(SHEL_OBJS)
 	$(FC) $(FFLAGS) $(LIBS) -o ww3_shel $(SHEL_OBJS)
@@ -81,7 +89,7 @@ $(OBJ)/%.o:%.F90
 
 ## Clean:
 clean: 
-	rm -f ww3_grid ww3_shel ww3_outf ww3_outp $(MOD)/*.mod $(OBJ)/* 
+	rm -f ww3_grid ww3_shel ww3_outf ww3_outp $(MOD)/* *.mod $(OBJ)/* 
 
 
 ## Specific dependencies of each module:

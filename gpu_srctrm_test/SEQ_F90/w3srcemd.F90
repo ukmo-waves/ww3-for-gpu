@@ -381,7 +381,7 @@
                           XFC, XFLT, XREL, XFT, FXFM, FXPM, DDEN,      &
                           FTE, FTF, FHMAX, ECOS, ESIN, IICEDISP,       &
                           ICESCALES, IICESMOOTH, MAPSF, MAPSTA, FACP,  &
-                          FLAGST, NK2
+                          FLAGST, NK2, MPARS
       USE W3GDATMD, ONLY: FSSOURCE, optionCall
       USE W3GDATMD, ONLY: B_JGS_NLEVEL, B_JGS_SOURCE_NONLINEAR
       USE W3WDATMD, ONLY: TIME
@@ -435,23 +435,25 @@
 !CODENotes: Changes to local variables to allow managed memory to work
 !properly, requires POINTERS to be defined as ALLOCATABLES and then
 !allocated. 
-      INTEGER                :: IK, ITH, IS, IS0, NKH, NKH1,           &
+      INTEGER                :: IK, ITH, IS, IS0, NKH, NKH1, NSTEPS,   &
                                 IKS1, IS1, NSPECH, IDT, IERR, NKI, NKD,&
                                 ISPEC, JSEA, ISEA, IX, IY
       REAL                   :: FHIGH, DT, AFILT, DAMAX, AFAC,         &
                                  HDT, ZWND, FP, FHIGI, KDMEAN
 ! Scaling factor for SIN, SDS, SNL
-      REAL,ALLOCATABLE       :: ICESCALELN(:), ICESCALEIN(:),          &
-                                ICESCALENL(:), ICESCALEDS(:),DEPTH(:)
+      REAL                   :: ICESCALELN, ICESCALEIN,          &
+                                ICESCALENL, ICESCALEDS
       REAL                   :: EMEAN, FMEAN, WNMEAN, AMAX, CD, Z0,    &
-                                 SCAT, SMOOTH_ICEDISP,ICECOEF2
+                                SCAT, SMOOTH_ICEDISP,ICECOEF2, DTTOT,  &
+                                PHINL, TAUWAX, TAUWAY, TAUSCX, TAUSCY
+
       REAL,ALLOCATABLE       :: WN_R(:,:),CG_ICE(:,:),ALPHA_LIU(:,:),  &
                                 R(:,:), SPECINIT(:,:), SPEC2(:,:)
       REAL,ALLOCATABLE       :: DAM (:,:), WN2 (:,:), VSLN(:,:),       &
                                 VSIN(:,:), VDIN(:,:),VSNL(:,:),        &
                                 VDNL(:,:), VSDS(:,:), VDDS(:,:),       &
                                 VSBT(:,:), VDBT(:,:), VS(:,:),         &
-                                VD(:,:),COSI(:,:)
+                                VD(:,:),COSI(:,:),DEPTH(:)
       LOGICAL,ALLOCATABLE    :: LLWS(:,:)
       REAL,ALLOCATABLE       :: FOUT(:,:), SOUT(:,:), DOUT(:,:)
       INTEGER                :: I,JJ
@@ -479,10 +481,7 @@
      
       REAL,ALLOCATABLE       :: TMP1(:,:), TMP2(:,:), TMP3(:,:),       &
                                 TMP4(:,:)
-      INTEGER, ALLOCATABLE   :: NSTEPS(:) 
-      REAL,ALLOCATABLE       :: DTTOT(:), PHINL(:), TAUWAX(:),         &
-                                TAUWAY(:), TAUSCX(:), TAUSCY(:),       &
-                                BRLAMBDA(:,:)
+      REAL,ALLOCATABLE       :: BRLAMBDA(:,:)
 !/
 !/ ------------------------------------------------------------------- /
 !/
@@ -501,7 +500,6 @@
 !been converted. Deallocated at the end of this routine. 
 
 !/
-!/
       ALLOCATE(DAM(NSPEC,NSEAL), WN2(NSPEC,NSEAL), VSLN(NSPEC,NSEAL),  &
       SPECINIT(NSPEC,NSEAL), SPEC2(NSPEC,NSEAL), VSIN(NSPEC,NSEAL),    &
       VDIN(NSPEC,NSEAL), VSNL(NSPEC,NSEAL), VDNL(NSPEC,NSEAL),         &
@@ -510,24 +508,24 @@
       FOUT(NK,NTH), SOUT(NK,NTH), DOUT(NK,NTH), WN_R(NK,NSEAL),        &
       CG_ICE(NK,NSEAL), ALPHA_LIU(NK,NSEAL), R(NK,NSEAL),              &
       COSI(2,NSEAL), LLWS(NSPEC,NSEAL))
-      ALLOCATE(DTTOT(NSEAL),NSTEPS(NSEAL),PHINL(NSEAL),TAUWAX(NSEAL),  &
-      TAUWAY(NSEAL),TAUSCX(NSEAL),TAUSCY(NSEAL),BRLAMBDA(NSPEC,NSEAL), &
-      TMP1(4,NSEAL),TMP2(3,NSEAL), DEPTH(NSEAL), ICESCALELN(NSEAL),    &
-      ICESCALEIN(NSEAL), ICESCALENL(NSEAL), ICESCALEDS(NSEAL),         &
-      TMP3(2,NSEAL), TMP4(2,NSEAL))
+
+      ALLOCATE(BRLAMBDA(NSPEC,NSEAL), DEPTH(NSEAL), &
+      TMP1(4,NSEAL),TMP2(3,NSEAL), TMP3(2,NSEAL), TMP4(2,NSEAL))
+
 #ifdef MM
 #else
 ! The remaining data requirements can be copied in implicitly corretly.
 ! The use of IX, IY in MAPSTA stop this from working implicitly. 
 !$ACC DATA  copyin(mapsta(:,:))
-
 #endif
 
 ! Data is required in multiple places and not updated so is simple
 ! placed on the GPU and not moved. 
 !$ACC ENTER DATA COPYIN(NK,NK2, NTH, NSPEC, NSEAL)
 
-!$ACC KERNELS 
+!$ACC KERNELS
+
+      DEPTH(:)  = 0.
       PHIAW(:)  = 0.
       DTDYN(:)  = 0.
       CHARN(:)  = 0.
@@ -541,13 +539,6 @@
       TAUWX(:)=0.
       TAUWY(:)=0.
 
-      DTTOT(:)  = 0.
-      NSTEPS(:) = 0.
-      PHINL(:)  = 0.
-      TAUWAX(:) = 0.
-      TAUWAY(:) = 0.
-      TAUSCX(:) = 0.
-      TAUSCY(:) = 0.
       TMP3(:,:) = 0.
       TMP4(:,:) = 0.
       BRLAMBDA(:,:)=0.
@@ -565,14 +556,19 @@
       DRAT  = DAIR / DWAT
       IKS1 = 1
 !GPUNotes Outer seapoint loop for source term calculations
-!GPUNotes We needed to use PARALLEL instead of KERNEL for this section
-!of the code. Presumeably due to treatment of the IF condition.
-!$ACC LOOP GANG VECTOR INDEPENDENT PRIVATE(EMEAN, FMEAN, FMEAN1, WNMEAN, AMAX, CD)&
-!$ACC                 PRIVATE(Z0, FMEANWS, IX, IY) 
+!$ACC LOOP GANG VECTOR INDEPENDENT PRIVATE(EMEAN,FMEAN,FMEAN1,WNMEAN   )&
+!$ACC PRIVATE(Z0, FMEANWS, IX, IY, TAUWAX, TAUWAY)&
+!$ACC PRIVATE(AMAX, CD, ICESCALELN, ICESCALEIN, ICESCALEDS, ICESCALENL)
       DO ISEA=1, NSEAL
 !GPUNotes removed INIT_GET_ISEA as its functions is simple but its
 !application affected the parallelism of the kernel. 
 !        CALL INIT_GET_ISEA(ISEA, JSEA)
+      DTTOT=0.
+      PHINL=0.
+      TAUWAX=0.
+      TAUWAY=0.
+      TAUSCX=0.
+      TAUSCY=0.
         IX     = MAPSF(ISEA,1)
         IY     = MAPSF(ISEA,2)
         IF ( MAPSTA(IY,IX) .EQ. 1 .AND. FLAGST(ISEA)) THEN
@@ -582,10 +578,10 @@
           TMP3(:,ISEA)   = TAUBBL(ISEA,:)
           TMP4(:,ISEA)   = TAUICE(ISEA,:)
           DEPTH(ISEA)  = MAX ( DMIN , D_INP(ISEA) )
-          ICESCALELN(ISEA) = MAX(0.,MIN(1.,1.-ICE(ISEA)*ICESCALES(1)))
-          ICESCALEIN(ISEA) = MAX(0.,MIN(1.,1.-ICE(ISEA)*ICESCALES(2)))
-          ICESCALENL(ISEA) = MAX(0.,MIN(1.,1.-ICE(ISEA)*ICESCALES(3)))
-          ICESCALEDS(ISEA) = MAX(0.,MIN(1.,1.-ICE(ISEA)*ICESCALES(4)))
+          ICESCALELN = MAX(0.,MIN(1.,1.-ICE(ISEA)*ICESCALES(1)))
+          ICESCALEIN = MAX(0.,MIN(1.,1.-ICE(ISEA)*ICESCALES(2)))
+          ICESCALENL = MAX(0.,MIN(1.,1.-ICE(ISEA)*ICESCALES(3)))
+          ICESCALEDS = MAX(0.,MIN(1.,1.-ICE(ISEA)*ICESCALES(4)))
           IS1=(IKS1-1)*NTH+1
 !
 !
@@ -636,7 +632,7 @@
              CALL W3SIN4(SPEC(:,ISEA), CG1(:,ISEA), WN2(:,ISEA),       &
                          U10ABS(ISEA), USTAR(ISEA), DRAT, AS(ISEA),    &
                          U10DIR(ISEA), Z0, CD, TAUWX(ISEA),            &
-                         TAUWY(ISEA), TAUWAX(ISEA), TAUWAY(ISEA),      &
+                         TAUWY(ISEA), TAUWAX, TAUWAY,      &
                          VSIN(:,ISEA), VDIN(:,ISEA), LLWS(:,ISEA), IX, &
                          IY, BRLAMBDA(:,ISEA))
           END IF
@@ -677,9 +673,10 @@
 !compiler panics. Setting it to loop over a larger extent and leaving
 !the EXIT statements in gives us the output we require.
 
+
 !$ACC LOOP SEQ
           DO I=1,120 
-            NSTEPS(ISEA) = NSTEPS(ISEA) + 1
+            NSTEPS = NSTEPS + 1
 ! 2.  Calculate source terms ----------------------------------------- *
 ! 2.a Input.
 !
@@ -688,14 +685,14 @@
             NKH    = MIN (NK, INT(FACTI2+FACTI1*LOG(MAX(1.E-7,FHIGH))))
             NKH1   = MIN (NK, NKH+1 )
             NSPECH = NKH1*NTH
-            DT     = MIN (DTG-DTTOT(ISEA), DTMAX )
+            DT     = MIN (DTG-DTTOT, DTMAX )
             AFILT  = MAX (DAM(NSPEC,ISEA), XFLT*AMAX )
   
 !        CALL CPU_TIME(sTime2) 
             CALL W3SIN4(SPEC(:,ISEA), CG1(:,ISEA), WN2(:,ISEA),        &
                         U10ABS(ISEA), USTAR(ISEA), DRAT, AS(ISEA),     &
                         U10DIR(ISEA), Z0, CD, TAUWX(ISEA), TAUWY(ISEA),&
-                        TAUWAX(ISEA), TAUWAY(ISEA), VSIN(:,ISEA),      &
+                        TAUWAX, TAUWAY, VSIN(:,ISEA),      &
                         VDIN(:,ISEA), LLWS(:,ISEA), IX, IY,            &
                         BRLAMBDA(:,ISEA))
 !        CALL CPU_TIME(eTime2)
@@ -750,20 +747,20 @@
 !knockon affect of gang and vector sizes since they must be consistant
 !between kernel blocks.
             IF ( INFLAGS2(4) ) THEN
-              VSNL(1:NSPECH,ISEA) = ICESCALENL(ISEA)*VSNL(1:NSPECH,ISEA)
-              VDNL(1:NSPECH,ISEA) = ICESCALENL(ISEA)*VDNL(1:NSPECH,ISEA)
-              VSLN(1:NSPECH,ISEA) = ICESCALELN(ISEA)*VSLN(1:NSPECH,ISEA)
-              VSIN(1:NSPECH,ISEA) = ICESCALEIN(ISEA)*VSIN(1:NSPECH,ISEA)
-              VDIN(1:NSPECH,ISEA) = ICESCALEIN(ISEA)*VDIN(1:NSPECH,ISEA)
-              VSDS(1:NSPECH,ISEA) = ICESCALEDS(ISEA)*VSDS(1:NSPECH,ISEA)
-              VDDS(1:NSPECH,ISEA) = ICESCALEDS(ISEA)*VDDS(1:NSPECH,ISEA)
+              VSNL(1:NSPECH,ISEA) = ICESCALENL*VSNL(1:NSPECH,ISEA)
+              VDNL(1:NSPECH,ISEA) = ICESCALENL*VDNL(1:NSPECH,ISEA)
+              VSLN(1:NSPECH,ISEA) = ICESCALELN*VSLN(1:NSPECH,ISEA)
+              VSIN(1:NSPECH,ISEA) = ICESCALEIN*VSIN(1:NSPECH,ISEA)
+              VDIN(1:NSPECH,ISEA) = ICESCALEIN*VDIN(1:NSPECH,ISEA)
+              VSDS(1:NSPECH,ISEA) = ICESCALEDS*VSDS(1:NSPECH,ISEA)
+              VDDS(1:NSPECH,ISEA) = ICESCALEDS*VDDS(1:NSPECH,ISEA)
             END IF
             NKI    = MAX( 2 , MIN ( NKH1 ,                           &
                      INT(FACTI2+FACTI1*LOG(MAX(1.E-7,FFXFI* FMEAN1)))))
 !GPUNotes spectral loop up to frequency cut off
             VS(:,ISEA) = 0.
             VD(:,ISEA) = 0.
-!$ACC LOOP
+!$ACC LOOP SEQ
             DO IS=IS1, NSPECH
               VS(IS,ISEA)=VSLN(IS,ISEA) + VSIN(IS,ISEA) + VSNL(IS,ISEA)&
                      + VSDS(IS,ISEA) + VSBT(IS,ISEA)
@@ -781,11 +778,11 @@
 ! Here we have a hardlimit, which is not too usefull, at least not as a fixed con
 !
             DTDYN(ISEA)  = DTDYN(ISEA) + DT
-            IDT    = 1 + INT ( 0.99*(DTG-DTTOT(ISEA))/DT ) ! number of iterations
-            DT     = (DTG-DTTOT(ISEA))/REAL(IDT)         ! actualy time step
-            SHAVE  = DT.LT.DTMIN .AND. DT.LT.DTG-DTTOT(ISEA) ! limiter check ...
+            IDT    = 1 + INT ( 0.99*(DTG-DTTOT)/DT ) ! number of iterations
+            DT     = (DTG-DTTOT)/REAL(IDT)         ! actualy time step
+            SHAVE  = DT.LT.DTMIN .AND. DT.LT.DTG-DTTOT ! limiter check ...
             SHAVEIO = SHAVE
-            DT     = MAX ( DT , MIN (DTMIN,DTG-DTTOT(ISEA)) ) 
+            DT     = MAX ( DT , MIN (DTMIN,DTG-DTTOT) ) 
 ! override dt with input time step or last time step if it is bigger ... anyway
   
 !CODENotes: This call is to a variable that is not defined, this causes
@@ -794,7 +791,7 @@
 !        IF (srce_call .eq. srce_imp_post) DT = DTG! for implicit part
   
             HDT    = OFFSET * DT
-            DTTOT(ISEA)  = DTTOT(ISEA) + DT
+            DTTOT  = DTTOT + DT
   
 !GPUNotes calls below may be for implicit source term update
 !GPUNotes would this remove the need for the NSTEPS loop?
@@ -815,7 +812,7 @@
 !GPUNotes Running sequentially due to the recursive use of eIncX, adding
 !loop independent does not force the loop to be parallel as it should.
   
-!$ACC LOOP 
+!$ACC LOOP SEQ
                 DO IS=IS1, NSPECH
                   eInc1 = VS(IS,ISEA)*DT/MAX(1.,(1.-HDT*VD(IS,ISEA)))
                   eInc2 = SIGN ( MIN (DAM(IS,ISEA),ABS(eInc1)) , eInc1 )
@@ -845,7 +842,7 @@
 !GPUNotes Loop has been refactored for ACC applications to allow the
 !loops to be closely nested and collapsable.
   
-!$ACC LOOP COLLAPSE(2)
+!$ACC LOOP SEQ COLLAPSE(2)
             DO IK=IKS1, NK
               DO ITH=1, NTH
                 FACTOR = DDEN(IK)/CG1(IK,ISEA)                  !Jacobian to get energy in band
@@ -860,7 +857,7 @@
                   / MAX ( 1. , (1.-HDT*VDIN(IS,ISEA))) ! semi-implict integration scheme
                 PHIBBL(ISEA)= PHIBBL(ISEA)- VSBT(IS,ISEA) * DT * FACTOR&
                  / MAX ( 1. , (1.-HDT*VDBT(IS,ISEA))) ! semi-implict integration scheme
-                PHINL(ISEA) = PHINL(ISEA) + VSNL(IS,ISEA) * DT * FACTOR&
+                PHINL = PHINL + VSNL(IS,ISEA) * DT * FACTOR&
                  / MAX ( 1. , (1.-HDT*VDNL(IS,ISEA))) ! semi-implict integration scheme
                 IF (VSIN(IS,ISEA).GT.0.) THEN
                   TMP1(3,ISEA) = TMP1(3,ISEA) + SPEC(IS,ISEA)  * FACTOR
@@ -872,8 +869,8 @@
             HSTOT=4.*SQRT(HSTOT)
             TAUWIX(ISEA)= TAUWIX(ISEA)+ TAUWX(ISEA) * DRAT *DT
             TAUWIY(ISEA)= TAUWIY(ISEA)+ TAUWY(ISEA) * DRAT *DT
-            TAUWNX(ISEA)= TAUWNX(ISEA)+ TAUWAX(ISEA) * DRAT *DT
-            TAUWNY(ISEA)= TAUWNY(ISEA)+ TAUWAY(ISEA) * DRAT *DT
+            TAUWNX(ISEA)= TAUWNX(ISEA)+ TAUWAX * DRAT *DT
+            TAUWNY(ISEA)= TAUWNY(ISEA)+ TAUWAY * DRAT *DT
         ! MISSING: TAIL TO BE ADDED ?
 ! 6.  Add tail ------------------------------------------------------- *
 !   a Mean parameters
@@ -912,7 +909,7 @@
 !GPUNotes Smaller spectral loop to add energy to tail
 !GPUNotes Independence is acceptable for inner loop, outer loop
 !dependence on IK within SPEC limits any collapsable option.
-!$ACC LOOP 
+!$ACC LOOP SEQ COLLAPSE(2)
             DO IK=NKH+1, NK
               DO ITH=1, NTH
                 SPEC(ITH+(IK-1)*NTH,ISEA) = SPEC(ITH+(IK-2)*NTH,ISEA) &
@@ -926,7 +923,7 @@
             CALL W3SIN4(SPEC(:,ISEA), CG1(:,ISEA), WN2(:,ISEA),        &
                         U10ABS(ISEA), USTAR(ISEA), DRAT, AS(ISEA),     &
                         U10DIR(ISEA), Z0, CD, TAUWX(ISEA), TAUWY(ISEA),&
-                        TAUWAX(ISEA), TAUWAY(ISEA), VSIN(:,ISEA),      &
+                        TAUWAX, TAUWAY, VSIN(:,ISEA),      &
                         VDIN(:,ISEA), LLWS(:,ISEA), IX, IY,            &
                         BRLAMBDA(:,ISEA) )
 !        CALL CPU_TIME(eTime2)
@@ -936,7 +933,7 @@
             IF (srce_call .eq. srce_imp_post) THEN
               EXIT
             ENDIF
-            IF ( DTTOT(ISEA) .GE. 0.9999*DTG ) THEN
+            IF ( DTTOT .GE. 0.9999*DTG ) THEN
 !            IF (IX == DEBUG_NODE) WRITE(*,*) 'DTTOT, DTG', DTTOT, DTG
               EXIT
             ENDIF
@@ -945,7 +942,7 @@
 ! ... End point dynamic integration - - - - - - - - - - - - - - - - - -
 !
 ! 8.  Save integration data ------------------------------------------ *
-          DTDYN(ISEA)  = DTDYN(ISEA) / REAL(MAX(1,NSTEPS(ISEA)))
+          DTDYN(ISEA)  = DTDYN(ISEA) / REAL(MAX(1,NSTEPS))
           FCUT(ISEA)   = FHIGH * TPIINV
 !
 ! Error escape locations
@@ -998,7 +995,7 @@
 !
           PHIOC(ISEA) =DWAT*GRAV*(EFINISH+PHIAW(ISEA)-PHIBBL(ISEA))/DTG
           PHIAW(ISEA) =DWAT*GRAV*PHIAW(ISEA) /DTG
-          PHINL(ISEA) =DWAT*GRAV*PHINL(ISEA) /DTG
+          PHINL =DWAT*GRAV*PHINL /DTG
           PHIBBL(ISEA)=DWAT*GRAV*PHIBBL(ISEA)/DTG
 !
 ! 10.1  Adds ice scattering and dissipation: implicit integration---------------- *
@@ -1043,7 +1040,7 @@
 ! 10.2  Fluxes of energy and momentum due to ice effects
 !
 !GPUNotes Moved FACTOR and FACTOR2 inside lopp for collapse.
-!$ACC LOOP COLLAPSE(2)
+!$ACC LOOP SEQ COLLAPSE(2)
             DO IK=1,NK
               DO ITH = 1,NTH
               FACTOR = DDEN(IK)/CG1(IK,ISEA)                  !Jacobian to get energy in band

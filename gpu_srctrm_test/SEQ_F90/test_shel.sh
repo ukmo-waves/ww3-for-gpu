@@ -22,20 +22,16 @@ set -e
 
 # Make sure to run the test with -c if changing the compiler flags.
 
-# Mananged memory
-#FFLAGS="-module mod -O2 -acc -DMM -ta=tesla,managed,cuda10.2 -Minfo=acc"
-# Explicit transfers
-FFLAGS="-module mod -O2 -acc -ta=tesla,cuda10.2 -Minfo=acc"
+# Makefile controls Mananged memory vs Explicit transfers
+mode="acc"
 # CPU Sequential
-#FFLAGS="-module mod -O2 "
-
-export FFLAGS=$FFLAGS
+#mode="seq"
 
 if [ -z "$1" ]; then 
 	if [[ -f ww3_grid && ww3_shel && ww3_outp ]]; then
-		make ww3_shel
+		make MODE=$mode ww3_shel
 	else 
-		make
+		make MODE=$mode
 	fi
 fi
 
@@ -43,8 +39,8 @@ CLEAN=false
 
 while [ -n "$1" ]; do
     case "$1" in
-        -a) make;;
-        -c) make clean; CLEAN=.true.; make;;
+        -a) make MODE=$mode;;
+        -c) make clean; CLEAN=.true.; make MODE=$mode;;
     esac
     shift
 done
@@ -60,15 +56,13 @@ ln -sf inp/ww3_shel.inp .
 ln -sf inp/ww3_outp.inp .
 
 # Run grid preprocessor for WW3
-../SEQ_F90/ww3_grid
+../SEQ_F90/ww3_grid 2> grid_profile
 
 # Run wave model
-#NV_ACC_NOTIFY=3 
-nvprof ../SEQ_F90/ww3_shel 2> shel_profile
-#nsys profile --force-overwrite true -o profile --stats=true ../SEQ_F90/ww3_shel 2> metrics
+NV_ACC_NOTIFY=3 nvprof ../SEQ_F90/ww3_shel 2> shel_profile
 
 # Run point output
-../SEQ_F90/ww3_outp
+../SEQ_F90/ww3_outp 2> outp_profile
 
 # Compare point output with KGO
 vimdiff ww3.68060600.spc out/KGO/ww3.68060600.spc

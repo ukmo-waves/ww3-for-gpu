@@ -103,16 +103,16 @@
 
 ! Declare global allocatable arrays for use in ACC ROUTINE subroutines.
 
-!$ACC DECLARE CREATE(TAUT(:,:), TAUHFT(:,:), TAUHFT2(:,:,:)         )&
-!$ACC         CREATE(DELU, DELTAUW, DELTAIL,DELALP, DELUST, DIKCUMUL)&
-!$ACC         CREATE(NSMOOTH(:,:), IKSUP(:,:), S1(:,:), E1(:,:)     )&
-!$ACC         CREATE(COEF4(:,:), NTIMES(:,:), DK(:,:), HS(:,:)      )&
-!$ACC         CREATE(KBAR(:,:),DCK(:,:),EFDF(:,:),BTH0(:,:),QB(:,:) )&
-!$ACC         CREATE(S2(:,:),BTH(:,:),BTH0S(:,:),BTHS(:,:),SBK(:,:) )&
-!$ACC         CREATE(IMSSMAX(:,:), SBKT(:,:), MSSSUM(:,:,:)         )&
-!$ACC         CREATE(WTHSUM(:,:), PB(:,:), MSSSUM2(:,:,:)           )&
-!$ACC         CREATE(MSSLONG(:,:,:), PB2(:,:), EB(:,:), EB2(:,:)    )&
-!$ACC         CREATE(ALFA(:,:))
+!$ACC DECLARE COPYIN(TAUT(:,:), TAUHFT(:,:), TAUHFT2(:,:,:)         )&
+!$ACC         COPYIN(DELU, DELTAUW, DELTAIL, DELALP, DELUST, DIKCUMUL)&
+!$ACC         COPYIN(NSMOOTH(:,:), IKSUP(:,:), S1(:,:), E1(:,:)     )&
+!$ACC         COPYIN(COEF4(:,:), NTIMES(:,:), DK(:,:), HS(:,:)      )&
+!$ACC         COPYIN(KBAR(:,:),DCK(:,:),EFDF(:,:),BTH0(:,:),QB(:,:) )&
+!$ACC         COPYIN(S2(:,:),BTH(:,:),BTH0S(:,:),BTHS(:,:),SBK(:,:) )&
+!$ACC         COPYIN(IMSSMAX(:,:), SBKT(:,:), MSSSUM(:,:,:)         )&
+!$ACC         COPYIN(WTHSUM(:,:), PB(:,:), MSSSUM2(:,:,:)           )&
+!$ACC         COPYIN(MSSLONG(:,:,:), PB2(:,:), EB(:,:), EB2(:,:)    )&
+!$ACC         COPYIN(ALFA(:,:))
 !!$ACC         CREATE(K1(:,:), K2(:,:), SIGTAB(:,:))
       CONTAINS
 

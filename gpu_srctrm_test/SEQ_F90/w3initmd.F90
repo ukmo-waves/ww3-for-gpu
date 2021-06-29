@@ -697,7 +697,6 @@
 !
       FLOUT(1) = .FALSE.
       FLOGRD   = FLGRD
-!$ACC ENTER DATA COPYIN(FLOGRD)
       FLOGD    = FLGD
       DO J=1, NOGRP
         DO K=1, NGRPP
@@ -1030,6 +1029,7 @@
 !
 ! 8.  Final MPI set up ----------------------------------------------- /
 !
+!$ACC ENTER DATA COPYIN(FLOGRD)
       RETURN
 !
 ! Escape locations read errors :

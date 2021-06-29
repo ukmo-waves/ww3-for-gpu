@@ -631,7 +631,7 @@
  
         REAL   , ALLOCATABLE :: TRNX(:,:), TRNY(:,:) ! TRANSPARENCY INFORMATION ON IX,IY
         REAL   , ALLOCATABLE :: SPCBAC(:,:), ANGARC(:)
-        REAL   , POINTER :: XGRD(:,:), YGRD(:,:) ! X AND Y DEFINED ON IX,IY
+        REAL   , ALLOCATABLE :: XGRD(:,:), YGRD(:,:) ! X AND Y DEFINED ON IX,IY
         REAL   , ALLOCATABLE :: DXDP(:,:), DXDQ(:,:) ! DX/DP & DX/DQ DEFINED ON IX,IY
         REAL   , ALLOCATABLE :: DYDP(:,:), DYDQ(:,:) ! DY/DP & DY/DQ DEFINED ON IX,IY
         REAL   , ALLOCATABLE :: DPDX(:,:), DPDY(:,:) ! DP/DX & DP/DY DEFINED ON IX,IY
@@ -658,9 +658,9 @@
 ! unstructured data
 !
         INTEGER               :: NTRI
-        DOUBLE PRECISION, POINTER         :: XYB(:,:)
-        INTEGER, ALLOCATABLE :: TRIGP(:,:)
-        REAL(8), ALLOCATABLE:: LEN(:,:),SI(:), IEN(:,:)
+        DOUBLE PRECISION, ALLOCATABLE         :: XYB(:,:)
+        INTEGER, ALLOCATABLE  :: TRIGP(:,:)
+        REAL(8), ALLOCATABLE  :: LEN(:,:),SI(:), IEN(:,:)
  
         REAL                  :: MAXX, MAXY, DXYMAX
         REAL, ALLOCATABLE     :: ANGLE(:,:),ANGLE0(:,:)
@@ -669,9 +669,9 @@
                                  POS_CELL(:), IOBP(:), IOBPD(:,:), IOBDP(:), IOBPA(:),   &
                                  IAA(:), JAA(:), POSI(:,:), INDEX_CELL(:),       &
                                  I_DIAG(:), JA_IE(:,:,:)
-        INTEGER, POINTER      :: EDGES(:,:), NEIGH(:,:)
-        REAL(8), POINTER      :: TRIA(:)
-        REAL, POINTER         :: CROSSDIFF(:,:)
+        INTEGER, ALLOCATABLE  :: EDGES(:,:), NEIGH(:,:)
+        REAL(8), ALLOCATABLE  :: TRIA(:)
+        REAL, ALLOCATABLE     :: CROSSDIFF(:,:)
  
  
       END TYPE GRID
@@ -711,16 +711,15 @@
         REAL                  :: WWNMEANPTAIL, SSTXFTFTAIL
         INTEGER               :: SSWELLFPAR, SSDSISO, SSDSBRFDF
         INTEGER, ALLOCATABLE  :: IKTAB(:,:), SATINDICES(:,:)
-        REAL,    ALLOCATABLE  :: DCKI(:,:), SATWEIGHTS(:,:),          &
-                                 CUMULW(:,:), QBI(:,:), SSWELLF(:),   &
+        REAL,    ALLOCATABLE  :: DCKI(:,:), SATWEIGHTS(:,:),           &
+                                 CUMULW(:,:), QBI(:,:), SSWELLF(:),    &
                                  SSDSC(:), SSDSBM(:)
         REAL                  :: SSDSBR, SSDSP, WWNMEANP, SSTXFTF, SSTXFTWN,  &
-                                 FFXPM, FFXFM, FFXFA, FFXFI, FFXFD,   &
-                                 SSDSBRF1, SSDSBRF2, SSDSBINT,SSDSBCK,&
+                                 FFXPM, FFXFM, FFXFA, FFXFI, FFXFD,    &
+                                 SSDSBRF1, SSDSBRF2, SSDSBINT,SSDSBCK, &
                                  SSDSHCK, SSDSABK, SSDSPBK 
-        REAL,ALLOCATABLE      :: ZZWND, AALPHA, BBETA, ZZALP,         &
-                                 TTAUWSHELTER, SSINTHP, SSINBR, ZZ0RAT&
-                                 ,ZZ0MAX
+        REAL                  :: ZZWND, AALPHA, BBETA, ZZALP ,ZZ0MAX,  &
+                                 TTAUWSHELTER, SSINTHP, SSINBR, ZZ0RAT
         REAL                  :: SSDSCOS, SSDSDTH, SSDSBR2
 !
       END TYPE SRCP
@@ -787,20 +786,20 @@
 !
       TYPE MPAR
         LOGICAL               :: PINIT
-        TYPE(NPAR)            :: NPARS
-        TYPE(PROP)            :: PROPS
-        TYPE(FLDP)            :: FLDPS
-        TYPE(SFLP)            :: SFLPS
-        TYPE(SLNP)            :: SLNPS
-        TYPE(SRCP)            :: SRCPS
-        TYPE(SNLP)            :: SNLPS
-        TYPE(SBTP)            :: SBTPS
-        TYPE(SDBP)            :: SDBPS
-        TYPE(STRP)            :: STRPS
-        TYPE(SBSP)            :: SBSPS
-        TYPE(SICP)            :: SICPS
-        TYPE(SXXP)            :: SXXPS
-        TYPE(SCHM)            :: SCHMS
+        TYPE(NPAR), ALLOCATABLE:: NPARS
+        TYPE(PROP), ALLOCATABLE:: PROPS
+        TYPE(FLDP), ALLOCATABLE:: FLDPS
+        TYPE(SFLP), ALLOCATABLE:: SFLPS
+        TYPE(SLNP), ALLOCATABLE:: SLNPS
+        TYPE(SRCP), ALLOCATABLE:: SRCPS
+        TYPE(SNLP), ALLOCATABLE:: SNLPS
+        TYPE(SBTP), ALLOCATABLE:: SBTPS
+        TYPE(SDBP), ALLOCATABLE:: SDBPS
+        TYPE(STRP), ALLOCATABLE:: STRPS
+        TYPE(SBSP), ALLOCATABLE:: SBSPS
+        TYPE(SICP), ALLOCATABLE:: SICPS
+        TYPE(SXXP), ALLOCATABLE:: SXXPS
+        TYPE(SCHM), ALLOCATABLE:: SCHMS
       END TYPE MPAR
 !/
 !/ Data storage
@@ -965,15 +964,15 @@
 !
 !$ACC DECLARE COPYIN(SIG(:), SIG2(:), ESIN(:), ECOS(:),QBI(:,:)       )& 
 !$ACC         COPYIN(DDEN(:), DDEN2(:), SSWELLF(:), SSDSC(:)          )&
-!$ACC         COPYIN(CUMULW(:,:), SATINDICES, SATWEIGHTS(:,:)         )&
+!$ACC         COPYIN(CUMULW(:,:), SATINDICES(:,:), SATWEIGHTS(:,:)    )&
 !$ACC         COPYIN(IKTAB(:,:), DCKI(:,:), SSDSBM(:), DTH, WWNMEANP  )&
-!$ACC         COPYIN(WWNMEANPTAIL, FTE, FTF, FACP, SSTXFTF, SSTXFTWN  )&
+!$ACC         COPYIN(WWNMEANPTAIL, FTE, FTF, SSTXFTF, SSTXFTWN  )&
 !$ACC         COPYIN(SSTXFTFTAIL, ZZ0RAT, AALPHA, ZZWND, BBETA, ZZALP )&
 !$ACC         COPYIN(TTAUWSHELTER, SSINTHP, SSINBR, XFR, FACHFE, KDCON)&
 !$ACC         COPYIN(KDMN, SNLC1, SNLS1, SNLS2, SNLS3, EC2, ES2, ESC  )&
 !$ACC         COPYIN(SSDSP, DSIP, SSDSISO, SSDSDTH, SSDSBR2, SSDSBRFDF)&
 !$ACC         COPYIN(SSDSBCK, NKHS, NDTAB, SSDSBR, SLNC1, FSPM, FSHF)
-!$ACC DECLARE COPYIN(NSEAL, NSPEC, NTH, NK, XREL, XFLT, XFC, XFT, NK2)
+!$ACC DECLARE CREATE(NSEAL, NSPEC, NTH, NK, NK2)
 !/ Data aliasing for structure SICP(S)
 !/
       CONTAINS
@@ -1478,15 +1477,6 @@
                  MPARS(IMOD)%SRCPS%SSWELLF(1:7),    &
                  MPARS(IMOD)%SRCPS%SSDSC(1:11),     &
                  MPARS(IMOD)%SRCPS%SSDSBM(0:4),     &
-                 MPARS(IMOD)%SRCPS%ZZWND,           &
-                 MPARS(IMOD)%SRCPS%AALPHA,          &
-                 MPARS(IMOD)%SRCPS%BBETA,           &
-                 MPARS(IMOD)%SRCPS%ZZALP,           &
-                 MPARS(IMOD)%SRCPS%TTAUWSHELTER,    &
-                 MPARS(IMOD)%SRCPS%SSINTHP,         &
-                 MPARS(IMOD)%SRCPS%SSINBR,          &
-                 MPARS(IMOD)%SRCPS%ZZ0RAT,          &
-                 MPARS(IMOD)%SRCPS%ZZ0MAX,          &
                  STAT=ISTAT                         )
       CHECK_ALLOC_STATUS ( ISTAT )
       SDSNTH  = MTH/2-1 !MIN(NINT(SSDSDTH/(DTH*RADE)),MTH/2-1)
@@ -1843,7 +1833,6 @@
       PINIT  => MPARS(IMOD)%PINIT
 !
 !     Structure NPARS
-!
       FACP   => MPARS(IMOD)%NPARS%FACP
       XREL   => MPARS(IMOD)%NPARS%XREL
       XFLT   => MPARS(IMOD)%NPARS%XFLT
@@ -2086,7 +2075,7 @@
 ! 2.  Create grid search utility object
 !
       GRIDS(IMOD)%GSU = W3GSUC( IJG, FLAGLL, GRIDS(IMOD)%ICLOSE, &
-                                GRIDS(IMOD)%XGRD, GRIDS(IMOD)%YGRD )
+                                XGRD, YGRD )
 #if defined(TEST_W3GDATMD) || defined(TEST_W3GDATMD_W3GNTX)
       CALL W3GSUP(GRIDS(IMOD)%GSU, NDST)
       WRITE (NDST,9001)

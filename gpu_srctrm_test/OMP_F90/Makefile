@@ -4,7 +4,10 @@ OBJ=obj
 
 ## PGI Fortran:
 FC=nvfortran
-FFLAGS= -module $(MOD) -O2 -acc -ta=tesla,cuda10.2 -Minfo=acc
+ifeq ($(MODE),omp)
+FFLAGS=-module $(MOD) -mp -O2
+endif
+
 LIBS=
 
 ## GNU Fortran
@@ -79,7 +82,7 @@ $(OBJ)/%.o:%.F90
 
 ## Clean:
 clean: 
-	rm -f ww3_grid ww3_shel ww3_outf $(MOD)/*.mod $(OBJ)/* 
+	rm -f ww3_grid ww3_shel ww3_outf ww3_outp $(MOD)/* *.mod $(OBJ)/* 
 
 
 ## Specific dependencies of each module:

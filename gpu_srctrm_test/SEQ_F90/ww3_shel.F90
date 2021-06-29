@@ -375,6 +375,11 @@
       CALL W3NOUT (    6, 6 )
       CALL W3NINP (    6, 6 )
 !
+      ALLOCATE(MPARS(1)%NPARS)
+      ALLOCATE(MPARS(1)%SLNPS)
+      ALLOCATE(MPARS(1)%SRCPS)
+      ALLOCATE(MPARS(1)%SNLPS)
+      ALLOCATE(MPARS(1)%SCHMS)
       CALL W3SETG ( 1, 6, 6 )
       CALL W3SETW ( 1, 6, 6 )
       CALL W3SETA ( 1, 6, 6 )
