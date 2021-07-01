@@ -479,6 +479,7 @@
                                 sTime3, eTime3
       REAL(8), INTENT(OUT)   :: SIN4T, SPR4T, SDS4T
      
+      INTEGER :: NSEAL_LOCAL
       REAL,ALLOCATABLE       :: TMP1(:,:), TMP2(:,:), TMP3(:,:),       &
                                 TMP4(:,:)
       REAL,ALLOCATABLE       :: BRLAMBDA(:,:)
@@ -495,6 +496,7 @@
       SIN4T = 0.0
       SDS4T = 0.0
 !
+      NSEAL_LOCAL = NSEAL
 !Allocating arrays here, this are local to routine and typically treated
 !as scalars. In order to allow parallelism over sea points they have
 !been converted. Deallocated at the end of this routine. 
@@ -516,28 +518,30 @@
 #else
 ! The remaining data requirements can be copied in implicitly corretly.
 ! The use of IX, IY in MAPSTA stop this from working implicitly. 
-!$ACC DATA  copyin(mapsta(:,:))
+!$ACC DATA  COPYIN(MAPSTA(:,:))
 #endif
 
 ! Data is required in multiple places and not updated so is simple
 ! placed on the GPU and not moved. 
-!$ACC ENTER DATA COPYIN(NK,NK2, NTH, NSPEC, NSEAL)
 
 !$ACC KERNELS
 
-      DEPTH(:)  = 0.
-      PHIAW(:)  = 0.
-      DTDYN(:)  = 0.
-      CHARN(:)  = 0.
-      TWS(:)    = 0.
-      PHIBBL(:) = 0.
-      TAUWIX(:) = 0.
-      TAUWIY(:) = 0.
-      TAUWNX(:) = 0.
-      TAUWNY(:) = 0.
-      PHICE(:) = 0.
-      TAUWX(:)=0.
-      TAUWY(:)=0.
+!$ACC LOOP INDEPENDENT GANG VECTOR
+      DO ISEA=1,NSEAL
+        DEPTH(ISEA)  = 0.
+        PHIAW(ISEA)  = 0.
+        DTDYN(ISEA)  = 0.
+        CHARN(ISEA)  = 0.
+        TWS(ISEA)    = 0.
+        PHIBBL(ISEA) = 0.
+        TAUWIX(ISEA) = 0.
+        TAUWIY(ISEA) = 0.
+        TAUWNX(ISEA) = 0.
+        TAUWNY(ISEA) = 0.
+        PHICE(ISEA) = 0.
+        TAUWX(ISEA)=0.
+        TAUWY(ISEA)=0.
+      ENDDO
 
       TMP3(:,:) = 0.
       TMP4(:,:) = 0.
@@ -555,6 +559,8 @@
       ZWND   = ZZWND
       DRAT  = DAIR / DWAT
       IKS1 = 1
+!$ACC END KERNELS
+!$ACC KERNELS
 !GPUNotes Outer seapoint loop for source term calculations
 !$ACC LOOP GANG VECTOR INDEPENDENT PRIVATE(EMEAN,FMEAN,FMEAN1,WNMEAN   )&
 !$ACC PRIVATE(Z0, FMEANWS, IX, IY, TAUWAX, TAUWAY)&

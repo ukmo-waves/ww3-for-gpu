@@ -14,10 +14,11 @@ def main():
     # This will run for each grid size (N^2) and each modelruns variable. 
     gridsizes = [5, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 240, 280, 320]
     rundir = '/home/mo-lsampson/ww3-for-gpu/gpu_srctrm_test/RUN'
+    pwd=os.getcwd()
 
     # We are only doing MM for the ACC run. Hardcoded in makefile. It is worth being
     # aware that the SEQ runs are much longer than the other 2. 
-    modelruns = ['Sequential','ACC run','OMP run'] # 'Sequential','ACC run','OMP run'
+    modelruns = []#'Sequential','ACC run','OMP run'] # 'Sequential','ACC run','OMP run'
 
     # The script will attempt to save the current time outputs as much as possible
     # so there is no need to re-run completely if a failure occurs. Instead remove the
@@ -33,12 +34,13 @@ def main():
         # since the github was created, other than to allow for testing. 
         timer[:]=0.0
         if mr == 'OMP run':
-            os.chdir('/home/mo-lsampson/ww3-for-gpu/gpu_srctrm_test/OMP_F90')
+            srcdir='/home/mo-lsampson/ww3-for-gpu/gpu_srctrm_test/OMP_F90'
         else:
-            os.chdir('/home/mo-lsampson/ww3-for-gpu/gpu_srctrm_test/SEQ_F90')
+            srcdir='/home/mo-lsampson/ww3-for-gpu/gpu_srctrm_test/SEQ_F90'
 
         # We clean the make file to ensure since both SEQ and ACC will make from
         # the same list of .F90 files in same directory.
+        os.chdir(srcdir)
         clean = subprocess.Popen(["make clean"], shell=True)
         clean.wait()
         
@@ -49,15 +51,14 @@ def main():
         process=subprocess.Popen([mkstr], shell=True)
         process.wait() # Without wait the python script runs on to next tasks.
 
-        pwd=os.getcwd()
-        os.chdir(rundir)
 
         # To keep all runs consistent in terms of runtime comparison we premake
         # the model definitions from a clean slate. This means the first call
         # to test_shel.sh will skip the ww3_grid (or will be very fast). 
+        os.chdir(rundir)
         rmst = subprocess.Popen(["rm ST4TABUHF2.bin"], shell=True)
         rmst.wait()
-        os.system(pwd+"/ww3_grid")
+        os.system(srcdir+"/ww3_grid")
         os.chdir(pwd)
 
         for i, gs in enumerate(gridsizes):
@@ -91,15 +92,15 @@ def main():
         np.savez('../run_test/timecost', seq=seq, acc=acc, omp=omp)
 
     for k, mode in enumerate((seq, acc, omp)):
-        if np.sum(mode) != 0:
-            print(np.sum(mode))
-            duration[0:len(gridsizes),k]=mode
+        if all(mode == np.zeros((len(gridsizes)))):
+            print(mode)
+            mode = duration[:,k]
+            print(mode)
         else:
-            print('test')
-            print(duration[:,k])
-            mode = duration[0:len(gridsizes),k]
+            print(mode)
+            duration[:,k]=mode
 
-    np.savez('../run_test/timecost.npz', seq=seq, acc=acc, omp=omp)
+    np.savez('../run_test/timecost.npz', seq=duration[:,0], acc=duration[:,1], omp=duration[:,2])
     #plt.title('Runtime for the mini-app using different compilation options')
     plt.xlabel('Number of gridpoints (N^2)')
     plt.ylabel('Time (Seconds)')
@@ -107,7 +108,7 @@ def main():
         plt.plot(gridsizes,duration[:,j],color=colors[j],marker='^',linestyle='--',label=mr)
     plt.legend()
     plt.savefig('../run_test/timecomp.png')
-    plt.show()
+    #plt.show()
 
 
 if __name__ == '__main__':

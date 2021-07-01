@@ -6,7 +6,7 @@ OBJ=obj
 FC=nvfortran
 
 ifeq ($(MODE),acc)
-FFLAGS= -module $(MOD) -O2 -acc -DMM -ta=tesla,managed
+FFLAGS= -module $(MOD) -O2 -acc -DMM -ta=tesla,managed -Minfo=acc
 #FFLAGS= -module $(MOD) -O2 -acc -ta=tesla
 endif
 
