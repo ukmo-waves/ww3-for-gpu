@@ -34,7 +34,7 @@ cd ../run_test
 # NVidia profiler only
 # nvprof ../SEQ_F90/ww3_shel 2> prof
 
-# NVidia profiler and information for the kernal launches(1) and data transfers(2), or both (3). 
+# NVidia profiler and information for the kernal launches(1) or data transfers(2), or both (3). 
 # NV_ACC_NOTIFY=3 nvprof ../SEQ_F90/ww3_shel 2> prof
 
 # Full formed Nvidia profile description. --stats generates summary statistics, --force-overwrite will 

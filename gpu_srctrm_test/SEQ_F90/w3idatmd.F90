@@ -186,6 +186,7 @@
       LOGICAL, POINTER        :: FLMTH, FLMVS, FLMDN
       LOGICAL, POINTER        :: FLIC1, FLIC2, FLIC3, FLIC4, FLIC5
 !/
+!$ACC DECLARE COPYIN(INFLAGS2) 
       CONTAINS
 !/ ------------------------------------------------------------------- /
       SUBROUTINE W3NINP ( NDSE, NDST )

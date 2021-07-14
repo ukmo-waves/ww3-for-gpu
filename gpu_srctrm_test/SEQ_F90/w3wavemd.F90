@@ -407,7 +407,8 @@
 !
       INTEGER, ALLOCATABLE    :: TCALC(:), REFLED(:), TOUT(:), TLST(:),&
                                  TTEST(:)
-      REAL, ALLOCATABLE       :: FIELD(:),  REFLEC(:)
+      REAL, ALLOCATABLE       :: FIELD(:),  REFLEC(:), TMP1(:),TMP2(:),&
+                                 TMP3(:), TMP4(:)
 !
 ! Orphaned arrays from old data structure
 !
@@ -458,7 +459,8 @@
 !      
       ALLOCATE(TAUWX(NSEAL), TAUWY(NSEAL), TCALC(2), REFLED(6),TOUT(2),&
                TLST(2), TTEST(2),  REFLEC(4), VSioDummy(NSPEC), &
-               VDioDummy(NSPEC), VAoldDummy(NSPEC))
+               VDioDummy(NSPEC), VAoldDummy(NSPEC), TMP1(4), TMP2(3), &
+               TMP3(2), TMP4(2))
 !
 !
       IF ( PRESENT(STAMP) ) THEN
@@ -1151,26 +1153,76 @@
 ! on the declaration inside the fuction are critical to avoid confusing 
 ! validation errors.
 
-                CALL W3SRCE(srce_direct, IT, IMOD, &
-                            VAoldDummy, VA(:,:),                     &
+      WRITE(0,*)'TAG: W3SRCE'
+      SPR4T = 0.0
+      SIN4T = 0.0
+      SDS4T = 0.0
+!
+
+#ifdef MM
+#else
+! The remaining data requirements can be copied in implicitly corretly.
+! The use of IX, IY in MAPSTA stop this from working implicitly. 
+!$ACC DATA  COPYIN(MAPSTA(:,:))
+#endif
+
+! Data is required in multiple places and not updated so is simple
+! placed on the GPU and not moved. 
+
+!$ACC KERNELS
+!$ACC LOOP GANG VECTOR INDEPENDENT
+!! PRIVATE(EMEAN,FMEAN,FMEAN1,WNMEAN   )&
+!!$ACC PRIVATE(Z0, FMEANWS, IX, IY, TAUWAX, TAUWAY)&
+!!$ACC PRIVATE(AMAX, CD, ICESCALELN, ICESCALEIN, ICESCALEDS, ICESCALENL)
+      DO ISEA=1,NSEAL
+        IX=MAPSF(ISEA,1)
+        IY=MAPSF(ISEA,2)
+        DELA=1
+        DELX=1
+        DELY=1
+        IF ( MAPSTA(IY,IX) .EQ. 1 .AND. FLAGST(ISEA)) THEN
+                TMP1 = WHITECAP(ISEA,1:4)
+                TMP2 = BEDFORMS(ISEA,1:3)
+                TMP3 = TAUBBL(ISEA,1:2)
+                TMP4 = TAUICE(ISEA,1:2)
+                CALL W3SRCE(srce_direct, IT, ISEA, IX, IY, IMOD, &
+                            VAoldDummy, VA(:,ISEA),                     &
                             VSioDummy, VDioDummy, SHAVETOTioDummy,      &
-                            ALPHA(1:NK,1:NSEAL), WN(1:NK,1:NSEAL),            &
-                            CG(1:NK,1:NSEAL), DW(:), U10(:),         &
-                            U10D(:), AS(:), UST(:),            &
-                            USTDIR(:), CX(:), CY(:),           &
-                            ICE(:), ICEH(:), ICEF(:),          &
-                            ICEDMAX(:),                              &
-                            REFLEC(:), REFLED(:),            &
-                            TRNX(:,:), TRNY(:,:), BERG(:),       &
-                            FPIS(:), DTDYN(:),                    &
-                            FCUT(:), DTG, TAUWX(:), TAUWY(:), &
-                            TAUOX(:), TAUOY(:), TAUWIX(:),     &
-                            TAUWIY(:), TAUWNX(:),                 &
-                            TAUWNY(:),  PHIAW(:), CHARN(:),    &
-                            TWS(:), PHIOC(:), WHITECAP(:,1:4), D50,PSIC,&
-                            BEDFORMS(:,1:3), PHIBBL(:), TAUBBL(:,1:2), &
-                            TAUICE(:,1:2), PHICE(:), ASF(:),&
+                            ALPHA(1:NK,ISEA), WN(1:NK,ISEA),            &
+                            CG(1:NK,ISEA), DW(ISEA), U10(ISEA),         &
+                            U10D(ISEA), AS(ISEA), UST(ISEA),            &
+                            USTDIR(ISEA), CX(ISEA), CY(ISEA),           &
+                            ICE(ISEA), ICEH(ISEA), ICEF(ISEA),          &
+                            ICEDMAX(ISEA),                              &
+                            REFLEC, REFLED, DELX, DELY, DELA,            &
+                            TRNX(IY,IX), TRNY(IY,IX), BERG(ISEA),       &
+                            FPIS(ISEA), DTDYN(ISEA),                    &
+                            FCUT(ISEA), DTG, TAUWX(ISEA), TAUWY(ISEA), &
+                            TAUOX(ISEA), TAUOY(ISEA), TAUWIX(ISEA),     &
+                            TAUWIY(ISEA), TAUWNX(ISEA),                 &
+                            TAUWNY(ISEA),  PHIAW(ISEA), CHARN(ISEA),    &
+                            TWS(ISEA), PHIOC(ISEA), TMP1, D50,PSIC,&
+                            TMP2, PHIBBL(ISEA), TMP3, &
+                            TMP4, PHICE(ISEA), ASF(ISEA),&
                             SIN4T, SPR4T, SDS4T)
+                WHITECAP(ISEA,1:4) = TMP1
+                BEDFORMS(ISEA,1:3) = TMP2
+                TAUBBL(ISEA,1:2) = TMP3
+                TAUICE(ISEA,1:2) = TMP4
+              ELSE
+                UST   (ISEA) = UNDEF
+                USTDIR(ISEA) = UNDEF
+                DTDYN (ISEA) = UNDEF
+                FCUT  (ISEA) = UNDEF
+!               VA(:,JSEA)  = 0.
+              END IF
+            END DO
+!$ACC END KERNELS
+#ifdef MM
+#else
+!$ACC END DATA
+#endif
+
 !GPUNotes end of seapoint loop for source terms  
 !
             CALL WAV_MY_WTIME(eTime1)

@@ -29,7 +29,7 @@ mode="acc"
 
 if [ -z "$1" ]; then 
 	if [[ -f ww3_grid && ww3_shel && ww3_outp ]]; then
-		make MODE=$mode ww3_shel
+		make MODE=$mode
 	else 
 		make MODE=$mode
 	fi
@@ -40,7 +40,7 @@ CLEAN=false
 while [ -n "$1" ]; do
     case "$1" in
         -a) make MODE=$mode;;
-        -c) make clean; CLEAN=.true.; make MODE=$mode;;
+        -c) make clean; CLEAN=true; make MODE=$mode;;
     esac
     shift
 done

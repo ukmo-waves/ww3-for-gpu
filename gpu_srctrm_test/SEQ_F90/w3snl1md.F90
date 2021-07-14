@@ -282,7 +282,7 @@
 !
 !      WRITE(0,*) KDCON, KDMEAN, KDMN
 !GPUNotes loop over full spectrum
-!$ACC LOOP COLLAPSE(2)
+!!$ACC LOOP COLLAPSE(2)
       DO IFR=1, NFR
         DO ITH=1, NTH
           CONX = TPIINV / SIG(IFR) * CG(IFR)
@@ -294,7 +294,7 @@
 !
 !GPUNotes loop over subset of frequencies and all directions
 !GPUNotes refactored code
-!$ACC LOOP COLLAPSE(2)
+!!$ACC LOOP COLLAPSE(2)
       DO IFR=NFR+1, NFRHGH
         DO ITH=1, NTH
           ISP      = ITH + (IFR-1)*NTH
@@ -357,7 +357,7 @@
 ! 4.  Put source and diagonal term together -------------------------- *
 !
 !GPUNotes loops over full spectrum
-!$ACC LOOP SEQ
+!!$ACC LOOP SEQ
       DO ISP=1, NSPEC
         S(ISP) = CON(ISP,ISEA) * ( -2.*(SA1(ISP,ISEA) + SA2(ISP,ISEA)) &
                    + AWG1 * (SA1(IC11(ISP),ISEA) + SA2(IC12(ISP),ISEA))&

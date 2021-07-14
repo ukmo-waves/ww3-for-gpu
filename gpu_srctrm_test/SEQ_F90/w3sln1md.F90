@@ -180,7 +180,7 @@
 !      FFILT  = MIN ( MAX(FF1,FF2) , 2.*SIG(NK) )
 !
 !GPUNotes loop over frequencies no dependence on above
-!$ACC LOOP 
+!!$ACC LOOP 
       DO IK=1, NK
         RFR    = SIG(IK) / FFILT
         IF ( RFR .LT. 0.5 ) THEN
@@ -196,7 +196,7 @@
 !GPUNotes replaced array format with loop in order to use ACC LOOP
 !statement
 
-!$ACC LOOP COLLAPSE(2)
+!!$ACC LOOP COLLAPSE(2)
       DO IK=1, NK
         DO ITH=1, NTH
           S(ITH,IK) = WNF(IK) * DIRF(ITH)

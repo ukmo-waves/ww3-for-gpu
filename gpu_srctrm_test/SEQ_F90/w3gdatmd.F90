@@ -618,7 +618,7 @@
         REAL             :: SX, SY, X0, Y0, DTCFL, DTCFLI, DTMAX,      &
                             DTMIN, DMIN, CTMAX, FICE0, FICEN, FICEL,   &
                             PFMOVE, STEXU, STEYU, STEDU, IICEHMIN,     &
-                            IICEHINIT, ICESCALES(4), IICEHFAC, IICEHDISP, &
+                            IICEHINIT, IICEHFAC, IICEHDISP, &
                             IICEDDISP, IICEFDISP, BTBETA
  
         REAL(8)          :: GRIDSHIFT ! see notes in WMGHGH
@@ -630,7 +630,7 @@
         REAL   , ALLOCATABLE :: CTHG0S(:) ! TAN(Y)/R, DEFINED ON ISEA
  
         REAL   , ALLOCATABLE :: TRNX(:,:), TRNY(:,:) ! TRANSPARENCY INFORMATION ON IX,IY
-        REAL   , ALLOCATABLE :: SPCBAC(:,:), ANGARC(:)
+        REAL   , ALLOCATABLE :: SPCBAC(:,:), ANGARC(:), ICESCALES(:) 
         REAL   , ALLOCATABLE :: XGRD(:,:), YGRD(:,:) ! X AND Y DEFINED ON IX,IY
         REAL   , ALLOCATABLE :: DXDP(:,:), DXDQ(:,:) ! DX/DP & DX/DQ DEFINED ON IX,IY
         REAL   , ALLOCATABLE :: DYDP(:,:), DYDQ(:,:) ! DY/DP & DY/DQ DEFINED ON IX,IY
@@ -972,7 +972,9 @@
 !$ACC         COPYIN(KDMN, SNLC1, SNLS1, SNLS2, SNLS3, EC2, ES2, ESC  )&
 !$ACC         COPYIN(SSDSP, DSIP, SSDSISO, SSDSDTH, SSDSBR2, SSDSBRFDF)&
 !$ACC         COPYIN(SSDSBCK, NKHS, NDTAB, SSDSBR, SLNC1, FSPM, FSHF  )&
-!$ACC         COPYIN(NSEAL, NSPEC, NTH, NK, NK2)
+!$ACC         COPYIN(NSEAL, NSPEC, NTH, NK, NK2, XREL, FACHFA, FACP   )&
+!$ACC         COPYIN(FACTI1, FACTI2, DTMAX, XFLT, DTMIN, FFXFM, FFXFA )&
+!$ACC         COPYIN(FFXPM, DMIN, ICESCALES(:), IICEDISP)
 !/ Data aliasing for structure SICP(S)
 !/
       CONTAINS
@@ -1263,6 +1265,7 @@
                  GRIDS(IMOD)%GSQRT(MY,MX),   &
                  GRIDS(IMOD)%HPFAC(MY,MX),   &
                  GRIDS(IMOD)%HQFAC(MY,MX),   &
+                 GRIDS(IMOD)%ICESCALES(4),   &
                  STAT=ISTAT                  )
       CHECK_ALLOC_STATUS ( ISTAT )
 !!/DEBUGINIT         WRITE(740+IAPROC,*) 'After alocation of MAPST2, MY=', MY, ' MX=', MX

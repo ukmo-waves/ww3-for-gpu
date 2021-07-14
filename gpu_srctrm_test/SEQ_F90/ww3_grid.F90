@@ -1545,10 +1545,6 @@
       ICESNL  = MIN ( 1. , MAX ( 0. , ICESNL ) )
       FICEN  = CICEN
       GRIDSHIFT=GSHIFT
-      ICESCALES(1)=ICESLN
-      ICESCALES(2)=ICEWIND
-      ICESCALES(3)=ICESNL
-      ICESCALES(4)=ICESDS
       CMPRTRCK=TRCKCMPR
       CICE0  = MIN ( CICEN , MAX ( 0. , CICE0 ) )
       FICEL  = LICE
@@ -2768,6 +2764,10 @@
       CALL W3DIMX ( 1, NX, NY, NSEA, NDSE, NDST  &
                   )
 !
+      ICESCALES(1)=ICESLN
+      ICESCALES(2)=ICEWIND
+      ICESCALES(3)=ICESNL
+      ICESCALES(4)=ICESDS
 ! 8.g Activation of reflections and scattering
       FFACBERG=FACBERG
  
