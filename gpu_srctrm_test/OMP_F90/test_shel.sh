@@ -60,6 +60,6 @@ ln -sf inp/ww3_outp.inp .
 ../OMP_F90/ww3_outp 2> outp_profile
 
 # Compare point output with KGO
-#vimdiff ww3.68060600.spc out/KGO/ww3.68060600.spc
+vimdiff ww3.68060600.spc out/KGO/ww3.68060600.spc
 
 cd ../OMP_F90
