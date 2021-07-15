@@ -100,8 +100,6 @@
       INTEGER, PARAMETER       :: DEBUG_ELEMENT = 50
       LOGICAL                  :: LPDLIB = .FALSE.
       LOGICAL                  :: LSETUP
-
-      INTEGER                  :: ONE = 1 
 !
 ! Parameters in support of running as ESMF component
 !

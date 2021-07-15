@@ -78,8 +78,6 @@
                DA2C(1-NTH:NSPECX,NSEAL), DA2P(1-NTH:NSPECX,NSEAL),     &
                DA2M(1-NTH:NSPECX,NSEAL), CON(NSPEC,NSEAL))
 
-!!$ACC ENTER DATA COPYIN(UE, SA1, SA2, DA1C, DA1P, DA1M, DA2C, DA2P)&
-!!$ACC            COPYIN(DA2M, CON)
       END SUBROUTINE
 !/ ------------------------------------------------------------------- /
       SUBROUTINE W3SNL1 (A, CG, KDMEAN, S, D, ISEA)
@@ -259,8 +257,8 @@
 !/ ------------------------------------------------------------------- /
 !/ Parameter list
 !/
-      REAL, INTENT(IN)    :: A(1:NSPEC), CG(1:NK), KDMEAN
-      REAL, INTENT(OUT)   :: S(1:NSPEC), D(1:NSPEC)
+      REAL, INTENT(IN)    :: A(NSPEC), CG(NK), KDMEAN
+      REAL, INTENT(OUT)   :: S(NSPEC), D(NSPEC)
       INTEGER, OPTIONAL, INTENT(IN)  :: ISEA
 
 !/ ------------------------------------------------------------------- /
@@ -280,9 +278,7 @@
       CONS   = SNLC1 * ( 1. + SNLS1/X * (1.-SNLS2*X) * EXP(X2) )
 ! 2.  Prepare auxiliary spectrum and arrays -------------------------- *
 !
-!      WRITE(0,*) KDCON, KDMEAN, KDMN
 !GPUNotes loop over full spectrum
-!$ACC LOOP COLLAPSE(2)
       DO IFR=1, NFR
         DO ITH=1, NTH
           CONX = TPIINV / SIG(IFR) * CG(IFR)
@@ -294,7 +290,6 @@
 !
 !GPUNotes loop over subset of frequencies and all directions
 !GPUNotes refactored code
-!$ACC LOOP COLLAPSE(2)
       DO IFR=NFR+1, NFRHGH
         DO ITH=1, NTH
           ISP      = ITH + (IFR-1)*NTH
@@ -357,7 +352,6 @@
 ! 4.  Put source and diagonal term together -------------------------- *
 !
 !GPUNotes loops over full spectrum
-!$ACC LOOP SEQ
       DO ISP=1, NSPEC
         S(ISP) = CON(ISP,ISEA) * ( -2.*(SA1(ISP,ISEA) + SA2(ISP,ISEA)) &
                    + AWG1 * (SA1(IC11(ISP),ISEA) + SA2(IC12(ISP),ISEA))&

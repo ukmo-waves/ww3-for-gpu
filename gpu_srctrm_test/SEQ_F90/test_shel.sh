@@ -23,9 +23,9 @@ set -e
 # Make sure to run the test with -c if changing the compiler flags.
 
 # Makefile controls Mananged memory vs Explicit transfers
-#mode="acc"
+mode="acc"
 # CPU Sequential
-mode="seq"
+#mode="seq"
 
 if [ -z "$1" ]; then 
 	if [[ -f ww3_grid && ww3_shel && ww3_outp ]]; then

@@ -153,8 +153,7 @@
 !/ Local parameters
 !/
       INTEGER                 :: ITH, IK
-      REAL                    :: COSU, SINU, FAC, FF1, FF2, &
-                                 FFILT, RFR
+      REAL                    :: COSU, SINU, FAC, FF1, FF2, FFILT, RFR
       REAL                    :: DIRF(NTH), WNF(NK)
 !/
 !/ ------------------------------------------------------------------- /
@@ -174,13 +173,7 @@
 !GPUNotes loop over directions
       DIRF(:) = MAX ( 0. , (ECOS(:)*COSU+ESIN(:)*SINU) )**4
 !
-!      FAC    = SLNC1 * USTAR**4
-!      FF1    = FSPM * GRAV/(28.*USTAR)
-!      FF2    = FSHF * MIN(SIG(NK),FHIGH)
-!      FFILT  = MIN ( MAX(FF1,FF2) , 2.*SIG(NK) )
-!
 !GPUNotes loop over frequencies no dependence on above
-!$ACC LOOP 
       DO IK=1, NK
         RFR    = SIG(IK) / FFILT
         IF ( RFR .LT. 0.5 ) THEN
@@ -193,10 +186,7 @@
 ! 2.  Compose source term -------------------------------------------- *
 !
 !GPUNotes loop over frequencies
-!GPUNotes replaced array format with loop in order to use ACC LOOP
-!statement
 
-!$ACC LOOP COLLAPSE(2)
       DO IK=1, NK
         DO ITH=1, NTH
           S(ITH,IK) = WNF(IK) * DIRF(ITH)

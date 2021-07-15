@@ -209,7 +209,7 @@
 !       U10DIR  Real.  I   Id. wind direction.
 !       AS      Real.  I   Air-sea temp. difference.      ( !/ST3 )
 !       USTAR   Real. !/O  Friction velocity.
-!       USTDIR  Real!/O  Idem, direction.
+!       USTDIR  Real  !/O  Idem, direction.
 !       CX-Y    Real.  I   Current velocity components.   ( !/BS1 )
 !       ICE     Real   I   Sea ice concentration
 !       ICEH    Real   I   Sea ice thickness
@@ -398,35 +398,30 @@
 !/ ------------------------------------------------------------------- /
 !/ Parameter list
 !/
-!CODENotes: Specifying the correct bounds for input variables here, and 
-! on the call to the fuction are critical to avoid confusing validation
-! errors.
-
       INTEGER, INTENT(IN)    :: srce_call, IT, IMOD
-      REAL, intent(in)       :: SPECOLD(1:NSPEC)
-      REAL, INTENT(OUT)      :: VSIO(1:NSPEC), VDIO(1:NSPEC)
+      REAL, intent(IN)       :: SPECOLD(NSPEC)
+      REAL, INTENT(OUT)      :: VSIO(NSPEC), VDIO(NSPEC)
       LOGICAL, INTENT(OUT)   :: SHAVEIO
-      REAL, INTENT(IN)       :: D_INP(1:), U10ABS(1:NSEAL),            &
-                                U10DIR(1:NSEAL), AS(1:), CX(1:),       &
-                                CY(1:), DTG, D50, PSIC, ICE(1:),       &
-                                ICEH(1:)
+      REAL, INTENT(IN)       :: D_INP(NSEAL), U10ABS(NSEAL),           &
+                                U10DIR(NSEAL), AS(NSEAL), CX(NSEAL),   &
+                                CY(NSEAL), DTG, D50, PSIC, ICE(NSEAL), &
+                                ICEH(NSEAL)
       INTEGER, INTENT(IN)    :: REFLED(6)
       REAL, INTENT(IN)       :: REFLEC(4), TRNX(:,:), TRNY(:,:),       &
                                 BERG(:), ICEDMAX(:)
-      REAL, INTENT(INOUT)    :: WN1(1:NK,1:NSEAL), CG1(1:NK,1:NSEAL),  &
-                                SPEC(1:NSPEC,1:NSEAL), ALPHA(:,:),     &
-                                USTAR(1:NSEAL),USTDIR(1:NSEAL),FPI(:), &
-                                TAUOX(1:NSEAL), TAUOY(1:NSEAL),        &
-                                TAUWX(1:NSEAL), TAUWY(1:NSEAL),        &
-                                PHIAW(1:NSEAL), PHIOC(1:NSEAL),        &
-                                PHICE(1:NSEAL), CHARN(1:NSEAL),        &
-                                TWS(1:NSEAL), BEDFORMS(1:NSEAL,1:3),   &
-                                PHIBBL(1:NSEAL), TAUBBL(1:NSEAL,1:2),  &
-                                TAUICE(1:NSEAL,1:2),                   &
-                                WHITECAP(1:NSEAL,1:4), TAUWIX(1:NSEAL),&
-                                TAUWIY(1:NSEAL), TAUWNX(1:NSEAL),    &
-                                TAUWNY(1:NSEAL),ICEF(1:NSEAL)
-      REAL, INTENT(OUT)      :: DTDYN(1:NSEAL), FCUT(1:NSEAL)
+      REAL, INTENT(INOUT)    :: WN1(NK,NSEAL), CG1(NK,NSEAL),          &
+                                SPEC(NSPEC,NSEAL), ALPHA(:,:),         &
+                                USTAR(NSEAL),USTDIR(NSEAL),FPI(:),     &
+                                TAUOX(NSEAL), TAUOY(NSEAL),            &
+                                TAUWX(NSEAL), TAUWY(NSEAL),            &
+                                PHIAW(NSEAL), PHIOC(NSEAL),            &
+                                PHICE(NSEAL), CHARN(NSEAL),            &
+                                TWS(NSEAL), BEDFORMS(NSEAL,1:3),       &
+                                PHIBBL(NSEAL), TAUBBL(NSEAL,1:2),      &
+                                TAUICE(NSEAL,1:2), WHITECAP(NSEAL,1:4),&
+                                TAUWIX(NSEAL), TAUWIY(NSEAL),          &
+                                TAUWNX(NSEAL), TAUWNY(NSEAL),ICEF(NSEAL)
+      REAL, INTENT(OUT)      :: DTDYN(NSEAL), FCUT(NSEAL)
       REAL, INTENT(IN)       :: COEF(:)
 !/
 !/ ------------------------------------------------------------------- /
@@ -479,7 +474,6 @@
                                 sTime3, eTime3
       REAL(8), INTENT(OUT)   :: SIN4T, SPR4T, SDS4T
      
-      INTEGER :: NSEAL_LOCAL
       REAL,ALLOCATABLE       :: TMP1(:,:), TMP2(:,:), TMP3(:,:),       &
                                 TMP4(:,:)
       REAL,ALLOCATABLE       :: BRLAMBDA(:,:)
@@ -487,16 +481,11 @@
 !/ ------------------------------------------------------------------- /
 !/
   
-
-!GPUNotes SIN4 requires these values from constants.f90, however it does
-!not automatically transfer the data even if they are declared with
-!copyin. This seemed to be the best place to put the updates. 
       WRITE(0,*)'TAG: W3SRCE'
       SPR4T = 0.0
       SIN4T = 0.0
       SDS4T = 0.0
 !
-      NSEAL_LOCAL = NSEAL
 !Allocating arrays here, this are local to routine and typically treated
 !as scalars. In order to allow parallelism over sea points they have
 !been converted. Deallocated at the end of this routine. 
@@ -514,38 +503,33 @@
       ALLOCATE(BRLAMBDA(NSPEC,NSEAL), DEPTH(NSEAL), &
       TMP1(4,NSEAL),TMP2(3,NSEAL), TMP3(2,NSEAL), TMP4(2,NSEAL))
 
-#ifdef MM
-#else
 ! The remaining data requirements can be copied in implicitly corretly.
 ! The use of IX, IY in MAPSTA stop this from working implicitly. 
+
+#ifdef MM
+#else
 !$ACC DATA  COPYIN(MAPSTA(:,:))
 #endif
 
-! Data is required in multiple places and not updated so is simple
-! placed on the GPU and not moved. 
-
 !$ACC KERNELS
 
-!$ACC LOOP INDEPENDENT GANG VECTOR
-      DO ISEA=1,NSEAL
-        DEPTH(ISEA)  = 0.
-        PHIAW(ISEA)  = 0.
-        DTDYN(ISEA)  = 0.
-        CHARN(ISEA)  = 0.
-        TWS(ISEA)    = 0.
-        PHIBBL(ISEA) = 0.
-        TAUWIX(ISEA) = 0.
-        TAUWIY(ISEA) = 0.
-        TAUWNX(ISEA) = 0.
-        TAUWNY(ISEA) = 0.
-        PHICE(ISEA) = 0.
-        TAUWX(ISEA)=0.
-        TAUWY(ISEA)=0.
-      ENDDO
+      DEPTH  = 0.
+      PHIAW  = 0.
+      DTDYN  = 0.
+      CHARN  = 0.
+      TWS    = 0.
+      PHIBBL = 0.
+      TAUWIX = 0.
+      TAUWIY = 0.
+      TAUWNX = 0.
+      TAUWNY = 0.
+      PHICE  = 0.
+      TAUWX  = 0.
+      TAUWY  = 0.
 
       TMP3(:,:) = 0.
       TMP4(:,:) = 0.
-      BRLAMBDA(:,:)=0.
+      BRLAMBDA(:,:)= 0.
 
       VSIN(:,:) = 0.
       VDIN(:,:) = 0.
@@ -559,9 +543,9 @@
       ZWND   = ZZWND
       DRAT  = DAIR / DWAT
       IKS1 = 1
-!$ACC END KERNELS
-!$ACC KERNELS
+
 !GPUNotes Outer seapoint loop for source term calculations
+
 !$ACC LOOP GANG VECTOR INDEPENDENT PRIVATE(EMEAN,FMEAN,FMEAN1,WNMEAN   )&
 !$ACC PRIVATE(Z0, FMEANWS, IX, IY, TAUWAX, TAUWAY)&
 !$ACC PRIVATE(AMAX, CD, ICESCALELN, ICESCALEIN, ICESCALEDS, ICESCALENL)
@@ -599,14 +583,12 @@
 !FACP   = XP / PI * 0.62E-3 * TPI**4 / GRAV**2
   
 !GPUNotes loop over frequencies
-!$ACC LOOP 
           DO IK=1, NK
             DAM(1+(IK-1)*NTH,ISEA) = FACP / ( SIG(IK) * WN1(IK,ISEA)**3)
             WN2(1+(IK-1)*NTH,ISEA) = WN1(IK,ISEA)
           END DO
   
 !GPUNotes loop over full spectrum
-!$ACC LOOP COLLAPSE(2)
           DO IK=1, NK
             DO ITH=2, NTH
               IS0    = (IK-1)*NTH
@@ -643,14 +625,11 @@
                          IY, BRLAMBDA(:,ISEA))
           END IF
 !GPUNotes call below will contain source term specific spectral loops
-!      CALL CPU_TIME(sTime1)
           CALL W3SPR4 (SPEC(:,ISEA), CG1(:,ISEA), WN1(:,ISEA), EMEAN,&
                          FMEAN, FMEAN1, WNMEAN, AMAX, U10ABS(ISEA),    &
                          U10DIR(ISEA), USTAR(ISEA), USTDIR(ISEA),      &
                          TAUWX(ISEA), TAUWY(ISEA), CD, Z0, CHARN(ISEA),&
                          LLWS(:,ISEA), FMEANWS,ISEA)
-!      CALL CPU_TIME(eTime1)
-!      SPR4T = SPR4T + eTime1 - sTime1
           TWS(ISEA) = 1./FMEANWS
 !
 ! 1.c2 Stores the initial data
@@ -672,13 +651,10 @@
 !
 ! ... Branch point dynamic integration - - - - - - - - - - - - - - - -
 !GPUNotes loop for explicit time integration of source terms
-!GPUNotes this might be a pain in the proverbial for tightening
-!GPUNotes the seapoint and spectral loops
 
 !GPUNotes Bodged DO WHILE LOOP, it is required to be sequential but the
 !compiler panics. Setting it to loop over a larger extent and leaving
 !the EXIT statements in gives us the output we require.
-
 
 !$ACC LOOP SEQ
           DO I=1,120 
@@ -694,15 +670,12 @@
             DT     = MIN (DTG-DTTOT, DTMAX )
             AFILT  = MAX (DAM(NSPEC,ISEA), XFLT*AMAX )
   
-!        CALL CPU_TIME(sTime2) 
             CALL W3SIN4(SPEC(:,ISEA), CG1(:,ISEA), WN2(:,ISEA),        &
                         U10ABS(ISEA), USTAR(ISEA), DRAT, AS(ISEA),     &
                         U10DIR(ISEA), Z0, CD, TAUWX(ISEA), TAUWY(ISEA),&
                         TAUWAX, TAUWAY, VSIN(:,ISEA),      &
                         VDIN(:,ISEA), LLWS(:,ISEA), IX, IY,            &
                         BRLAMBDA(:,ISEA))
-!        CALL CPU_TIME(eTime2)
-!        SIN4T = SIN4T + eTime2 - sTime2
 !
 ! 2.b Nonlinear interactions.
   
@@ -716,15 +689,11 @@
   
 !GPUNotes subroutine will contain source term specific spectral loops
   
-!        CALL CPU_TIME(sTime3)
             CALL W3SDS4(SPEC(:,ISEA), WN1(:,ISEA), CG1(:,ISEA),        &
                         USTAR(ISEA), USTDIR(ISEA), DEPTH(ISEA),        &
                         VSDS(:,ISEA), VDDS(:,ISEA), IX, IY,            &
                         BRLAMBDA(:,ISEA),TMP1(1:4,ISEA), ISEA)  
           
-!        CALL CPU_TIME(eTime3)
-!        SDS4T = SDS4T + eTime3 - sTime3
-   
 !
 ! 2.c2   optional dissipation parameterisations
 !
@@ -749,9 +718,6 @@
 !     INFLAGS2(4) is true if ice concentration was ever read during
 !             this simulation
   
-!GPUNotes The different between using the ACC WAIT and kernels is the
-!knockon affect of gang and vector sizes since they must be consistant
-!between kernel blocks.
             IF ( INFLAGS2(4) ) THEN
               VSNL(1:NSPECH,ISEA) = ICESCALENL*VSNL(1:NSPECH,ISEA)
               VDNL(1:NSPECH,ISEA) = ICESCALENL*VDNL(1:NSPECH,ISEA)
@@ -766,7 +732,6 @@
 !GPUNotes spectral loop up to frequency cut off
             VS(:,ISEA) = 0.
             VD(:,ISEA) = 0.
-!$ACC LOOP SEQ
             DO IS=IS1, NSPECH
               VS(IS,ISEA)=VSLN(IS,ISEA) + VSIN(IS,ISEA) + VSNL(IS,ISEA)&
                      + VSDS(IS,ISEA) + VSBT(IS,ISEA)
@@ -815,10 +780,6 @@
 !              WRITE(*,'(A20,I20,F20.10,L20,4F20.10)') 'BEFORE', IX, DEPTH, SHAVE, SUM(VS), SUM(VD), SUM(SPEC)
 !            ENDIF
               IF ( SHAVE ) THEN
-!GPUNotes Running sequentially due to the recursive use of eIncX, adding
-!loop independent does not force the loop to be parallel as it should.
-  
-!$ACC LOOP SEQ
                 DO IS=IS1, NSPECH
                   eInc1 = VS(IS,ISEA)*DT/MAX(1.,(1.-HDT*VD(IS,ISEA)))
                   eInc2 = SIGN ( MIN (DAM(IS,ISEA),ABS(eInc1)) , eInc1 )
@@ -826,9 +787,6 @@
                 END DO
               ELSE
 !
-!GPUNotes Running sequentially due to the recursive use of eIncX, adding
-!loop independent does not force the loop to be parallel as it should.
-!$ACC LOOP 
                 DO IS=IS1, NSPECH
                   eInc1 = VS(IS,ISEA)*DT/MAX(1.,(1.-HDT*VD(IS,ISEA)))
                   SPEC(IS,ISEA) = MAX( 0. , SPEC(IS,ISEA)+eInc1 )
@@ -845,10 +803,6 @@
             HSTOT=0.
 !GPUNotes Loops over spectrum - the spectrum must be properly updated first
   
-!GPUNotes Loop has been refactored for ACC applications to allow the
-!loops to be closely nested and collapsable.
-  
-!$ACC LOOP SEQ COLLAPSE(2)
             DO IK=IKS1, NK
               DO ITH=1, NTH
                 FACTOR = DDEN(IK)/CG1(IK,ISEA)                  !Jacobian to get energy in band
@@ -882,14 +836,11 @@
 !   a Mean parameters
 !
 !GPUNotes source term specific loops over spectrum in this call
-!        CALL CPU_TIME(sTime1)
             CALL W3SPR4 (SPEC(:,ISEA), CG1(:,ISEA), WN1(:,ISEA), EMEAN,&
                          FMEAN, FMEAN1, WNMEAN, AMAX, U10ABS(ISEA),    &
                          U10DIR(ISEA), USTAR(ISEA), USTDIR(ISEA),      &
                          TAUWX(ISEA), TAUWY(ISEA), CD, Z0, CHARN(ISEA),&
                          LLWS(:,ISEA), FMEANWS, ISEA)
-!        CALL CPU_TIME(eTime1)
-!        SPR4T = SPR4T + eTime1 - sTime1
 !
 ! Introduces a Long & Resio (JGR2007) type dependance on wave age
             FAGE   = FFXFA*TANH(0.3*U10ABS(ISEA)*FMEANWS*TPI/GRAV)
@@ -899,9 +850,6 @@
             FHIGH  = MIN ( SIG(NK) , MAX ( FH1 , FH2 ) )
             NKH    = MAX ( 2 , MIN ( NKH1 ,                           &
                    INT ( FACTI2 + FACTI1*LOG(MAX(1.E-7,FHIGH)) ) ) )
-  
-!GPUNotes UPDATE HOST solves issues with unnecessary last private values
-!of scalars within the vector loop.
   
 ! 6.b Limiter for shallow water or Miche style criterion
 !     Last time step ONLY !
@@ -913,9 +861,6 @@
 ! 6.d Add tail
 !
 !GPUNotes Smaller spectral loop to add energy to tail
-!GPUNotes Independence is acceptable for inner loop, outer loop
-!dependence on IK within SPEC limits any collapsable option.
-!$ACC LOOP SEQ COLLAPSE(2)
             DO IK=NKH+1, NK
               DO ITH=1, NTH
                 SPEC(ITH+(IK-1)*NTH,ISEA) = SPEC(ITH+(IK-2)*NTH,ISEA) &
@@ -925,15 +870,12 @@
 !
 ! 6.e  Update wave-supported stress----------------------------------- *
 !
-!        CALL CPU_TIME(sTime2) 
             CALL W3SIN4(SPEC(:,ISEA), CG1(:,ISEA), WN2(:,ISEA),        &
                         U10ABS(ISEA), USTAR(ISEA), DRAT, AS(ISEA),     &
                         U10DIR(ISEA), Z0, CD, TAUWX(ISEA), TAUWY(ISEA),&
                         TAUWAX, TAUWAY, VSIN(:,ISEA),      &
                         VDIN(:,ISEA), LLWS(:,ISEA), IX, IY,            &
                         BRLAMBDA(:,ISEA) )
-!        CALL CPU_TIME(eTime2)
-!        SIN4T = SIN4T + eTime2 - sTime2
 ! 7.  Check if integration complete ---------------------------------- *
 !
             IF (srce_call .eq. srce_imp_post) THEN
@@ -959,8 +901,6 @@
 !     and final energy, plus wind input plus the SNL flux to high freq.,
 !     minus the energy lost to the bottom boundary layer (BBL)
 !
-!CODENotes: Brought initialisations here to avoid them being pulled and
-!push to gpu.
   
 !GPUNotes loop over spectrum requires spectrum to be properly updated
           EFINISH  = 0.
@@ -1007,7 +947,6 @@
 ! 10.1  Adds ice scattering and dissipation: implicit integration---------------- *
 !     INFLAGS2(4) is true if ice concentration was ever read during
 !             this simulation
-!
    
           IF ( INFLAGS2(4).AND.ICE(ISEA).GT.0 ) THEN
             IF (IICEDISP) THEN
@@ -1027,41 +966,37 @@
             TMP4(:,ISEA) = 0.
             PHICE(ISEA) = 0.
   
-!CODENotes: Previously was stored inside following IK loop, but due to
-!specific values of ATT, is a null operation.
-  
 ! First part of ice term integration: dissipation part
-!
-            ATT=1.
-            SPEC(1+(IK-1)*NTH:NTH+(IK-1)*NTH,ISEA) =                   &
-              ATT*SPEC2(1+(IK-1)*NTH:NTH+(IK-1)*NTH,ISEA)
 !
   
 !GPUNotes These spectral loops are for ice effects?
 !GPUnotes slightly surprised they aren't enclosed in a conditional?
 !GPUNotes actually maybe they are, think this is an indentation thing
 !GPUNotes which I have tried to address
+
 ! Second part of ice term integration: scattering including re-distribution in directions
 !
 ! 10.2  Fluxes of energy and momentum due to ice effects
 !
-!GPUNotes Moved FACTOR and FACTOR2 inside lopp for collapse.
-!$ACC LOOP SEQ COLLAPSE(2)
+!GPUNotes Moved FACTOR and FACTOR2 inside loop for collapse.
+            ATT=1.
             DO IK=1,NK
+              SPEC(1+(IK-1)*NTH:NTH+(IK-1)*NTH,ISEA) =                 &
+                      ATT*SPEC2(1+(IK-1)*NTH:NTH+(IK-1)*NTH,ISEA)
               DO ITH = 1,NTH
-              FACTOR = DDEN(IK)/CG1(IK,ISEA)                  !Jacobian to get energy in band
-              FACTOR2= FACTOR*GRAV*WN1(IK,ISEA)/SIG(IK)       ! coefficient to get momentum
+                FACTOR  = DDEN(IK)/CG1(IK,ISEA)                  !Jacobian to get energy in band
+                FACTOR2 = FACTOR*GRAV*WN1(IK,ISEA)/SIG(IK)       ! coefficient to get momentum
                 IS = ITH+(IK-1)*NTH
                 PHICE(ISEA) = PHICE(ISEA) + (SPEC(IS,ISEA)-SPEC2(IS,   &
                               ISEA)) * FACTOR
-                COSI(1,ISEA)=ECOS(IS)
-                COSI(2,ISEA)=ESIN(IS)
-                TMP4(:,ISEA) = TMP4(:,ISEA) -(SPEC(IS,ISEA)-SPEC2(IS,&
-                ISEA))*FACTOR2*COSI(:,ISEA)
+                COSI(1,ISEA) = ECOS(IS)
+                COSI(2,ISEA) = ESIN(IS)
+                TMP4(:,ISEA) = TMP4(:,ISEA) -(SPEC(IS,ISEA)-SPEC2(IS,  &
+                               ISEA))*FACTOR2*COSI(:,ISEA)
               END DO
             END DO
-            PHICE(ISEA) =-1.*DWAT*GRAV*PHICE(ISEA) /DTG
-            TMP4(:,ISEA)=TMP4(:,ISEA)/DTG
+            PHICE(ISEA) = -1.*DWAT*GRAV*PHICE(ISEA)/DTG
+            TMP4(:,ISEA)= TMP4(:,ISEA)/DTG
           ELSE
           END IF
   
@@ -1085,9 +1020,6 @@
           IF (IT.EQ.0) SPEC(:,ISEA) = SPECINIT(:,ISEA)
           SPEC(:,ISEA) = MAX(0., SPEC(:,ISEA))
 !LINE FROM W3WAVE
-!          SIN4TOT = SIN4TOT + SIN4T
-!          SPR4TOT = SPR4TOT + SPR4T
-!          SDS4TOT = SDS4TOT + SDS4T
 
           WHITECAP(ISEA,:) = TMP1(:,ISEA)
           BEDFORMS(ISEA,:) = TMP2(:,ISEA)
