@@ -8,17 +8,17 @@
 set -eu
 
 ## Change directory to where job was submitted:
-#cd ${PBS_O_WORKDIR:-.}
+cd ${PBS_O_WORKDIR:-.}
 
 ## link in the correct input files:
 ln -sf inp/ww3_outp.inp ./
 
-mv out/*.ww3 ./
+#mv -f out/*.ww3 ./
 
 ## run the ww3_outp program:
 ../SEQ_F90/ww3_outp
 
-mv *.ww3 out/
+mv -f *.ww3 out/
 mkdir -p out/ww3_outp/
 rm -rf out/ww3_outp/*
 mv ww3.*.spc out/ww3_outp/

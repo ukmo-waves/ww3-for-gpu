@@ -89,7 +89,7 @@
 ! Parameters for friction factor table
 !
       INTEGER, PARAMETER       :: SIZEFWTABLE=300
-      REAL                     :: FWTABLE(0:SIZEFWTABLE)
+      REAL, ALLOCATABLE        :: FWTABLE(:)
       REAL                     :: DELAB
       REAL,    PARAMETER       :: ABMIN = -1.
       REAL, PRIVATE, PARAMETER :: ABMAX = 8.
@@ -100,6 +100,8 @@
       INTEGER, PARAMETER       :: DEBUG_ELEMENT = 50
       LOGICAL                  :: LPDLIB = .FALSE.
       LOGICAL                  :: LSETUP
+
+      INTEGER                  :: ONE = 1 
 !
 ! Parameters in support of running as ESMF component
 !
@@ -108,6 +110,8 @@
 !     module during initialization.
       LOGICAL :: IS_ESMF_COMPONENT = .FALSE.
 !
+!$ACC DECLARE CREATE(DELAB, FWTABLE(:),TPIINV,GRAV, NU_AIR, KAPPA, TPI)& 
+!$ACC         CREATE(SIZEFWTABLE, ABMIN, RADE,PI,DAIR, DEBUG_NODE)
       CONTAINS
 ! ----------------------------------------------------------------------
       SUBROUTINE TABU_FW
@@ -180,7 +184,9 @@
       REAL KER, KEI
       REAL ABR,ABRLOG,L10,FACT,FSUBW,FSUBWMEMO,dzeta0,dzeta0memo
 !
+      ALLOCATE(FWTABLE(0:SIZEFWTABLE))
       DELAB   = (ABMAX-ABMIN)/REAL(SIZEFWTABLE)
+
       L10=ALOG(10.)
       DO I=0,SIZEFWTABLE
 !

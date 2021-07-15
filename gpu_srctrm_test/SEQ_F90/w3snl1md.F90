@@ -57,9 +57,33 @@
 !/
       PUBLIC
 !/
+      REAL,ALLOCATABLE    :: UE(:,:), SA1(:,:), SA2(:,:), DA1C(:,:),   &
+                             DA1P(:,:), DA1M(:,:), DA2C(:,:), DA2P(:,:)&
+                             , DA2M(:,:), CON(:,:)
+!$ACC DECLARE CREATE(UE, SA1, SA2, DA1C, DA1P, DA1M, DA2C, DA2P, DA2M,CON)
+
       CONTAINS
 !/ ------------------------------------------------------------------- /
-      SUBROUTINE W3SNL1 (A, CG, KDMEAN, S, D)
+      SUBROUTINE W3SNL1_INIT()
+
+      USE W3GDATMD, ONLY: NTH, NSPEC, NSEAL
+      USE W3ADATMD, ONLY: NSPECY, NSPECX
+
+      IMPLICIT NONE
+
+      WRITE(0,*) "W3SNL1_INIT (WW3_SHEL): NSPECY/NSPECX: ",NSPECY,NSPECX
+      ALLOCATE(UE(1-NTH:NSPECY,NSEAL), SA1(1-NTH:NSPECX,NSEAL),        &
+               SA2(1-NTH:NSPECX,NSEAL), DA1C(1-NTH:NSPECX,NSEAL),      &
+               DA1P(1-NTH:NSPECX,NSEAL), DA1M(1-NTH:NSPECX,NSEAL),     &
+               DA2C(1-NTH:NSPECX,NSEAL), DA2P(1-NTH:NSPECX,NSEAL),     &
+               DA2M(1-NTH:NSPECX,NSEAL), CON(NSPEC,NSEAL))
+
+!!$ACC ENTER DATA COPYIN(UE, SA1, SA2, DA1C, DA1P, DA1M, DA2C, DA2P)&
+!!$ACC            COPYIN(DA2M, CON)
+      END SUBROUTINE
+!/ ------------------------------------------------------------------- /
+      SUBROUTINE W3SNL1 (A, CG, KDMEAN, S, D, ISEA)
+!$ACC ROUTINE SEQ
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -229,88 +253,84 @@
                     DAL1, DAL2, DAL3, AF11,                           &
                     AWG1, AWG2, AWG3, AWG4, AWG5, AWG6, AWG7, AWG8,   &
                     SWG1, SWG2, SWG3, SWG4, SWG5, SWG6, SWG7, SWG8
-!!/DEBUGSRC      USE W3ODATMD, only : IAPROC
 !
       IMPLICIT NONE
 !/
 !/ ------------------------------------------------------------------- /
 !/ Parameter list
 !/
-      REAL, INTENT(IN)        :: A(NSPEC), CG(NK), KDMEAN
-      REAL, INTENT(OUT)       :: S(NSPEC), D(NSPEC)
-!/
+      REAL, INTENT(IN)    :: A(1:NSPEC), CG(1:NK), KDMEAN
+      REAL, INTENT(OUT)   :: S(1:NSPEC), D(1:NSPEC)
+      INTEGER, OPTIONAL, INTENT(IN)  :: ISEA
+
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
 !/
-      INTEGER                 :: ITH, IFR, ISP
-      REAL                    :: X, X2, CONS, CONX, FACTOR,           &
-                                 E00, EP1, EM1, EP2, EM2,             &
-                                 SA1A, SA1B, SA2A, SA2B
-      REAL               ::  UE  (1-NTH:NSPECY), SA1 (1-NTH:NSPECX),  &
-                             SA2 (1-NTH:NSPECX), DA1C(1-NTH:NSPECX),  &
-                             DA1P(1-NTH:NSPECX), DA1M(1-NTH:NSPECX),  &
-                             DA2C(1-NTH:NSPECX), DA2P(1-NTH:NSPECX),  &
-                             DA2M(1-NTH:NSPECX), CON (      NSPEC )
+      INTEGER             :: ITH, IFR, ISP, I, TEST
+      REAL                :: X, X2, CONS, CONX, FACTOR, E00, EP1, EM1,&
+                             EP2, EM2, SA1A, SA1B, SA2A, SA2B
 !/
 !/ ------------------------------------------------------------------- /
 !/
-! initialisations
-!
+
 ! 1.  Calculate prop. constant --------------------------------------- *
 !
       X      = MAX ( KDCON*KDMEAN , KDMN )
       X2     = MAX ( -1.E15, SNLS3*X)
       CONS   = SNLC1 * ( 1. + SNLS1/X * (1.-SNLS2*X) * EXP(X2) )
-!
 ! 2.  Prepare auxiliary spectrum and arrays -------------------------- *
 !
+!      WRITE(0,*) KDCON, KDMEAN, KDMN
 !GPUNotes loop over full spectrum
+!$ACC LOOP COLLAPSE(2)
       DO IFR=1, NFR
-        CONX = TPIINV / SIG(IFR) * CG(IFR)
         DO ITH=1, NTH
+          CONX = TPIINV / SIG(IFR) * CG(IFR)
           ISP       = ITH + (IFR-1)*NTH
-          UE (ISP) = A(ISP) / CONX
-          CON(ISP) = CONX
+          UE (ISP,ISEA) = A(ISP) / CONX
+          CON(ISP,ISEA) = CONX
         END DO
       END DO
 !
 !GPUNotes loop over subset of frequencies and all directions
+!GPUNotes refactored code
+!$ACC LOOP COLLAPSE(2)
       DO IFR=NFR+1, NFRHGH
         DO ITH=1, NTH
           ISP      = ITH + (IFR-1)*NTH
-          UE(ISP) = UE(ISP-NTH) * FACHFE
+          UE(ISP,ISEA) = UE((NFR-1)*NTH+ITH,ISEA) * (FACHFE)**(IFR-NFR)
         END DO
       END DO
 !
 !GPUNotes loop over subset of directions
       DO ISP=1-NTH, 0
-        UE  (ISP) = 0.
-        SA1 (ISP) = 0.
-        SA2 (ISP) = 0.
-        DA1C(ISP) = 0.
-        DA1P(ISP) = 0.
-        DA1M(ISP) = 0.
-        DA2C(ISP) = 0.
-        DA2P(ISP) = 0.
-        DA2M(ISP) = 0.
+        UE  (ISP,ISEA) = 0.0
+        SA1 (ISP,ISEA) = 0.0
+        SA2 (ISP,ISEA) = 0.0
+        DA1C(ISP,ISEA) = 0.0
+        DA1P(ISP,ISEA) = 0.0
+        DA1M(ISP,ISEA) = 0.0
+        DA2C(ISP,ISEA) = 0.0
+        DA2P(ISP,ISEA) = 0.0
+        DA2M(ISP,ISEA) = 0.0
       END DO
 !
 ! 3.  Calculate interactions for extended spectrum ------------------- *
 !
 !GPUNotes loop over extended spectrum for nonlinear calcs
-      DO ISP=1, NSPECX
 !
 ! 3.a Energy at interacting bins
 !
-        E00    =        UE(ISP)
-        EP1    = AWG1 * UE(IP11(ISP)) + AWG2 * UE(IP12(ISP))        &
-               + AWG3 * UE(IP13(ISP)) + AWG4 * UE(IP14(ISP))
-        EM1    = AWG5 * UE(IM11(ISP)) + AWG6 * UE(IM12(ISP))        &
-               + AWG7 * UE(IM13(ISP)) + AWG8 * UE(IM14(ISP))
-        EP2    = AWG1 * UE(IP21(ISP)) + AWG2 * UE(IP22(ISP))        &
-               + AWG3 * UE(IP23(ISP)) + AWG4 * UE(IP24(ISP))
-        EM2    = AWG5 * UE(IM21(ISP)) + AWG6 * UE(IM22(ISP))        &
-               + AWG7 * UE(IM23(ISP)) + AWG8 * UE(IM24(ISP))
+      DO ISP=1, NSPECX
+        E00    =        UE(ISP,ISEA)
+        EP1    = AWG1 * UE(IP11(ISP),ISEA) + AWG2 * UE(IP12(ISP),ISEA) &
+               + AWG3 * UE(IP13(ISP),ISEA) + AWG4 * UE(IP14(ISP),ISEA)
+        EM1    = AWG5 * UE(IM11(ISP),ISEA) + AWG6 * UE(IM12(ISP),ISEA) &
+               + AWG7 * UE(IM13(ISP),ISEA) + AWG8 * UE(IM14(ISP),ISEA)
+        EP2    = AWG1 * UE(IP21(ISP),ISEA) + AWG2 * UE(IP22(ISP),ISEA) &
+               + AWG3 * UE(IP23(ISP),ISEA) + AWG4 * UE(IP24(ISP),ISEA)
+        EM2    = AWG5 * UE(IM21(ISP),ISEA) + AWG6 * UE(IM22(ISP),ISEA) &
+               + AWG7 * UE(IM23(ISP),ISEA) + AWG8 * UE(IM24(ISP),ISEA)
 !
 ! 3.b Contribution to interactions
 !
@@ -321,51 +341,45 @@
         SA2A   = E00 * ( EP2*DAL1 + EM2*DAL2 )
         SA2B   = SA2A - EP2*EM2*DAL3
 !
-        SA1 (ISP) = FACTOR * SA1B
-        SA2 (ISP) = FACTOR * SA2B
+        SA1 (ISP,ISEA) = FACTOR * SA1B
+        SA2 (ISP,ISEA) = FACTOR * SA2B
 !
-        DA1C(ISP) = CONS * AF11(ISP) * ( SA1A + SA1B )
-        DA1P(ISP) = FACTOR * ( DAL1*E00 - DAL3*EM1 )
-        DA1M(ISP) = FACTOR * ( DAL2*E00 - DAL3*EP1 )
+        DA1C(ISP,ISEA) = CONS * AF11(ISP) * ( SA1A + SA1B )
+        DA1P(ISP,ISEA) = FACTOR * ( DAL1*E00 - DAL3*EM1 )
+        DA1M(ISP,ISEA) = FACTOR * ( DAL2*E00 - DAL3*EP1 )
 !
-        DA2C(ISP) = CONS * AF11(ISP) * ( SA2A + SA2B )
-        DA2P(ISP) = FACTOR * ( DAL1*E00 - DAL3*EM2 )
-        DA2M(ISP) = FACTOR * ( DAL2*E00 - DAL3*EP2 )
+        DA2C(ISP,ISEA) = CONS * AF11(ISP) * ( SA2A + SA2B )
+        DA2P(ISP,ISEA) = FACTOR * ( DAL1*E00 - DAL3*EM2 )
+        DA2M(ISP,ISEA) = FACTOR * ( DAL2*E00 - DAL3*EP2 )
 !
       END DO
 !
 ! 4.  Put source and diagonal term together -------------------------- *
 !
-!!/DEBUGSRC     WRITE(740+IAPROC,*)  'W3SNL1 : sum(SA1)=', sum(SA1)
-!!/DEBUGSRC     WRITE(740+IAPROC,*)  'W3SNL1 : sum(SA2)=', sum(SA2)
-!!/DEBUGSRC     FLUSH(740+IAPROC)
 !GPUNotes loops over full spectrum
+!$ACC LOOP SEQ
       DO ISP=1, NSPEC
+        S(ISP) = CON(ISP,ISEA) * ( -2.*(SA1(ISP,ISEA) + SA2(ISP,ISEA)) &
+                   + AWG1 * (SA1(IC11(ISP),ISEA) + SA2(IC12(ISP),ISEA))&
+                   + AWG2 * (SA1(IC21(ISP),ISEA) + SA2(IC22(ISP),ISEA))&
+                   + AWG3 * (SA1(IC31(ISP),ISEA) + SA2(IC32(ISP),ISEA))&
+                   + AWG4 * (SA1(IC41(ISP),ISEA) + SA2(IC42(ISP),ISEA))&
+                   + AWG5 * (SA1(IC51(ISP),ISEA) + SA2(IC52(ISP),ISEA))&
+                   + AWG6 * (SA1(IC61(ISP),ISEA) + SA2(IC62(ISP),ISEA))&
+                   + AWG7 * (SA1(IC71(ISP),ISEA) + SA2(IC72(ISP),ISEA))&
+                   + AWG8 * (SA1(IC81(ISP),ISEA) + SA2(IC82(ISP),ISEA)))
 !
-        S(ISP) = CON(ISP) * ( - 2. * ( SA1(ISP) + SA2(ISP) )       &
-                   + AWG1 * ( SA1(IC11(ISP)) + SA2(IC12(ISP)) )    &
-                   + AWG2 * ( SA1(IC21(ISP)) + SA2(IC22(ISP)) )    &
-                   + AWG3 * ( SA1(IC31(ISP)) + SA2(IC32(ISP)) )    &
-                   + AWG4 * ( SA1(IC41(ISP)) + SA2(IC42(ISP)) )    &
-                   + AWG5 * ( SA1(IC51(ISP)) + SA2(IC52(ISP)) )    &
-                   + AWG6 * ( SA1(IC61(ISP)) + SA2(IC62(ISP)) )    &
-                   + AWG7 * ( SA1(IC71(ISP)) + SA2(IC72(ISP)) )    &
-                   + AWG8 * ( SA1(IC81(ISP)) + SA2(IC82(ISP)) ) )
-!
-        D(ISP) =  - 2. * ( DA1C(ISP) + DA2C(ISP) )                 &
-                + SWG1 * ( DA1P(IC11(ISP)) + DA2P(IC12(ISP)) )     &
-                + SWG2 * ( DA1P(IC21(ISP)) + DA2P(IC22(ISP)) )     &
-                + SWG3 * ( DA1P(IC31(ISP)) + DA2P(IC32(ISP)) )     &
-                + SWG4 * ( DA1P(IC41(ISP)) + DA2P(IC42(ISP)) )     &
-                + SWG5 * ( DA1M(IC51(ISP)) + DA2M(IC52(ISP)) )     &
-                + SWG6 * ( DA1M(IC61(ISP)) + DA2M(IC62(ISP)) )     &
-                + SWG7 * ( DA1M(IC71(ISP)) + DA2M(IC72(ISP)) )     &
-                + SWG8 * ( DA1M(IC81(ISP)) + DA2M(IC82(ISP)) )
+        D(ISP) =  - 2. * ( DA1C(ISP,ISEA) + DA2C(ISP,ISEA) )           &
+                + SWG1 * ( DA1P(IC11(ISP),ISEA) + DA2P(IC12(ISP),ISEA))&
+                + SWG2 * ( DA1P(IC21(ISP),ISEA) + DA2P(IC22(ISP),ISEA))&
+                + SWG3 * ( DA1P(IC31(ISP),ISEA) + DA2P(IC32(ISP),ISEA))&
+                + SWG4 * ( DA1P(IC41(ISP),ISEA) + DA2P(IC42(ISP),ISEA))&
+                + SWG5 * ( DA1M(IC51(ISP),ISEA) + DA2M(IC52(ISP),ISEA))&
+                + SWG6 * ( DA1M(IC61(ISP),ISEA) + DA2M(IC62(ISP),ISEA))&
+                + SWG7 * ( DA1M(IC71(ISP),ISEA) + DA2M(IC72(ISP),ISEA))&
+                + SWG8 * ( DA1M(IC81(ISP),ISEA) + DA2M(IC82(ISP),ISEA))
 !
       END DO
-!!/DEBUGSRC     WRITE(740+IAPROC,*)  'W3SNL1 : sum(S)=', sum(S)
-!!/DEBUGSRC     WRITE(740+IAPROC,*)  'W3SNL1 : sum(D)=', sum(D)
-!!/DEBUGSRC     FLUSH(740+IAPROC)
 !
 ! ... Test output :
 !
@@ -477,12 +491,13 @@
                                  IF5(:), IF6(:), IF7(:), IF8(:),      &
                                  IT1(:), IT2(:), IT3(:), IT4(:),      &
                                  IT5(:), IT6(:), IT7(:), IT8(:)
+                         
       REAL                    :: DELTH3, DELTH4, LAMM2, LAMP2, CTHP,  &
                                  WTHP, WTHP1, CTHM, WTHM, WTHM1,      &
                                  XFRLN, WFRP, WFRP1, WFRM, WFRM1, FR, &
                                  AF11A
 !/
-!/ ------------------------------------------------------------------- /
+                         
 !/
 !
       NFR     = NK
@@ -665,7 +680,15 @@
       SWG7   = AWG7**2
       SWG8   = AWG8**2
 !
-      RETURN
+!$ACC ENTER DATA COPYIN(NFR,NFRHGH, NFRCHG,NSPECX, NSPECY)            &
+!$ACC            COPYIN(IP11, IP12, IP13, IP14, IM11, IM12, IM13, IM14)&
+!$ACC            COPYIN(IP21, IP22, IP23, IP24, IM21, IM22, IM23, IM24)&
+!$ACC            COPYIN(IC11, IC12, IC21, IC22, IC31, IC32, IC41, IC42)&
+!$ACC            COPYIN(IC51, IC52, IC61, IC62, IC71, IC72, IC81, IC82)&
+!$ACC            COPYIN(DAL1, DAL2, DAL3, AF11)                        &
+!$ACC            COPYIN(AWG1, AWG2, AWG3, AWG4, AWG5, AWG6, AWG7, AWG8)&
+!$ACC            COPYIN(SWG1, SWG2, SWG3, SWG4, SWG5, SWG6, SWG7, SWG8)
+RETURN
 !
 ! Formats
 !

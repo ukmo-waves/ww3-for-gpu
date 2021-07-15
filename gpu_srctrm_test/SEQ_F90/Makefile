@@ -4,7 +4,16 @@ OBJ=obj
 
 ## PGI Fortran:
 FC=nvfortran
-FFLAGS= -module $(MOD) -O2 -acc -ta=tesla,managed,cuda10.2 -Minfo=acc
+
+ifeq ($(MODE),acc)
+FFLAGS= -module $(MOD) -O2 -acc -DMM -ta=tesla,managed -Minfo=acc
+#FFLAGS= -module $(MOD) -O2 -acc -ta=tesla
+endif
+
+ifeq ($(MODE),seq)
+FFLAGS= -module $(MOD) -O2
+endif
+
 LIBS=
 
 ## GNU Fortran
@@ -29,11 +38,6 @@ GRID_OBJS=$(addprefix $(OBJ)/, constants.o w3servmd.o w3gsrumd.o w3arrymd.o \
 	w3adatmd.o w3snl1md.o w3src4md.o w3parall.o w3iogrmd.o w3triamd.o \
         ww3_grid.o)
 
-OUTF_OBJS=$(addprefix $(OBJ)/, constants.o w3servmd.o w3timemd.o w3arrymd.o \
-	w3dispmd.o w3gsrumd.o w3parall.o wmmdatmd.o w3gdatmd.o w3wdatmd.o \
-	w3adatmd.o w3idatmd.o w3odatmd.o w3src4md.o w3snl1md.o w3iogrmd.o \
-	w3iogomd.o ww3_outf.o)
-
 OUTP_OBJS=$(addprefix $(OBJ)/, constants.o w3servmd.o w3timemd.o w3arrymd.o \
 	w3dispmd.o w3gsrumd.o wmmdatmd.o w3parall.o w3triamd.o w3gdatmd.o \
 	w3wdatmd.o w3adatmd.o w3idatmd.o w3odatmd.o w3flx1md.o w3sln1md.o \
@@ -44,7 +48,7 @@ OUTP_OBJS=$(addprefix $(OBJ)/, constants.o w3servmd.o w3timemd.o w3arrymd.o \
 .PHONY: all objdir moddir
 
 # By default, build both the ww3_shel, ww3_grid and ww3_outf targets below:
-all: ww3_shel ww3_grid ww3_outf ww3_outp
+all: ww3_shel ww3_grid ww3_outp
 
 ## Build and link the WW3_SHEL executable:
 ww3_shel: objdir moddir $(SHEL_OBJS)
@@ -53,10 +57,6 @@ ww3_shel: objdir moddir $(SHEL_OBJS)
 ## Build and link the WW3_GRID executable:
 ww3_grid: objdir moddir $(GRID_OBJS)
 	$(FC) $(FFLAGS) $(LIBS) -o ww3_grid $(GRID_OBJS)
-
-## Build and link the WW3_OUTF executable:
-ww3_outf: objdir moddir $(OUTF_OBJS)
-	$(FC) $(FFLAGS) $(LIBS) -o ww3_outf $(OUTF_OBJS)
 
 ## Build and link the WW3_OUTP executable:
 ww3_outp: objdir moddir $(OUTP_OBJS)
@@ -79,7 +79,7 @@ $(OBJ)/%.o:%.F90
 
 ## Clean:
 clean: 
-	rm -f ww3_grid ww3_shel ww3_outf $(MOD)/*.mod $(OBJ)/* 
+	rm -f ww3_grid ww3_shel ww3_outp $(MOD)/* *.mod $(OBJ)/* 
 
 
 ## Specific dependencies of each module:
@@ -158,8 +158,6 @@ $(OBJ)/wmmdatmd.o : wmmdatmd.F90 w3macros.h $(OBJ)/constants.o $(OBJ)/w3gdatmd.o
 $(OBJ)/ww3_grid.o : ww3_grid.F90 w3macros.h $(OBJ)/constants.o $(OBJ)/w3arrymd.o $(OBJ)/w3dispmd.o $(OBJ)/w3gdatmd.o $(OBJ)/w3gsrumd.o $(OBJ)/w3iogrmd.o $(OBJ)/w3nmlgridmd.o $(OBJ)/w3odatmd.o $(OBJ)/w3servmd.o $(OBJ)/w3timemd.o $(OBJ)/w3triamd.o 
 
 $(OBJ)/ww3_shel.o : ww3_shel.F90 w3macros.h $(OBJ)/w3adatmd.o $(OBJ)/w3fldsmd.o $(OBJ)/w3gdatmd.o $(OBJ)/w3idatmd.o $(OBJ)/w3initmd.o $(OBJ)/w3iogomd.o $(OBJ)/w3iogrmd.o $(OBJ)/w3iopomd.o $(OBJ)/w3nmlshelmd.o $(OBJ)/w3odatmd.o $(OBJ)/w3servmd.o $(OBJ)/w3timemd.o $(OBJ)/w3wavemd.o $(OBJ)/w3wdasmd.o $(OBJ)/w3wdatmd.o 
-
-$(OBJ)/ww3_outf.o: ww3_outf.F90 w3macros.h $(OBJ)/constants.o $(OBJ)/w3adatmd.o $(OBJ)/w3arrymd.o $(OBJ)/w3gdatmd.o $(OBJ)/w3iogomd.o $(OBJ)/w3iogrmd.o $(OBJ)/w3odatmd.o $(OBJ)/w3servmd.o $(OBJ)/w3timemd.o $(OBJ)/w3wdatmd.o
 
 $(OBJ)/ww3_outp.o: ww3_outp.F90 w3macros.h  $(OBJ)/constants.o $(OBJ)/w3adatmd.o $(OBJ)/w3arrymd.o $(OBJ)/w3bullmd.o $(OBJ)/w3dispmd.o $(OBJ)/w3gdatmd.o $(OBJ)/w3iogrmd.o $(OBJ)/w3iopomd.o $(OBJ)/w3odatmd.o $(OBJ)/w3partmd.o $(OBJ)/w3servmd.o $(OBJ)/w3sln1md.o $(OBJ)/w3snl1md.o $(OBJ)/w3src4md.o $(OBJ)/w3timemd.o $(OBJ)/w3wdatmd.o
 

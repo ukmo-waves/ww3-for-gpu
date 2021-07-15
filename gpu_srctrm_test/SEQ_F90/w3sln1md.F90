@@ -54,6 +54,7 @@
       CONTAINS
 !/ ------------------------------------------------------------------- /
       SUBROUTINE W3SLN1 (K, FHIGH, USTAR, USDIR, S)
+!$ACC ROUTINE SEQ
 !/
 !/                  +-----------------------------------+
 !/                  | WAVEWATCH III           NOAA/NCEP |
@@ -135,8 +136,8 @@
 ! 10. Source code :
 !
 !/ ------------------------------------------------------------------- /
-      USE CONSTANTS
-      USE W3GDATMD, ONLY: NTH, NK, ECOS, ESIN, SIG, SLNC1, FSPM, FSHF
+      USE CONSTANTS,ONLY: GRAV
+      USE W3GDATMD, ONLY: NTH, NK, ECOS, ESIN, SIG, SLNC1,FSPM,FSHF
       USE W3ODATMD, ONLY: NDSE, NDST
       USE W3SERVMD, ONLY: EXTCDE
 !/
@@ -146,50 +147,61 @@
 !/ Parameter list
 !/
       REAL, INTENT(IN)        :: K(NK), FHIGH, USTAR, USDIR
-      REAL, INTENT(OUT)       :: S(NTH,NK)
+      REAL, INTENT(OUT)       :: S(NTH, NK)
 !/
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
 !/
       INTEGER                 :: ITH, IK
-      REAL                    :: COSU, SINU, DIRF(NTH), FAC, FF1, FF2, &
-                                 FFILT, RFR, WNF(NK)
+      REAL                    :: COSU, SINU, FAC, FF1, FF2, &
+                                 FFILT, RFR
+      REAL                    :: DIRF(NTH), WNF(NK)
 !/
 !/ ------------------------------------------------------------------- /
 !/
 !
+!GPUNotes now running entire subroutine on GPU
 ! 1.  Set up factors ------------------------------------------------- *
 !
       COSU   = COS(USDIR)
       SINU   = SIN(USDIR)
-!
-!GPUNotes loop over directions
-      DO ITH=1, NTH
-        DIRF(ITH) = MAX ( 0. , (ECOS(ITH)*COSU+ESIN(ITH)*SINU) )**4
-      END DO
 !
       FAC    = SLNC1 * USTAR**4
       FF1    = FSPM * GRAV/(28.*USTAR)
       FF2    = FSHF * MIN(SIG(NK),FHIGH)
       FFILT  = MIN ( MAX(FF1,FF2) , 2.*SIG(NK) )
 !
+!GPUNotes loop over directions
+      DIRF(:) = MAX ( 0. , (ECOS(:)*COSU+ESIN(:)*SINU) )**4
+!
+!      FAC    = SLNC1 * USTAR**4
+!      FF1    = FSPM * GRAV/(28.*USTAR)
+!      FF2    = FSHF * MIN(SIG(NK),FHIGH)
+!      FFILT  = MIN ( MAX(FF1,FF2) , 2.*SIG(NK) )
+!
 !GPUNotes loop over frequencies no dependence on above
+!$ACC LOOP 
       DO IK=1, NK
         RFR    = SIG(IK) / FFILT
         IF ( RFR .LT. 0.5 ) THEN
-            WNF(IK) = 0.
-          ELSE
-            WNF(IK) = FAC / K(IK) * EXP(-RFR**(-4))
+          WNF(IK) = 0.
+        ELSE
+          WNF(IK) = FAC / K(IK) * EXP(-RFR**(-4))
         END IF
       END DO
 !
 ! 2.  Compose source term -------------------------------------------- *
 !
-!GPUNotes loop over frequencies fills array using arrays from prior 2 loops
+!GPUNotes loop over frequencies
+!GPUNotes replaced array format with loop in order to use ACC LOOP
+!statement
+
+!$ACC LOOP COLLAPSE(2)
       DO IK=1, NK
-        S(:,IK) = WNF(IK) * DIRF(:)
+        DO ITH=1, NTH
+          S(ITH,IK) = WNF(IK) * DIRF(ITH)
+        END DO
       END DO
-!
       RETURN
 !
 ! Formats

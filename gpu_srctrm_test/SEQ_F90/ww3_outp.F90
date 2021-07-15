@@ -171,7 +171,7 @@
       USE W3ODATMD, ONLY: W3SETO, W3NOUT
       USE W3IOGRMD, ONLY: W3IOGR
       USE W3IOPOMD, ONLY: W3IOPO
-      USE W3SERVMD, ONLY : ITRACE, NEXTLN, EXTCDE
+      USE W3SERVMD, ONLY: ITRACE, NEXTLN, EXTCDE
       USE W3TIMEMD, ONLY: STME21, TICK21, DSEC21
 !/
       USE W3GDATMD
@@ -219,6 +219,11 @@
 ! 1.  IO set-up.
 !
       CALL W3NMOD ( 1, 6, 6 )
+      ALLOCATE(MPARS(1)%SLNPS)
+      ALLOCATE(MPARS(1)%SRCPS)
+      ALLOCATE(MPARS(1)%SNLPS)
+      ALLOCATE(MPARS(1)%SCHMS)
+      ALLOCATE(MPARS(1)%NPARS)
       CALL W3SETG ( 1, 6, 6 )
       CALL W3NDAT (    6, 6 )
       CALL W3SETW ( 1, 6, 6 )
@@ -1286,9 +1291,9 @@
                 TAUWY  = 0.
                 USTAR  = 1.
 !
-                CALL W3SPR4 (A, CG, WN, EMEAN, FMEAN,  FMEAN1,        &
-                             WNMEAN, AMAX, UABS, UDIRR, USTAR, USTD,&
-                             TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS )
+                CALL W3SPR4 (A, CG, WN, EMEAN, FMEAN,  FMEAN1,         &
+                             WNMEAN, AMAX, UABS, UDIRR, USTAR, USTD,   &
+                             TAUWX, TAUWY, CD, Z0, CHARN, LLWS,FMEANWS)
 !
                 DO ITT=1, 3
                   IX=1
@@ -1298,7 +1303,7 @@
                                TAUWNX, TAUWNY, XIN, DIA, LLWS, IX, IY, LAMBDA )
                   CALL W3SPR4 (A, CG, WN, EMEAN, FMEAN,  FMEAN1,      &
                              WNMEAN, AMAX, UABS, UDIRR, USTAR, USTD,&
-                             TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS )
+                             TAUWX, TAUWY, CD, Z0, CHARN, LLWS,FMEANWS)
                   END DO
 !
 ! Add alternative flux calculations here as part of !/ST2 option ....
@@ -1347,12 +1352,12 @@
 !
                 CALL W3SPR4 (A, CG, WN, EMEAN, FMEAN,  FMEAN1,        &
                              WNMEAN, AMAX, UABS, UDIRR, USTAR, USTD,&
-                             TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS )
+                             TAUWX, TAUWY, CD, Z0, CHARN, LLWS,FMEANWS)
 !
                 DO ITT=1, 3
                 CALL W3SPR4 (A, CG, WN, EMEAN, FMEAN, FMEAN1,        &
                              WNMEAN, AMAX, UABS, UDIRR, USTAR, USTD,&
-                             TAUWX, TAUWY, CD, Z0, CHARN, LLWS, FMEANWS )
+                             TAUWX, TAUWY, CD, Z0, CHARN, LLWS,FMEANWS)
                   CALL W3SIN4 ( A, CG, WN2, UABS, USTAR, DAIR/DWAT,&
                                 ASO(J), UDIRR, Z0, CD,TAUWX, TAUWY, &
                                 TAUWNX, TAUWNY, XIN, DIA, LLWS, IX, IY, LAMBDA )

@@ -1,5 +1,6 @@
 #include "w3macros.h"
 !/ ------------------------------------------------------------------- /
+!/ ------------------------------------------------------------------- /
        PROGRAM W3SHEL
 !/
 !/                  +-----------------------------------+
@@ -260,7 +261,11 @@
  
 !
       USE W3NMLSHELMD
- 
+!
+      ! TODO: Do this indrectly via w3srce? or w3wavemd?
+      USE W3SRC4MD, ONLY: W3SRC4_INIT
+      USE W3SRCEMD, ONLY: W3SRCE_INIT
+      USE W3SNL1MD, ONLY: W3SNL1_INIT 
  
       IMPLICIT NONE
 !
@@ -297,7 +302,7 @@
                              HS(NHMAX,-7:8)
       REAL                :: CLKFIN, CLKFEL
       REAL, ALLOCATABLE   :: X(:), Y(:), XXX(:,:), DATA0(:,:),         &
-                             DATA1(:,:), DATA2(:,:)
+                             DATA1(:,:), DATA2(:,:), COSI(:)
 !
       DOUBLE PRECISION    :: STARTJULDAY, STOPJULDAY
 !
@@ -370,6 +375,11 @@
       CALL W3NOUT (    6, 6 )
       CALL W3NINP (    6, 6 )
 !
+      ALLOCATE(MPARS(1)%NPARS)
+      ALLOCATE(MPARS(1)%SLNPS)
+      ALLOCATE(MPARS(1)%SRCPS)
+      ALLOCATE(MPARS(1)%SNLPS)
+      ALLOCATE(MPARS(1)%SCHMS)
       CALL W3SETG ( 1, 6, 6 )
       CALL W3SETW ( 1, 6, 6 )
       CALL W3SETA ( 1, 6, 6 )
@@ -634,6 +644,7 @@
         ELSE
           FACTOR = 1.E-3
         END IF
+
  
 ! 2.4 Output dates
  
@@ -1281,8 +1292,6 @@
  
  
  
- 
- 
 !
 ! ----------------
 !
@@ -1472,9 +1481,8 @@
 ! 5.  Initializations
 !
  
-      IF ( IAPROC .EQ. NAPOUT ) WRITE (NDSO,951) 'Wave model ...'
 !
-     CALL W3INIT ( 1, .FALSE., 'ww3', NDS, NTRACE, ODAT, FLGRD, FLGR2, FLGD,    &
+      CALL W3INIT ( 1, .FALSE., 'ww3', NDS, NTRACE, ODAT, FLGRD, FLGR2, FLGD,    &
                    FLG2, NPTS, X, Y, PNAMES, IPRT, PRTFRM, MPI_COMM,   &
                    FLAGSTIDEIN=FLAGSTIDE )
 !
@@ -1515,7 +1523,6 @@
 !        CALL FLUSH(740+IAPROC)
 !        CALL EXTCDE(666)
 !      ENDIF
- 
  
       IF ( .NOT. FLFLG ) THEN
 !
@@ -1854,7 +1861,21 @@
 !      CALL PRINT_MY_TIME( "Wave model time step - W3SHEL", NDTO )
       CALL WAV_MY_WTIME(sTime1)
 
+!     Initialise source terms SCRATCH variables
+ 
+!     TODO: probably want to do this indirectly via w3srcemd
+      WRITE(0,*) "W3SRC4_INIT (WW3_SHEL): NK/NTH/NSPEC: ", NK, NTH, NSPEC
+      CALL W3SRC4_INIT()
+ 
+!     TODO: probably want to do this indirectly via w3srcemd
+      WRITE(0,*) "W3SRCE_INIT (WW3_SHEL): NK/NTH/NSPEC: ", NK, NTH, NSPEC
+      CALL W3SRCE_INIT()
+
+      IF ( IAPROC .EQ. NAPOUT ) WRITE (NDSO,951) 'Wave model ...'
+
+      CALL W3SNL1_INIT()
       TIME0  = TTIME
+
 !
       CALL W3WAVE ( 1, ODAT, TIME0                                    &
                   )
@@ -1901,8 +1922,8 @@
           IF ( IAPROC .EQ. NAPOUT ) WRITE (NDSO,*) ' '
           CALL W3WAVE ( 1, ODAT, TIME0                                 &
                       )
+          END IF
         END IF
-      END IF
 !
       CALL WAV_MY_WTIME(eTime2)
       T2 = eTime2 - sTime2

@@ -220,10 +220,9 @@
       USE CONSTANTS
       USE W3GDATMD
       USE W3ODATMD
-      USE W3SRC4MD, ONLY: INSIN4, TAUT, TAUHFT, TAUHFT2, &
-                          DELU, DELTAUW, DELUST, &
-                          DELALP, DELTAIL, &
-                          DIKCUMUL
+      USE W3SRC4MD, ONLY: INSIN4, TAUT, TAUHFT, TAUHFT2, DELU, DELTAUW,&
+                          DELUST, DELALP, DELTAIL, DIKCUMUL, IUSTAR,   &
+                          IALPHA, ILEVTAIL, ITAUMAX, JUMAX
       USE W3SNL1MD, ONLY: INSNL1
       USE W3TIMEMD, ONLY: NOLEAP
       USE W3SERVMD, ONLY: EXTCDE
@@ -267,7 +266,6 @@
 !/ ------------------------------------------------------------------- /
 !/
 !
- 
  
       MESSAGE =(/ '     MOD DEF FILE WAS GENERATED WITH A DIFFERENT    ', &
                   '     WW3 VERSION OR USING A DIFFERENT SWITCH FILE.  ', &
@@ -376,7 +374,7 @@
           NTH    = MTH
           NK2    = NK + 2
           NSPEC  = NK * NTH
-!$ACC ENTER DATA COPYIN(NTH, NK)
+!$ACC ENTER DATA COPYIN(NK,NK2, NTH, NSPEC, NSEAL)
 !
           IF ( IDTST .NE. IDSTR ) THEN
               IF ( IAPROC .EQ. NAPERR )                               &
@@ -511,8 +509,8 @@
               COUNTCON=0
               WRITE (NDSM)                                            &
                 X0, Y0, SX, SY, DXYMAX, XYB, TRIGP, TRIA,             &
-                LEN, IEN, ANGLE0, ANGLE, SI, MAXX, MAXY,   &
-                DXYMAX, INDEX_CELL, CCON, COUNTCON, IE_CELL,  &
+                LEN, IEN, ANGLE0, ANGLE, SI, MAXX, MAXY,              &
+                DXYMAX, INDEX_CELL, CCON, COUNTCON, IE_CELL,          &
                 POS_CELL, IOBP, IOBPA, IOBDP, IOBPD, IAA, JAA, POSI
             END SELECT !GTYPE
 !
@@ -631,7 +629,8 @@
                MAPWN, MAPTH, DTH, TH, ESIN, ECOS, ES2, ESC, EC2,      &
                XFR, FR1, SIG, SIG2, DSIP, DSII, DDEN, DDEN2, FTE,     &
                FTF, FTWN, FTTR, FTWL, FACTI1, FACTI2, FACHFA, FACHFE
-!$ACC ENTER DATA COPYIN(DDEN, ES2, ESIN, ECOS, DTH, SIG, EC2)
+!$ACC ENTER DATA COPYIN(DDEN,DDEN2,ES2,ESIN,ECOS,DTH,SIG,SIG2,XFR) &
+!$ACC            COPYIN(EC2,FACHFA,FACHFE,FACTI1,FACTI2,FTF,FTE,ESC,DSIP)
         END IF
  
 !
@@ -682,11 +681,12 @@
           WRITE (NDSM)                                                &
                 FACP, XREL, XFLT, FXFM, FXPM, XFT, XFC, FACSD, FHMAX, &
                 FFACBERG, DELAB, FWTABLE
-        ELSE
+      ELSE
+          ALLOCATE(FWTABLE(0:SIZEFWTABLE))
           READ (NDSM,END=801,ERR=802,IOSTAT=IERR)                     &
                 FACP, XREL, XFLT, FXFM, FXPM, XFT, XFC, FACSD, FHMAX, &
                 FFACBERG, DELAB, FWTABLE
-!$ACC ENTER DATA COPYIN(FWTABLE)
+!$ACC UPDATE DEVICE(FWTABLE,DELAB)
         END IF
 !
 ! Source term parameters --------------------------------------------- *
@@ -700,6 +700,7 @@
           WRITE (NDSM)                            SLNC1, FSPM, FSHF
         ELSE
           READ (NDSM,END=801,ERR=802,IOSTAT=IERR) SLNC1, FSPM, FSHF
+!$ACC ENTER DATA COPYIN(SLNC1, FSPM, FSHF)
         END IF
 !
       IF ( FLTEST ) WRITE (NDST,9049) SLNC1, FSPM, FSHF
@@ -720,6 +721,9 @@
                 IKTAB, DCKI, QBI, SATINDICES, SATWEIGHTS,        &
                 DIKCUMUL, CUMULW
         ELSE
+          ALLOCATE(TAUHFT2(0:IUSTAR,0:IALPHA,0:ILEVTAIL),        &
+                   TAUHFT (0:IUSTAR,0:IALPHA),                   &
+                   TAUT   (0:ITAUMAX,0:JUMAX))
           READ (NDSM,END=801,ERR=802,IOSTAT=IERR)                &
                 ZZWND, AALPHA, ZZ0MAX, BBETA, SSINTHP, ZZALP,    &
                 TTAUWSHELTER, SSWELLFPAR, SSWELLF, SSINBR,       &
@@ -735,10 +739,21 @@
                 DIKCUMUL, CUMULW
 !Use enter data to avoid creating a data structure, only use single
 !data transfer. Placed here to copy over to GPU as soon as it is 
-!read on CPU. 
-!$ACC ENTER DATA COPYIN(TAUT, TAUHFT, TAUHFT2, QBI, IKTAB, DCKI) &
-!$ACC            COPYIN(SSDSC, SSDSISO, SSDSBR,SSDSBRFDF, CUMULW)&
-!$ACC            COPYIN(SATINDICES, SATWEIGHTS, SSDSDTH, SSDSP)  
+!read on CPU. Requires both ENTER DATA and UPDATE DEVICE to work with
+!explicit data transfers
+
+!Required allocation so has different treatment. 
+
+!$ACC ENTER DATA COPYIN(SSINBR, SSDSC, SSDSBR2, SSDSBCK, CUMULW )&
+!$ACC            COPYIN(SSDSISO, SSDSBR, SSDSBRFDF, SSDSBINT    )&
+!$ACC            COPYIN(SATINDICES, SATWEIGHTS, SSDSDTH, SSDSP  )&
+!$ACC            COPYIN(ZZ0RAT, ZZALP, SSINTHP, BBETA, SSWELLF  )&
+!$ACC            COPYIN(ZZWND, AALPHA, TTAUWSHELTER             )&
+!$ACC            COPYIN(SSDSBM, SSTXFTF,  SSTXFTFTAIL, SSTXFTWN )&
+!$ACC            COPYIN(WWNMEANP, WWNMEANPTAIL, FFXFM, FFXPM    )
+!$ACC UPDATE DEVICE(DELALP, DELU, DELTAUW, DELTAIL, DELUST, TAUT,&
+!$ACC              TAUHFT, TAUHFT2)
+
         END IF
 !
 ! ... Nonlinear interactions
@@ -746,10 +761,11 @@
       IF ( WRITE ) THEN
           WRITE (NDSM)                                           &
                 SNLC1, LAM, KDCON, KDMN, SNLS1, SNLS2, SNLS3
-        ELSE
+      ELSE
           READ (NDSM,END=801,ERR=802,IOSTAT=IERR)                &
                 SNLC1, LAM, KDCON, KDMN, SNLS1, SNLS2, SNLS3
-        END IF
+!$ACC ENTER DATA COPYIN(KDCON, KDMN, SNLS1, SNLS2, SNLS3, SNLC1)
+      END IF
 !
       IF ( FLTEST ) WRITE (NDST,9051) SNLC1, LAM,                &
                            KDCON, KDMN, SNLS1, SNLS2, SNLS3

@@ -388,12 +388,11 @@
 !/ Local parameters :
 !/
       INTEGER                 :: IP
-      INTEGER                 :: TCALC(2), IT, IT0, NT, ITEST,        &
+      INTEGER                 :: IT, IT0, NT, ITEST,        &
                                  ITLOC, ITLOCH, NTLOC, ISEA, JSEA,    &
-                                 IX, IY, ISPEC, J, TOUT(2), TLST(2),  &
-                                 REFLED(6), IK, ITH, IS, NKCFL
+                                 IX, IY, ISPEC, J, IK, ITH, IS, NKCFL
       INTEGER                 :: ISP, IP_glob
-      INTEGER                 :: TTEST(2),DTTEST
+      INTEGER                 :: DTTEST
       REAL                    :: ICEDAVE
 !
       INTEGER                 :: IXrel
@@ -401,13 +400,14 @@
                                  DTL0, DTI0, DTI10, DTI50,            &
                                  DTGA, DTG, DTGpre, DTRES,            &
                                  FAC, VGX, VGY, FACK, FACTH,          &
-                                 FACX, XXX, REFLEC(4),                &
+                                 FACX, XXX,                &
                                  DELX, DELY, DELA, DEPTH, D50, PSIC
-     REAL                     :: VSioDummy(NSPEC), VDioDummy(NSPEC), VAoldDummy(NSPEC)
+     REAL,ALLOCATABLE         :: VSioDummy(:), VDioDummy(:), VAoldDummy(:)
      LOGICAL                  :: SHAVETOTioDummy
 !
-      REAL, ALLOCATABLE       :: FIELD(:)
-      REAL                    :: TMP1(4), TMP2(3), TMP3(2), TMP4(2)
+      INTEGER, ALLOCATABLE    :: TCALC(:), REFLED(:), TOUT(:), TLST(:),&
+                                 TTEST(:)
+      REAL, ALLOCATABLE       :: FIELD(:),  REFLEC(:)
 !
 ! Orphaned arrays from old data structure
 !
@@ -428,14 +428,15 @@
       CHARACTER(LEN=17)       :: IDACT
       CHARACTER(LEN=13)       :: OUTID
       CHARACTER(LEN=23)       :: IDTIME
+      
       INTEGER eIOBP
       INTEGER ITH_F
 
 !!LS  Newly added time varibles
       REAL(8)                 :: sTime1, eTime1, T1, SIN4TOT, SPR4TOT, &
-                                 SIN4T, SPR4T
+                                 SIN4T, SPR4T, SDS4T, SDS4TOT
       CHARACTER(LEN=30)       :: S1
-      CHARACTER(LEN=34)       :: SIN4S, SPR4S
+      CHARACTER(LEN=34)       :: SIN4S, SPR4S, SDS4S
 !
 !/
 
@@ -446,14 +447,19 @@
 !
 ! 0.a Set pointers to data structure
 !
+      WRITE(0,*)'TAG: W3WAVE'
+
       IF ( IOUTP  .NE. IMOD ) CALL W3SETO ( IMOD, NDSE, NDST )
       IF ( IGRID  .NE. IMOD ) CALL W3SETG ( IMOD, NDSE, NDST )
       IF ( IWDATA .NE. IMOD ) CALL W3SETW ( IMOD, NDSE, NDST )
       IF ( IADATA .NE. IMOD ) CALL W3SETA ( IMOD, NDSE, NDST )
       IF ( IIDATA .NE. IMOD ) CALL W3SETI ( IMOD, NDSE, NDST )
  
+!      
+      ALLOCATE(TAUWX(NSEAL), TAUWY(NSEAL), TCALC(2), REFLED(6),TOUT(2),&
+               TLST(2), TTEST(2),  REFLEC(4), VSioDummy(NSPEC), &
+               VDioDummy(NSPEC), VAoldDummy(NSPEC))
 !
-      ALLOCATE(TAUWX(NSEAL), TAUWY(NSEAL))
 !
       IF ( PRESENT(STAMP) ) THEN
         TSTAMP = STAMP
@@ -502,8 +508,9 @@
         FACX   =  1.
       END IF
 !
-      TAUWX  = 0.
-      TAUWY  = 0.
+!CODENotes: Added array syntax.
+      TAUWX(:)  = 0.
+      TAUWY(:)  = 0.
 !
 ! 0.d Test output
 !
@@ -606,7 +613,7 @@
 !GPUNotes loop over seapoints
       DO
 !      DO JSEA = 1, NSEAL
-!        DO IS = 1, NSPEC
+!        DO NSPECIS = 1, NSPEC
 !          IF (VA(IS, JSEA) .LT. 0.) THEN
 !            WRITE(740+IAPROC,*) 'TEST W3WAVE 2', VA(IS,JSEA)
 !            CALL FLUSH(740+IAPROC)
@@ -1130,6 +1137,7 @@
 
           IF ( FLSOU ) THEN
 !
+            CALL WAV_MY_WTIME(sTime1)
             D50=0.0002
             REFLEC(:)=0.
             REFLED(:)=0
@@ -1137,54 +1145,32 @@
 !
             SPR4TOT=0.
             SIN4TOT=0.
-!GPUNotes Outer seapoint loop for source term calculations
-            CALL WAV_MY_WTIME(sTime1)
-            DO JSEA=1, NSEAL
-              CALL INIT_GET_ISEA(ISEA, JSEA)
-              IX     = MAPSF(ISEA,1)
-              IY     = MAPSF(ISEA,2)
-              DELA=1.
-              DELX=1.
-              DELY=1.
-!
-              IF ( MAPSTA(IY,IX) .EQ. 1 .AND. FLAGST(ISEA)) THEN
-                TMP1   = WHITECAP(JSEA,1:4)
-                TMP2   = BEDFORMS(JSEA,1:3)
-                TMP3   = TAUBBL(JSEA,1:2)
-                TMP4   = TAUICE(JSEA,1:2)
-                CALL W3SRCE(srce_direct, IT, JSEA, IX, IY, IMOD, &
-                            VAoldDummy, VA(:,JSEA),                     &
+            SDS4TOT=0.
+
+!CODENotes: Specifying the correct bounds for input variables here, and 
+! on the declaration inside the fuction are critical to avoid confusing 
+! validation errors.
+
+                CALL W3SRCE(srce_direct, IT, IMOD, &
+                            VAoldDummy, VA(:,:),                     &
                             VSioDummy, VDioDummy, SHAVETOTioDummy,      &
-                            ALPHA(1:NK,JSEA), WN(1:NK,ISEA),            &
-                            CG(1:NK,ISEA), DW(ISEA), U10(ISEA),         &
-                            U10D(ISEA), AS(ISEA), UST(ISEA),            &
-                            USTDIR(ISEA), CX(ISEA), CY(ISEA),           &
-                            ICE(ISEA), ICEH(ISEA), ICEF(ISEA),          &
-                            ICEDMAX(ISEA),                              &
-                            REFLEC, REFLED, DELX, DELY, DELA,           &
-                            TRNX(IY,IX), TRNY(IY,IX), BERG(ISEA),       &
-                            FPIS(ISEA), DTDYN(JSEA),                    &
-                            FCUT(JSEA), DTG, TAUWX(JSEA), TAUWY(JSEA),  &
-                            TAUOX(JSEA), TAUOY(JSEA), TAUWIX(JSEA),     &
-                            TAUWIY(JSEA), TAUWNX(JSEA),                 &
-                            TAUWNY(JSEA),  PHIAW(JSEA), CHARN(JSEA),    &
-                            TWS(JSEA), PHIOC(JSEA), TMP1, D50, PSIC,TMP2,&
-                            PHIBBL(JSEA), TMP3, TMP4 , PHICE(JSEA),     &
-                            ASF(ISEA), SIN4T, SPR4T)
-                SIN4TOT = SIN4TOT + SIN4T
-                SPR4TOT = SPR4TOT + SPR4T
-                WHITECAP(JSEA,1:4) = TMP1
-                BEDFORMS(JSEA,1:3) = TMP2
-                TAUBBL(JSEA,1:2) = TMP3
-                TAUICE(JSEA,1:2) = TMP4
-              ELSE
-                UST   (ISEA) = UNDEF
-                USTDIR(ISEA) = UNDEF
-                DTDYN (JSEA) = UNDEF
-                FCUT  (JSEA) = UNDEF
-!               VA(:,JSEA)  = 0.
-              END IF
-            END DO
+                            ALPHA(1:NK,1:NSEAL), WN(1:NK,1:NSEAL),            &
+                            CG(1:NK,1:NSEAL), DW(:), U10(:),         &
+                            U10D(:), AS(:), UST(:),            &
+                            USTDIR(:), CX(:), CY(:),           &
+                            ICE(:), ICEH(:), ICEF(:),          &
+                            ICEDMAX(:),                              &
+                            REFLEC(:), REFLED(:),            &
+                            TRNX(:,:), TRNY(:,:), BERG(:),       &
+                            FPIS(:), DTDYN(:),                    &
+                            FCUT(:), DTG, TAUWX(:), TAUWY(:), &
+                            TAUOX(:), TAUOY(:), TAUWIX(:),     &
+                            TAUWIY(:), TAUWNX(:),                 &
+                            TAUWNY(:),  PHIAW(:), CHARN(:),    &
+                            TWS(:), PHIOC(:), WHITECAP(:,1:4), D50,PSIC,&
+                            BEDFORMS(:,1:3), PHIBBL(:), TAUBBL(:,1:2), &
+                            TAUICE(:,1:2), PHICE(:), ASF(:),&
+                            SIN4T, SPR4T, SDS4T)
 !GPUNotes end of seapoint loop for source terms  
 !
             CALL WAV_MY_WTIME(eTime1)
@@ -1195,6 +1181,8 @@
             WRITE(NDTO,101) SIN4S, SIN4TOT
             SPR4S = 'Total of W3SPR4 subroutines - '
             WRITE(NDTO,101) SPR4S, SPR4TOT
+            SDS4S = 'Total of W3SDS4 subroutines - '
+            WRITE(NDTO,101) SDS4S, SDS4TOT
 
 !
 ! This barrier is from older code versions. It has been removed in 3.11
@@ -1494,7 +1482,7 @@
 !
 ! Formats
 !
-  101 FORMAT ('TIMESTAMP : ', A, F8.6)
+  101 FORMAT ('TIMESTAMP : ', A, F12.6)
   900 FORMAT (4X,I6,'|',I6,'| ', A19  ,' | ',A,' | ',A,' |')
   901 FORMAT (4X,I6,'|',I6,'| ',11X,A8,' | ',A,' | ',A,' |')
   902 FORMAT (2X,'--------+------+---------------------+'             &

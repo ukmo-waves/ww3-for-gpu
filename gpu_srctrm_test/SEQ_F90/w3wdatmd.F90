@@ -113,7 +113,7 @@
 !/
       TYPE WDATA
         INTEGER               :: TIME(2), TLEV(2), TICE(2), TIC1(2), TIC5(2)
-        REAL, POINTER         :: VA(:,:), WLV(:), ICE(:), UST(:),     &
+        REAL, ALLOCATABLE     :: VA(:,:), WLV(:), ICE(:), UST(:),     &
                                  USTDIR(:), ASF(:), FPIS(:), BERG(:), &
                                  ICEH(:), ICEF(:), ICEDMAX(:)
 !!/PDLIB     REAL, POINTER     :: VAOLD(:,:)

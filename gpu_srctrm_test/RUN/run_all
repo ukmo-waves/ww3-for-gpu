@@ -6,6 +6,10 @@
 #PBS -e out/run_all.err
 #PBS -o out/run_all.out
 
+#cd ${PBS_O_WORKDIR}
+#module use /projects/metoffice/pgi-compiler/modulefiles
+#module load cuda10.2/toolkit/10.2.89 openmpi/3.1.5/2020 netcdf/4.7.3/openmpi-3.1.5/2020 
+
 ## run the ww3_grid program:
 ## link in the correct *.dev input files:
 ln -sf inp/ww3_grid.nml ./
@@ -26,9 +30,16 @@ ln -sf inp/ww3_outf.inp ./
 #../OMP_F90/ww3_outf
 ../SEQ_F90/ww3_outf
 
+ln -sf inp/ww3_outp.inp ./
+#../OMP_F90/ww3_outp
+../SEQ_F90/ww3_outp
+
 mv *.ww3 out/
 mkdir -p out/ww3_outf/
 rm -rf out/ww3_outf/*
+mkdir -p out/ww3_outp/
+rm -rf out/ww3_outp/*
+mv ww3.68060600.spc out/ww3_outp/
 mv ww3.* out/ww3_outf/
 
 differences=$(diff -q -U 0 out/checking_outf/ out/ww3_outf/ | grep -v ^@ | wc -l)
@@ -40,3 +51,11 @@ else
     echo "There are no differences between checking_outf and this run."
 fi
 
+differences=$(diff -q -U 0 out/checking_outp/ out/ww3_outp/ | grep -v ^@ | wc -l)
+
+if [ $differences != 0 ]
+then
+    echo "There are $differences different lines between checking_outp and ww3_outp."
+else
+    echo "There are no differences between checking_outp and this run."
+fi

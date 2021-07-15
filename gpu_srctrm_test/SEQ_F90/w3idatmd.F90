@@ -147,7 +147,7 @@
         INTEGER               :: TFN(2,-7:8), TC0(2), TW0(2),     &
                                  TDN(2), TG0(2)
         REAL                  :: GA0, GD0, GAN, GDN
-        REAL, POINTER         :: WX0(:,:), WY0(:,:), DT0(:,:),        &
+        REAL, ALLOCATABLE     :: WX0(:,:), WY0(:,:), DT0(:,:),        &
                                  WXN(:,:), WYN(:,:), DTN(:,:),        &
                                  CX0(:,:), CY0(:,:), CXN(:,:),        &
                                  CYN(:,:), WLEV(:,:), ICEI(:,:),      &

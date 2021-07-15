@@ -119,7 +119,7 @@
 !/ ------------------------------------------------------------------- /
 !/ Local parameters
 !/
-       IMPLICIT NONE
+      IMPLICIT NONE
       INTEGER mpimode
       REAL(8), intent(out) :: eTime
       mpimode=0
@@ -1013,6 +1013,7 @@
       END SUBROUTINE
 !/ ------------------------------------------------------------------- /
       SUBROUTINE INIT_GET_ISEA(ISEA, JSEA)
+!$ACC ROUTINE SEQ
 !/ ------------------------------------------------------------------- /
 !/
 !/                  +-----------------------------------+
